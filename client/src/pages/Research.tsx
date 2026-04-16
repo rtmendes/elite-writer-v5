@@ -8,8 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from 'sonner';
 import {
   Search, Plus, Database, Link2, BarChart3, Trash2,
-  FileText, ExternalLink, BookOpen
+  FileText, ExternalLink, BookOpen, Sparkles, Loader2
 } from 'lucide-react';
+import { aiGenerate, hasAnyProvider } from '@/lib/ai-engine';
+import { RESEARCH_SYSTEM_PROMPT, buildResearchPrompt } from '@/lib/ai-prompts';
 
 const DATA_SOURCES = [
   { name: 'FRED (Federal Reserve)', url: 'https://fred.stlouisfed.org/', category: 'Economics' },
@@ -36,6 +38,9 @@ export default function Research() {
   const [dpSource, setDpSource] = useState('');
   const [dataPoints, setDataPoints] = useState<{ label: string; value: string; source: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiAngle, setAiAngle] = useState('');
+  const [isResearching, setIsResearching] = useState(false);
 
   const addSource = () => {
     if (sourceUrl.trim()) {
@@ -137,6 +142,24 @@ export default function Research() {
                   </div>
                 )}
               </div>
+              {hasAnyProvider() && (
+                <Button variant="outline" className="w-full gap-2" disabled={isResearching || !title.trim()}
+                  onClick={async () => {
+                    setIsResearching(true);
+                    try {
+                      const result = await aiGenerate('research', RESEARCH_SYSTEM_PROMPT,
+                        buildResearchPrompt(title, content || 'General analysis'),
+                        { temperature: 0.5, maxTokens: 2000 }
+                      );
+                      setContent(prev => prev ? prev + '\n\n---\nAI Research Brief:\n' + result.text : result.text);
+                      toast.success(`Research brief generated via ${result.model} ($${result.cost.toFixed(4)})`);
+                    } catch (err: any) {
+                      toast.error(err.message || 'AI research failed');
+                    } finally { setIsResearching(false); }
+                  }}>
+                  <Sparkles className="w-4 h-4" /> {isResearching ? 'Researching...' : 'AI Research Brief'}
+                </Button>
+              )}
               <Button onClick={handleCreate} className="w-full">Save Research Note</Button>
             </div>
           </DialogContent>

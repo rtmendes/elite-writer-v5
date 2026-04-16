@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import {
   Newspaper, Bookmark, BookmarkCheck, TrendingUp, Search,
-  ExternalLink, Lightbulb, Plus, Sparkles, RefreshCw
+  ExternalLink, Lightbulb, Plus, Sparkles, RefreshCw, Zap, Brain
 } from 'lucide-react';
+import { aiGenerate, hasAnyProvider } from '@/lib/ai-engine';
+import { SUMMARIZE_SYSTEM_PROMPT } from '@/lib/ai-prompts';
 
 // Demo trending content (simulates Giststack-style feed)
 const DEMO_FEED = [
@@ -29,6 +31,8 @@ export default function Giststack() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [customTopic, setCustomTopic] = useState('');
   const [topics, setTopics] = useState<string[]>(['AI & Technology', 'Business', 'Future of Work']);
+  const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
+  const [dailyBrief, setDailyBrief] = useState<string | null>(null);
 
   // Merge demo feed with saved items
   const allItems = useMemo(() => {
@@ -111,9 +115,30 @@ export default function Giststack() {
               Curate trending stories, extract article ideas, and track topics
             </p>
           </div>
-          <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10" onClick={() => toast.info('Feed refreshed with latest content')}>
-            <RefreshCw className="w-4 h-4" /> Refresh Feed
-          </Button>
+          <div className="flex gap-2">
+            {hasAnyProvider() && (
+              <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10" disabled={isGeneratingBrief}
+                onClick={async () => {
+                  setIsGeneratingBrief(true);
+                  try {
+                    const feedSummary = allItems.slice(0, 8).map(i => `- ${i.title}: ${i.summary} (${i.source})`).join('\n');
+                    const result = await aiGenerate('summarize', SUMMARIZE_SYSTEM_PROMPT,
+                      `Create a daily intelligence brief from these trending stories. Identify the 3 most promising article angles for a business/finance writer:\n\n${feedSummary}`,
+                      { temperature: 0.6, maxTokens: 1000 }
+                    );
+                    setDailyBrief(result.text);
+                    toast.success(`Daily brief generated via ${result.model} ($${result.cost.toFixed(4)})`);
+                  } catch (err: any) {
+                    toast.error(err.message || 'Brief generation failed');
+                  } finally { setIsGeneratingBrief(false); }
+                }}>
+                <Brain className="w-4 h-4" /> {isGeneratingBrief ? 'Generating...' : 'AI Daily Brief'}
+              </Button>
+            )}
+            <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10" onClick={() => toast.info('Feed refreshed with latest content')}>
+              <RefreshCw className="w-4 h-4" /> Refresh Feed
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -148,6 +173,27 @@ export default function Giststack() {
           </div>
         </CardContent>
       </Card>
+
+      {/* AI Daily Brief */}
+      {dailyBrief && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Brain className="w-4 h-4 text-primary" />
+              AI Daily Intelligence Brief
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm leading-relaxed whitespace-pre-wrap">{dailyBrief}</div>
+            <Button variant="outline" size="sm" className="mt-3 gap-1.5 text-xs" onClick={() => {
+              addIdea({ title: 'From Daily Brief', angle: dailyBrief.slice(0, 200), category: 'Business', news_peg: 'AI Daily Brief', status: 'idea' });
+              toast.success('Idea created from brief');
+            }}>
+              <Lightbulb className="w-3 h-3" /> Create Idea from Brief
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content */}
       <Tabs defaultValue="feed" className="space-y-4">

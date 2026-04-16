@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   BookOpen, Search, ExternalLink, Mail, DollarSign,
-  Users, TrendingUp, Filter, ChevronDown
+  Users, TrendingUp, Filter, ChevronDown, Download, Send
 } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { PUBLICATIONS, CATEGORIES, getPublicationTier, type Publication } from '@/lib/publications-data';
 
 export default function Publications() {
@@ -16,6 +17,23 @@ export default function Publications() {
   const [filterTier, setFilterTier] = useState('all');
   const [sortBy, setSortBy] = useState<'name' | 'pay' | 'acceptance'>('name');
   const [selectedPub, setSelectedPub] = useState<Publication | null>(null);
+  const [, navigate] = useLocation();
+
+  function exportCSV() {
+    const headers = ['Name','Category','Tier','Pay Min','Pay Max','Pay Structure','Acceptance Rate','Avg Response Days','Topics','Article Styles','Editors','Emails','Submission URL','Traffic','Notes'];
+    const rows = filtered.map(p => [
+      p.name, p.category, getPublicationTier(p), p.pay_min ?? '', p.pay_max ?? '', p.pay_structure,
+      p.acceptance_rate ?? '', p.avg_response_days ?? '', `"${p.topics}"`, `"${p.article_styles || ''}"`,
+      `"${p.editors.map(e => e.name).join('; ')}"`, `"${p.editors.map(e => e.email || '').join('; ')}"`,
+      p.submission_url, p.traffic_monthly, `"${(p.notes || '').replace(/"/g, '""')}"`
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `elite-writer-publications-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
 
   const filtered = useMemo(() => {
     return PUBLICATIONS.filter(pub => {
@@ -94,6 +112,9 @@ export default function Publications() {
           <option value="acceptance">Sort: Acceptance Rate</option>
         </select>
         <span className="text-xs text-muted-foreground">{filtered.length} results</span>
+        <Button variant="outline" size="sm" className="gap-1.5 text-xs ml-auto" onClick={exportCSV}>
+          <Download className="w-3.5 h-3.5" /> Export CSV
+        </Button>
       </div>
 
       {/* Publications Grid */}
@@ -175,6 +196,9 @@ export default function Publications() {
                     <ExternalLink className="w-3.5 h-3.5" /> Submission Guidelines
                   </Button>
                 </a>
+                <Button className="flex-1 gap-2 text-xs" onClick={() => { setSelectedPub(null); navigate(`/pitches?pub=${selectedPub.id}`); }}>
+                  <Send className="w-3.5 h-3.5" /> Create Pitch
+                </Button>
               </div>
             </div>
           )}

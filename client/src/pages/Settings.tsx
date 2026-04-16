@@ -1,218 +1,368 @@
-import { useState } from 'react';
+// Settings — Multi-LLM Configuration, News APIs, Cost Routing, Token Usage, Enterprise
+// Design: Dark command center, frosted glass cards, violet accents
+
+import { useState, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import {
-  Settings as SettingsIcon, Key, Target, DollarSign,
-  Palette, Database, Download, Upload, Trash2, Info
-} from 'lucide-react';
-import { BRAND_VOICES } from '@/lib/templates';
 import { PUBLICATIONS } from '@/lib/publications-data';
+import { BRAND_VOICES } from '@/lib/templates';
+import {
+  loadAIConfig, saveAIConfig, getProviderStatus, getUsageSummary,
+  loadUsage, type LLMConfig,
+} from '@/lib/ai-engine';
+import {
+  Settings as SettingsIcon, Key, Brain, DollarSign, Database, Download, Upload,
+  Trash2, Save, CheckCircle2, XCircle, Zap, BarChart3, Shield, Globe, Cpu,
+  AlertTriangle, Info,
+} from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function Settings() {
   const { state, updateSettings } = useApp();
-  const [apiKey, setApiKey] = useState(state.settings.openai_key);
-  const [dailyTarget, setDailyTarget] = useState(state.settings.daily_target.toString());
-  const [monthlyGoal, setMonthlyGoal] = useState(state.settings.monthly_revenue_goal.toString());
+  const [aiConfig, setAiConfig] = useState<LLMConfig>(loadAIConfig);
+  const [activeTab, setActiveTab] = useState<'llm' | 'news' | 'writing' | 'financial' | 'usage' | 'data'>('llm');
+
+  const providerStatus = useMemo(() => getProviderStatus(), []);
+  const usageSummary = useMemo(() => getUsageSummary(), []);
+  const usage = useMemo(() => loadUsage(), []);
+
   const [brandVoice, setBrandVoice] = useState(state.settings.brand_voice);
+  const [dailyTarget, setDailyTarget] = useState(state.settings.daily_target);
+  const [revenueGoal, setRevenueGoal] = useState(state.settings.monthly_revenue_goal);
 
-  const handleSave = () => {
-    updateSettings({
-      openai_key: apiKey,
-      daily_target: parseInt(dailyTarget) || 10,
-      monthly_revenue_goal: parseInt(monthlyGoal) || 100000,
-      brand_voice: brandVoice,
-    });
-    toast.success('Settings saved');
-  };
+  function saveAll() {
+    saveAIConfig(aiConfig);
+    updateSettings({ brand_voice: brandVoice, daily_target: dailyTarget, monthly_revenue_goal: revenueGoal });
+    toast.success('All settings saved');
+  }
 
-  const handleExportData = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  function exportData() {
+    const data = { state, aiConfig: { ...aiConfig, openai_key: '***', anthropic_key: '***', openrouter_key: '***', gemini_key: '***' }, usage, exported_at: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `elite-writer-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = `elite-writer-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
     toast.success('Data exported');
-  };
+  }
 
-  const handleImportData = () => {
+  function importData() {
     const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e) => {
+    input.type = 'file'; input.accept = '.json';
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          try {
-            const data = JSON.parse(ev.target?.result as string);
-            localStorage.setItem('elite_writer_v5_state', JSON.stringify(data));
-            toast.success('Data imported — refreshing...');
-            setTimeout(() => window.location.reload(), 1000);
-          } catch {
-            toast.error('Invalid JSON file');
-          }
-        };
-        reader.readAsText(file);
-      }
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (data.state) {
+          localStorage.setItem('elite_writer_v5_state', JSON.stringify(data.state));
+          toast.success('Data imported — reload to apply');
+        }
+      } catch { toast.error('Invalid import file'); }
     };
     input.click();
-  };
+  }
 
-  const handleClearData = () => {
-    if (confirm('Are you sure? This will delete all your data.')) {
+  function clearData() {
+    if (confirm('This will delete ALL data. Are you sure?')) {
       localStorage.removeItem('elite_writer_v5_state');
-      toast.success('Data cleared — refreshing...');
-      setTimeout(() => window.location.reload(), 1000);
+      localStorage.removeItem('elite_writer_ai_config');
+      localStorage.removeItem('elite_writer_ai_usage');
+      window.location.reload();
     }
-  };
+  }
+
+  const tabs = [
+    { id: 'llm' as const, label: 'LLM Providers', icon: Brain },
+    { id: 'news' as const, label: 'News APIs', icon: Globe },
+    { id: 'writing' as const, label: 'Writing', icon: Zap },
+    { id: 'financial' as const, label: 'Financial', icon: DollarSign },
+    { id: 'usage' as const, label: 'Token Usage', icon: BarChart3 },
+    { id: 'data' as const, label: 'Data', icon: Database },
+  ];
+
+  const configuredCount = Object.values(providerStatus).filter(p => p.configured).length;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <SettingsIcon className="w-6 h-6 text-muted-foreground" />
-          Settings
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configure your Elite Writer workspace
-        </p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <SettingsIcon className="w-7 h-7 text-violet-400" /> Settings
+          </h1>
+          <p className="text-sm text-zinc-400 mt-1">{configuredCount} providers configured — Cost mode: {aiConfig.cost_mode}</p>
+        </div>
+        <button onClick={saveAll} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors">
+          <Save className="w-4 h-4" /> Save All
+        </button>
       </div>
 
-      {/* API Configuration */}
-      <Card className="border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Key className="w-4 h-4 text-primary" />
-            API Configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">OpenAI API Key</label>
-            <Input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
-              placeholder="sk-..." />
-            <p className="text-xs text-muted-foreground mt-1">
-              Used for AI-powered scoring, research assistance, and content generation. Your key is stored locally only.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Tab Navigation */}
+      <div className="flex gap-1 p-1 bg-zinc-900/50 rounded-lg border border-zinc-800 overflow-x-auto">
+        {tabs.map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${activeTab === tab.id ? 'bg-violet-600/20 text-violet-300 border border-violet-500/30' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'}`}>
+            <tab.icon className="w-4 h-4" /> {tab.label}
+          </button>
+        ))}
+      </div>
 
-      {/* Writing Preferences */}
-      <Card className="border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Palette className="w-4 h-4 text-primary" />
-            Writing Preferences
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Default Brand Voice</label>
+      {/* LLM Providers Tab */}
+      {activeTab === 'llm' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2"><Cpu className="w-4 h-4 text-violet-400" /> Cost Optimization Mode</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {(['minimum', 'balanced', 'quality'] as const).map(mode => (
+                <button key={mode} onClick={() => setAiConfig(c => ({ ...c, cost_mode: mode }))}
+                  className={`p-3 rounded-lg border text-left transition-all ${aiConfig.cost_mode === mode ? 'border-violet-500 bg-violet-500/10' : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'}`}>
+                  <div className="text-sm font-semibold text-white capitalize">{mode}</div>
+                  <div className="text-xs text-zinc-400 mt-1">
+                    {mode === 'minimum' && 'Free/cheapest models for all tasks. Best for high-volume research.'}
+                    {mode === 'balanced' && 'Free for summaries, standard for drafts. Best cost/quality ratio.'}
+                    {mode === 'quality' && 'Premium models for drafts & edits. Best for final publication content.'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-3">Preferred Provider</h3>
+            <select value={aiConfig.preferred_provider} onChange={e => setAiConfig(c => ({ ...c, preferred_provider: e.target.value as LLMConfig['preferred_provider'] }))}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white">
+              <option value="auto">Auto (best for task + cost)</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="gemini">Google Gemini</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { key: 'openai_key' as const, label: 'OpenAI', desc: 'GPT-4o, GPT-4o Mini, o3-mini', placeholder: 'sk-...' },
+              { key: 'anthropic_key' as const, label: 'Anthropic', desc: 'Claude Sonnet 4, Haiku, Opus 4', placeholder: 'sk-ant-...' },
+              { key: 'openrouter_key' as const, label: 'OpenRouter', desc: '200+ models, free tier available', placeholder: 'sk-or-...' },
+              { key: 'gemini_key' as const, label: 'Google Gemini', desc: 'Gemini 2.0 Flash (free tier)', placeholder: 'AI...' },
+            ].map(provider => (
+              <div key={provider.key} className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">{provider.label}</h3>
+                    <p className="text-xs text-zinc-500">{provider.desc}</p>
+                  </div>
+                  {aiConfig[provider.key] ? (
+                    <span className="flex items-center gap-1 text-xs text-emerald-400"><CheckCircle2 className="w-3 h-3" /> Active</span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-zinc-500"><XCircle className="w-3 h-3" /> Not set</span>
+                  )}
+                </div>
+                <input type="password" value={aiConfig[provider.key]} placeholder={provider.placeholder}
+                  onChange={e => setAiConfig(c => ({ ...c, [provider.key]: e.target.value }))}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600" />
+              </div>
+            ))}
+          </div>
+
+          <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
+              <div className="text-xs text-zinc-400">
+                <p className="font-semibold text-blue-300 mb-1">Intelligent Model Routing</p>
+                <p>The AI engine automatically selects the best model for each task based on your cost mode. In <strong className="text-white">Minimum</strong> mode, scoring and ideas use free Gemini Flash; drafts use GPT-4o Mini. In <strong className="text-white">Quality</strong> mode, drafts use Claude Opus 4 or o3-mini for maximum quality. OpenRouter provides access to 200+ models including free tiers.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* News APIs Tab */}
+      {activeTab === 'news' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-1">Live News Feeds</h3>
+            <p className="text-xs text-zinc-500 mb-4">Connect news APIs to power the Intelligence Feed with real-time trending stories.</p>
+            <div className="space-y-4">
+              {[
+                { key: 'newsapi_key' as const, label: 'NewsAPI', desc: 'newsapi.org — 100 req/day free', placeholder: 'Your NewsAPI key' },
+                { key: 'gnews_key' as const, label: 'GNews', desc: 'gnews.io — 100 req/day free', placeholder: 'Your GNews key' },
+                { key: 'mediastack_key' as const, label: 'MediaStack', desc: 'mediastack.com — 100 req/month free', placeholder: 'Your MediaStack key' },
+              ].map(api => (
+                <div key={api.key} className="flex items-center gap-4">
+                  <div className="w-32 shrink-0">
+                    <div className="text-sm font-medium text-white">{api.label}</div>
+                    <div className="text-xs text-zinc-500">{api.desc}</div>
+                  </div>
+                  <input type="password" value={aiConfig[api.key]} placeholder={api.placeholder}
+                    onChange={e => setAiConfig(c => ({ ...c, [api.key]: e.target.value }))}
+                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600" />
+                  {aiConfig[api.key] ? <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" /> : <XCircle className="w-5 h-5 text-zinc-600 shrink-0" />}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
+              <div className="text-xs text-zinc-400">
+                <p className="font-semibold text-amber-300 mb-1">Free Tier Strategy</p>
+                <p>All three news APIs offer free tiers. Use NewsAPI (100 req/day) as primary, GNews as backup, and MediaStack for international coverage. This gives you 200+ free API calls per day — enough to power a daily intelligence brief without any cost.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Writing Preferences Tab */}
+      {activeTab === 'writing' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-3">Default Brand Voice</h3>
             <select value={brandVoice} onChange={e => setBrandVoice(e.target.value)}
-              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
-              {BRAND_VOICES.map(b => (
-                <option key={b.id} value={b.name}>{b.name} — {b.audience}</option>
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white">
+              {BRAND_VOICES.map(bv => (
+                <option key={bv.id} value={bv.id}>{bv.name} — {bv.audience}</option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Daily Idea Target</label>
-            <Input type="number" value={dailyTarget} onChange={e => setDailyTarget(e.target.value)}
-              placeholder="10" />
-            <p className="text-xs text-muted-foreground mt-1">Number of article ideas to generate per day</p>
+          <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-3">Daily Idea Target</h3>
+            <input type="number" value={dailyTarget} onChange={e => setDailyTarget(Number(e.target.value))}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" min={1} max={50} />
+            <p className="text-xs text-zinc-500 mt-1">Number of article ideas to generate per day</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
-      {/* Financial Goals */}
-      <Card className="border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-emerald-400" />
-            Financial Goals
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Monthly Revenue Goal ($)</label>
-            <Input type="number" value={monthlyGoal} onChange={e => setMonthlyGoal(e.target.value)}
-              placeholder="100000" />
+      {/* Financial Goals Tab */}
+      {activeTab === 'financial' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-3">Monthly Revenue Goal</h3>
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-emerald-400" />
+              <input type="number" value={revenueGoal} onChange={e => setRevenueGoal(Number(e.target.value))}
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" />
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-3">Revenue Projections</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 bg-zinc-800/50 rounded-lg text-center">
+                <div className="text-lg font-bold text-emerald-400">${Math.round(revenueGoal / 4).toLocaleString()}</div>
+                <div className="text-xs text-zinc-500">Weekly Target</div>
+              </div>
+              <div className="p-3 bg-zinc-800/50 rounded-lg text-center">
+                <div className="text-lg font-bold text-violet-400">{Math.ceil(revenueGoal / 750)}</div>
+                <div className="text-xs text-zinc-500">Articles/Month @ $750 avg</div>
+              </div>
+              <div className="p-3 bg-zinc-800/50 rounded-lg text-center">
+                <div className="text-lg font-bold text-amber-400">{Math.ceil(revenueGoal / 750 / 0.2)}</div>
+                <div className="text-xs text-zinc-500">Pitches/Month @ 20% accept</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* System Info */}
-      <Card className="border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Info className="w-4 h-4 text-primary" />
-            System Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Publications in database</span>
-            <Badge variant="outline" className="font-mono">{PUBLICATIONS.length}</Badge>
+      {/* Token Usage Tab */}
+      {activeTab === 'usage' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl text-center">
+              <div className="text-2xl font-bold text-violet-400">${usageSummary.totalCost.toFixed(4)}</div>
+              <div className="text-xs text-zinc-500 mt-1">Total AI Cost</div>
+            </div>
+            <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl text-center">
+              <div className="text-2xl font-bold text-emerald-400">{usageSummary.totalTokens.toLocaleString()}</div>
+              <div className="text-xs text-zinc-500 mt-1">Total Tokens</div>
+            </div>
+            <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl text-center">
+              <div className="text-2xl font-bold text-amber-400">{usage.length}</div>
+              <div className="text-xs text-zinc-500 mt-1">API Calls</div>
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Total ideas</span>
-            <Badge variant="outline" className="font-mono">{state.ideas.length}</Badge>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Total articles</span>
-            <Badge variant="outline" className="font-mono">{state.articles.length}</Badge>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Total pitches</span>
-            <Badge variant="outline" className="font-mono">{state.pitches.length}</Badge>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Research notes</span>
-            <Badge variant="outline" className="font-mono">{state.research.length}</Badge>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Earnings recorded</span>
-            <Badge variant="outline" className="font-mono">{state.earnings.length}</Badge>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Version</span>
-            <Badge variant="outline" className="font-mono">V5.0</Badge>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Data Management */}
-      <Card className="border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Database className="w-4 h-4 text-primary" />
-            Data Management
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-3">
-            <Button variant="outline" className="flex-1 gap-2 text-xs" onClick={handleExportData}>
-              <Download className="w-3.5 h-3.5" /> Export All Data
-            </Button>
-            <Button variant="outline" className="flex-1 gap-2 text-xs" onClick={handleImportData}>
-              <Upload className="w-3.5 h-3.5" /> Import Data
-            </Button>
+          <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-3">Usage by Provider</h3>
+            {Object.entries(usageSummary.byProvider).length === 0 ? (
+              <p className="text-xs text-zinc-500">No usage recorded yet. Start using AI features to see cost tracking.</p>
+            ) : (
+              <div className="space-y-2">
+                {Object.entries(usageSummary.byProvider).map(([provider, data]) => (
+                  <div key={provider} className="flex items-center justify-between p-2 bg-zinc-800/50 rounded-lg">
+                    <div className="text-sm text-white capitalize">{provider}</div>
+                    <div className="flex items-center gap-4 text-xs text-zinc-400">
+                      <span>{data.calls} calls</span>
+                      <span>{data.tokens.toLocaleString()} tokens</span>
+                      <span className="text-emerald-400">${data.cost.toFixed(4)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <Button variant="destructive" className="w-full gap-2 text-xs" onClick={handleClearData}>
-            <Trash2 className="w-3.5 h-3.5" /> Clear All Data
-          </Button>
-        </CardContent>
-      </Card>
 
-      {/* Save */}
-      <Button onClick={handleSave} className="w-full">Save Settings</Button>
+          <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-3">Usage by Task</h3>
+            {Object.entries(usageSummary.byTask).length === 0 ? (
+              <p className="text-xs text-zinc-500">No usage recorded yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {Object.entries(usageSummary.byTask).map(([task, data]) => (
+                  <div key={task} className="flex items-center justify-between p-2 bg-zinc-800/50 rounded-lg">
+                    <div className="text-sm text-white capitalize">{task}</div>
+                    <div className="flex items-center gap-4 text-xs text-zinc-400">
+                      <span>{data.calls} calls</span>
+                      <span className="text-emerald-400">${data.cost.toFixed(4)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Data Management Tab */}
+      {activeTab === 'data' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2"><Shield className="w-4 h-4 text-violet-400" /> System Information</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Publications', value: PUBLICATIONS.length },
+                { label: 'Ideas', value: state.ideas.length },
+                { label: 'Articles', value: state.articles.length },
+                { label: 'Pitches', value: state.pitches.length },
+                { label: 'Research', value: state.research.length },
+                { label: 'Earnings', value: state.earnings.length },
+                { label: 'Feed Items', value: state.giststack.length },
+                { label: 'Version', value: 'V5.1' },
+              ].map(item => (
+                <div key={item.label} className="p-2 bg-zinc-800/50 rounded-lg">
+                  <div className="text-xs text-zinc-500">{item.label}</div>
+                  <div className="text-sm font-semibold text-white">{item.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <button onClick={exportData} className="flex items-center justify-center gap-2 p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl text-sm text-white hover:border-violet-500/50 transition-colors">
+              <Download className="w-4 h-4 text-violet-400" /> Export All
+            </button>
+            <button onClick={importData} className="flex items-center justify-center gap-2 p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl text-sm text-white hover:border-violet-500/50 transition-colors">
+              <Upload className="w-4 h-4 text-blue-400" /> Import Data
+            </button>
+            <button onClick={clearData} className="flex items-center justify-center gap-2 p-3 bg-zinc-900/60 border border-red-500/20 rounded-xl text-sm text-red-400 hover:border-red-500/50 transition-colors">
+              <Trash2 className="w-4 h-4" /> Clear All
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

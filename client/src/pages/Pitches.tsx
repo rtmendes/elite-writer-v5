@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import {
   AlertCircle, Copy, Trash2, Eye
 } from 'lucide-react';
 import { PUBLICATIONS } from '@/lib/publications-data';
+import { aiGenerate, hasAnyProvider } from '@/lib/ai-engine';
+import { buildPitchSystemPrompt, buildPitchPrompt } from '@/lib/ai-prompts';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   draft: { label: 'Draft', color: 'bg-secondary text-secondary-foreground', icon: Clock },
@@ -83,6 +85,18 @@ export default function Pitches() {
   const [pitchTemplate, setPitchTemplate] = useState('standard');
   const [viewPitch, setViewPitch] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Handle URL params from Publications page
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pubId = params.get('pub');
+    if (pubId) {
+      handleSelectPub(pubId);
+      setShowNew(true);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const pubResults = useMemo(() => {
     if (!pubSearch.trim()) return [];
@@ -212,6 +226,34 @@ export default function Pitches() {
                       <option value="personal_narrative">Personal Narrative</option>
                     </select>
                     <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleInsertTemplate}>Insert</Button>
+                    {hasAnyProvider() && (
+                      <Button variant="default" size="sm" className="h-7 text-xs gap-1" disabled={!selectedPubId || isGenerating}
+                        onClick={async () => {
+                          if (!selectedPubId) { toast.error('Select a publication first'); return; }
+                          const pub = PUBLICATIONS.find(p => p.id === selectedPubId);
+                          if (!pub) return;
+                          setIsGenerating(true);
+                          try {
+                            const result = await aiGenerate('pitch',
+                              buildPitchSystemPrompt(pub),
+                              buildPitchPrompt(subject || 'Article pitch', '', subject || 'Business analysis'),
+                              { temperature: 0.8, maxTokens: 1000 }
+                            );
+                            const text = result.text;
+                            const subjectMatch = text.match(/SUBJECT:\s*(.+)/i);
+                            if (subjectMatch && !subject) setSubject(subjectMatch[1].trim());
+                            const bodyText = text.replace(/SUBJECT:\s*.+\n---\n?/i, '').trim();
+                            setBody(bodyText);
+                            toast.success(`Pitch generated via ${result.model} ($${result.cost.toFixed(4)})`);
+                          } catch (err: any) {
+                            toast.error(err.message || 'AI generation failed');
+                          } finally {
+                            setIsGenerating(false);
+                          }
+                        }}>
+                        {isGenerating ? 'Generating...' : 'AI Generate'}
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <textarea value={body} onChange={e => setBody(e.target.value)}

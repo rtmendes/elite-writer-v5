@@ -16,6 +16,8 @@ import {
 import { PUBLICATIONS, matchPublications, type Publication } from '@/lib/publications-data';
 import { scoreArticleLocally, DIMENSION_LABELS, getScoreColor, getScoreBgColor, getTierFromScore } from '@/lib/scoring';
 import { TEMPLATES, BRAND_VOICES, type WritingTemplate } from '@/lib/templates';
+import { aiGenerate, hasAnyProvider } from '@/lib/ai-engine';
+import { SCORING_SYSTEM_PROMPT, buildScoringPrompt, DRAFT_SYSTEM_PROMPT, buildDraftPrompt, EDIT_SYSTEM_PROMPT } from '@/lib/ai-prompts';
 import type { ArticleScores } from '@/lib/store';
 
 export default function Writer() {
@@ -33,6 +35,9 @@ export default function Writer() {
   const [scores, setScores] = useState<ArticleScores | null>(null);
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
   const [sidebarTab, setSidebarTab] = useState('score');
+  const [isAiScoring, setIsAiScoring] = useState(false);
+  const [isAiWriting, setIsAiWriting] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<Array<{category: string; title: string; impact: number; action_items: string[]}>>([]);
 
   const wordCount = useMemo(() => content.trim().split(/\s+/).filter(Boolean).length, [content]);
   const template = TEMPLATES.find(t => t.id === selectedTemplate);
@@ -162,6 +167,58 @@ export default function Writer() {
             </Badge>
           )}
 
+          {hasAnyProvider() && (
+            <>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" disabled={isAiScoring || wordCount < 50}
+                onClick={async () => {
+                  setIsAiScoring(true);
+                  try {
+                    const result = await aiGenerate('score', SCORING_SYSTEM_PROMPT, buildScoringPrompt(content, selectedPub?.name), { temperature: 0.3, maxTokens: 1500 });
+                    const parsed = JSON.parse(result.text.replace(/```json\n?|```/g, '').trim());
+                    const aiScores: ArticleScores = {
+                      clarity_structure: parsed.clarity_structure ?? 5,
+                      hook_engagement: parsed.hook_engagement ?? 5,
+                      voice_tone: parsed.voice_tone ?? 5,
+                      data_evidence: parsed.data_evidence ?? 5,
+                      originality_angle: parsed.originality_angle ?? 5,
+                      publication_fit: parsed.publication_fit ?? 5,
+                      timeliness: parsed.timeliness ?? 5,
+                      actionability: parsed.actionability ?? 5,
+                      expertise_depth: parsed.expertise_depth ?? 5,
+                      readability: parsed.readability ?? 5,
+                      conclusion_cta: parsed.conclusion_cta ?? 5,
+                      overall: parsed.overall ?? 5,
+                    };
+                    setScores(aiScores);
+                    if (parsed.suggestions) setAiSuggestions(parsed.suggestions);
+                    toast.success(`AI scored via ${result.model} ($${result.cost.toFixed(4)})`);
+                  } catch (err: any) {
+                    toast.error('AI scoring failed: ' + (err.message || 'Unknown error'));
+                  } finally { setIsAiScoring(false); }
+                }}>
+                <Sparkles className="w-3 h-3" /> {isAiScoring ? 'Scoring...' : 'AI Score'}
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" disabled={isAiWriting || !title.trim()}
+                onClick={async () => {
+                  setIsAiWriting(true);
+                  try {
+                    const tmpl = TEMPLATES.find(t => t.id === selectedTemplate);
+                    const brand = BRAND_VOICES.find(b => b.id === selectedBrand);
+                    const result = await aiGenerate('draft', DRAFT_SYSTEM_PROMPT,
+                      buildDraftPrompt(title, '', content.slice(0, 2000), tmpl?.name || 'General', brand?.name || 'Professional'),
+                      { temperature: 0.7, maxTokens: 4000 }
+                    );
+                    setContent(prev => prev ? prev + '\n\n---\n\n' + result.text : result.text);
+                    toast.success(`Draft generated via ${result.model} ($${result.cost.toFixed(4)})`);
+                  } catch (err: any) {
+                    toast.error('AI writing failed: ' + (err.message || 'Unknown error'));
+                  } finally { setIsAiWriting(false); }
+                }}>
+                <Zap className="w-3 h-3" /> {isAiWriting ? 'Writing...' : 'AI Draft'}
+              </Button>
+            </>
+          )}
+
           <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => handleExport('md')}>
             <Download className="w-3 h-3" /> Export
           </Button>
@@ -237,6 +294,33 @@ export default function Writer() {
               <div className="text-center py-6">
                 <BarChart3 className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-40" />
                 <p className="text-xs text-muted-foreground">Write at least 50 words to see your score</p>
+              </div>
+            )}
+
+            {/* AI Suggestions */}
+            {aiSuggestions.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-primary">AI Suggestions</p>
+                {aiSuggestions.map((s, i) => (
+                  <Card key={i} className="border-border">
+                    <CardContent className="p-2.5">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium">{s.title}</span>
+                        <Badge variant="outline" className="text-[10px]">
+                          Impact: {'★'.repeat(s.impact)}
+                        </Badge>
+                      </div>
+                      <ul className="space-y-0.5">
+                        {s.action_items.map((item, j) => (
+                          <li key={j} className="text-[11px] text-muted-foreground flex items-start gap-1">
+                            <ChevronRight className="w-3 h-3 shrink-0 mt-0.5 text-primary" />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
 

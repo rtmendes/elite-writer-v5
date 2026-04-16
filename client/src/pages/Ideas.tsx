@@ -13,6 +13,8 @@ import {
   Calendar, Tag, Target, Sparkles
 } from 'lucide-react';
 import { CATEGORIES } from '@/lib/publications-data';
+import { aiGenerate, hasAnyProvider } from '@/lib/ai-engine';
+import { IDEAS_SYSTEM_PROMPT, buildIdeasPrompt } from '@/lib/ai-prompts';
 
 const STATUS_COLORS: Record<string, string> = {
   idea: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -32,6 +34,7 @@ export default function Ideas() {
   const [newAngle, setNewAngle] = useState('');
   const [newCategory, setNewCategory] = useState('Business');
   const [newNewsPeg, setNewNewsPeg] = useState('');
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
 
   const todayCount = state.ideas.filter(i => {
     const d = new Date(i.created_at);
@@ -115,6 +118,36 @@ export default function Ideas() {
                 <label className="text-sm font-medium mb-1.5 block">News Peg (why now?)</label>
                 <Input value={newNewsPeg} onChange={e => setNewNewsPeg(e.target.value)} placeholder="e.g., McKinsey just released new AI workforce report" />
               </div>
+              {hasAnyProvider() && (
+                <Button variant="outline" className="w-full gap-2 mb-2" disabled={isAiGenerating}
+                  onClick={async () => {
+                    setIsAiGenerating(true);
+                    try {
+                      const result = await aiGenerate('ideas', IDEAS_SYSTEM_PROMPT,
+                        buildIdeasPrompt(newCategory, 5),
+                        { temperature: 0.9, maxTokens: 1500 }
+                      );
+                      const ideas = JSON.parse(result.text.replace(/```json\n?|```/g, '').trim());
+                      if (Array.isArray(ideas)) {
+                        ideas.forEach((idea: any) => {
+                          addIdea({
+                            title: idea.title || 'Untitled',
+                            angle: idea.angle || '',
+                            category: idea.category || newCategory,
+                            news_peg: idea.news_peg || '',
+                            status: 'idea',
+                          });
+                        });
+                        toast.success(`${ideas.length} ideas generated via ${result.model} ($${result.cost.toFixed(4)})`);
+                        setShowNewIdea(false);
+                      }
+                    } catch (err: any) {
+                      toast.error(err.message || 'AI generation failed');
+                    } finally { setIsAiGenerating(false); }
+                  }}>
+                  <Sparkles className="w-4 h-4" /> {isAiGenerating ? 'Generating 5 Ideas...' : 'AI Generate 5 Ideas'}
+                </Button>
+              )}
               <Button onClick={handleCreate} className="w-full">Create Idea</Button>
             </div>
           </DialogContent>
