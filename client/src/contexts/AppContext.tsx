@@ -1,12 +1,14 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import {
   type AppState, type ArticleIdea, type ResearchNote, type Article, type Pitch,
   type GiststackItem, type Earning, type Brand, type DigitalProduct, type FunnelMetric,
   loadState, saveState, generateId,
 } from '@/lib/store';
+import { useDbHydration } from '@/hooks/useDbHydration';
 
 interface AppContextType {
   state: AppState;
+  isHydrated: boolean;
   // Ideas
   addIdea: (idea: Omit<ArticleIdea, 'id' | 'created_at' | 'updated_at'>) => ArticleIdea;
   updateIdea: (id: string, updates: Partial<ArticleIdea>) => void;
@@ -47,7 +49,57 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(loadState);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const hydrationDone = useRef(false);
 
+  // DB hydration — loads persisted data from MySQL when authenticated
+  const { data: dbData, isLoading: dbLoading, isAuthenticated } = useDbHydration();
+
+  // Merge DB data into state on first successful load
+  useEffect(() => {
+    if (hydrationDone.current) return;
+    if (dbLoading) return;
+
+    if (dbData && isAuthenticated) {
+      setState(prev => {
+        const merged = { ...prev };
+        // Merge DB entities — DB data takes priority, but keep local-only items (no db_ prefix)
+        if (dbData.ideas.length > 0) {
+          const localOnly = prev.ideas.filter(i => !i.id.startsWith('db_'));
+          merged.ideas = [...dbData.ideas, ...localOnly];
+        }
+        if (dbData.articles.length > 0) {
+          const localOnly = prev.articles.filter(a => !a.id.startsWith('db_'));
+          merged.articles = [...dbData.articles, ...localOnly];
+        }
+        if (dbData.pitches.length > 0) {
+          const localOnly = prev.pitches.filter(p => !p.id.startsWith('db_'));
+          merged.pitches = [...dbData.pitches, ...localOnly];
+        }
+        if (dbData.research.length > 0) {
+          const localOnly = prev.research.filter(r => !r.id.startsWith('db_'));
+          merged.research = [...dbData.research, ...localOnly];
+        }
+        if (dbData.earnings.length > 0) {
+          const localOnly = prev.earnings.filter(e => !e.id.startsWith('db_'));
+          merged.earnings = [...dbData.earnings, ...localOnly];
+        }
+        if (dbData.brands.length > 0) {
+          const localOnly = prev.brands.filter(b => !b.id.startsWith('db_'));
+          merged.brands = [...dbData.brands, ...localOnly];
+        }
+        return merged;
+      });
+      hydrationDone.current = true;
+      setIsHydrated(true);
+    } else if (!isAuthenticated && !dbLoading) {
+      // Not authenticated — just use localStorage state
+      hydrationDone.current = true;
+      setIsHydrated(true);
+    }
+  }, [dbData, dbLoading, isAuthenticated]);
+
+  // Save to localStorage on every state change
   useEffect(() => {
     saveState(state);
   }, [state]);
@@ -221,6 +273,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       state,
+      isHydrated,
       addIdea, updateIdea, deleteIdea,
       addResearch, updateResearch, deleteResearch,
       addArticle, updateArticle, deleteArticle,

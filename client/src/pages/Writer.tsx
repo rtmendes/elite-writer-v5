@@ -9,21 +9,26 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
+import { trpc } from '@/lib/trpc';
 import {
   PenTool, Save, Send, BarChart3, BookOpen, Target,
-  Sparkles, ChevronRight, FileText, Zap, Eye, Download
+  Sparkles, ChevronRight, FileText, Zap, Eye, Download, Building2, Loader2
 } from 'lucide-react';
 import { PUBLICATIONS, matchPublications, type Publication } from '@/lib/publications-data';
 import { scoreArticleLocally, DIMENSION_LABELS, getScoreColor, getScoreBgColor, getTierFromScore } from '@/lib/scoring';
 import { TEMPLATES, BRAND_VOICES, type WritingTemplate } from '@/lib/templates';
-import { aiGenerate, hasAnyProvider } from '@/lib/ai-engine';
-import { SCORING_SYSTEM_PROMPT, buildScoringPrompt, DRAFT_SYSTEM_PROMPT, buildDraftPrompt, EDIT_SYSTEM_PROMPT } from '@/lib/ai-prompts';
-import type { ArticleScores, Brand } from '@/lib/store';
-import { Building2 } from 'lucide-react';
+import type { ArticleScores } from '@/lib/store';
 
 export default function Writer() {
   const { state, addArticle, updateArticle } = useApp();
   const [, navigate] = useLocation();
+
+  // tRPC mutations
+  const scoreMutation = trpc.ai.score.useMutation();
+  const draftMutation = trpc.ai.draft.useMutation();
+  const saveArticleMutation = trpc.data.articles.create.useMutation();
+  const updateArticleMutation = trpc.data.articles.update.useMutation();
+  const [dbArticleId, setDbArticleId] = useState<number | null>(null);
 
   // Editor state
   const [title, setTitle] = useState('');
@@ -36,18 +41,15 @@ export default function Writer() {
   const [scores, setScores] = useState<ArticleScores | null>(null);
   const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
   const [sidebarTab, setSidebarTab] = useState('score');
-  const [isAiScoring, setIsAiScoring] = useState(false);
-  const [isAiWriting, setIsAiWriting] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState<Array<{category: string; title: string; impact: number; action_items: string[]}>>([]);
+  const [aiScoreResult, setAiScoreResult] = useState<any>(null);
   const [selectedBrandId, setSelectedBrandId] = useState<string>(state.brands[0]?.id || '');
   const [selectedProductId, setSelectedProductId] = useState<string>('');
 
   const activeBrandObj = useMemo(() => state.brands.find(b => b.id === selectedBrandId), [state.brands, selectedBrandId]);
-
   const wordCount = useMemo(() => content.trim().split(/\s+/).filter(Boolean).length, [content]);
   const template = TEMPLATES.find(t => t.id === selectedTemplate);
 
-  // Auto-score on content change (debounced)
+  // Auto-score locally on content change (debounced)
   useEffect(() => {
     if (wordCount < 50) { setScores(null); return; }
     const timer = setTimeout(() => {
@@ -74,6 +76,67 @@ export default function Writer() {
     return matchPublications(title + ' ' + content.slice(0, 500), category, scores.overall).slice(0, 10);
   }, [scores, title, content, selectedPub, wordCount]);
 
+  // AI Score via backend
+  const handleAiScore = async () => {
+    if (wordCount < 50) { toast.error('Write at least 50 words first'); return; }
+    try {
+      const result = await scoreMutation.mutateAsync({
+        title,
+        content,
+        targetPublication: selectedPub?.name,
+        brandVoice: BRAND_VOICES.find(b => b.id === selectedBrand)?.name,
+      });
+      if (result.success && result.data) {
+        setAiScoreResult(result.data);
+        // Map AI scores to local format
+        const d = result.data.dimensions || {};
+        const aiScores: ArticleScores = {
+          clarity_structure: Math.round((d.clarity?.score || 50) / 10),
+          hook_engagement: Math.round((d.hook?.score || 50) / 10),
+          voice_tone: Math.round((d.voice?.score || 50) / 10),
+          data_evidence: Math.round((d.evidence?.score || 50) / 10),
+          originality_angle: Math.round((d.originality?.score || 50) / 10),
+          publication_fit: Math.round((d.authority?.score || 50) / 10),
+          timeliness: Math.round((d.timeliness?.score || 50) / 10),
+          actionability: Math.round((d.actionability?.score || 50) / 10),
+          expertise_depth: Math.round((d.depth?.score || 50) / 10),
+          readability: Math.round((d.structure?.score || 50) / 10),
+          conclusion_cta: Math.round((d.seo?.score || 50) / 10),
+          overall: Math.round((result.data.overall || 50) / 10),
+        };
+        setScores(aiScores);
+        const tokens = result.usage?.total_tokens || 0;
+        toast.success(`AI scored: ${result.data.overall}/100 (${tokens} tokens)`);
+      }
+    } catch (err: any) {
+      toast.error('AI scoring failed: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // AI Draft via backend
+  const handleAiDraft = async () => {
+    if (!title.trim()) { toast.error('Add a title first'); return; }
+    try {
+      const tmpl = TEMPLATES.find(t => t.id === selectedTemplate);
+      const brand = BRAND_VOICES.find(b => b.id === selectedBrand);
+      const result = await draftMutation.mutateAsync({
+        topic: title,
+        template: tmpl?.name,
+        brandVoice: brand?.name,
+        targetPublication: selectedPub?.name,
+        outline: content.slice(0, 2000) || undefined,
+        wordCount: template?.wordCountRange[1] || 1500,
+      });
+      if (result.success && result.text) {
+        setContent(prev => prev ? prev + '\n\n---\n\n' + result.text : result.text);
+        const tokens = result.usage?.total_tokens || 0;
+        toast.success(`Draft generated (${tokens} tokens)`);
+      }
+    } catch (err: any) {
+      toast.error('AI draft failed: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   const handleSave = useCallback(() => {
     if (!title.trim()) { toast.error('Please add a title'); return; }
     const articleData = {
@@ -91,13 +154,21 @@ export default function Writer() {
     };
     if (activeArticleId) {
       updateArticle(activeArticleId, articleData);
+      // Also persist to database
+      if (dbArticleId) {
+        updateArticleMutation.mutate({ id: dbArticleId, title: articleData.title, content: articleData.content, template: articleData.template, brandVoice: articleData.brand_voice, wordCount: articleData.word_count, targetPublication: articleData.target_publication, brandId: articleData.brand_id, productId: articleData.product_id, overallScore: scores?.overall });
+      }
       toast.success('Article saved');
     } else {
       const newArticle = addArticle(articleData);
       setActiveArticleId(newArticle.id);
+      // Also persist to database
+      saveArticleMutation.mutate({ title: articleData.title, content: articleData.content, template: articleData.template, brandVoice: articleData.brand_voice, wordCount: articleData.word_count, targetPublication: articleData.target_publication, brandId: articleData.brand_id, productId: articleData.product_id, overallScore: scores?.overall }, {
+        onSuccess: (result) => { if (result?.id) setDbArticleId(result.id); }
+      });
       toast.success('Article created and saved');
     }
-  }, [title, content, wordCount, selectedPub, selectedBrand, selectedTemplate, scores, activeArticleId, addArticle, updateArticle]);
+  }, [title, content, wordCount, selectedPub, selectedBrand, selectedTemplate, scores, activeArticleId, selectedBrandId, selectedProductId, activeBrandObj, addArticle, updateArticle]);
 
   const handleCreatePitch = () => {
     if (!selectedPub) { toast.error('Select a target publication first'); return; }
@@ -203,57 +274,19 @@ export default function Writer() {
             </Badge>
           )}
 
-          {hasAnyProvider() && (
-            <>
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" disabled={isAiScoring || wordCount < 50}
-                onClick={async () => {
-                  setIsAiScoring(true);
-                  try {
-                    const result = await aiGenerate('score', SCORING_SYSTEM_PROMPT, buildScoringPrompt(content, selectedPub?.name), { temperature: 0.3, maxTokens: 1500 });
-                    const parsed = JSON.parse(result.text.replace(/```json\n?|```/g, '').trim());
-                    const aiScores: ArticleScores = {
-                      clarity_structure: parsed.clarity_structure ?? 5,
-                      hook_engagement: parsed.hook_engagement ?? 5,
-                      voice_tone: parsed.voice_tone ?? 5,
-                      data_evidence: parsed.data_evidence ?? 5,
-                      originality_angle: parsed.originality_angle ?? 5,
-                      publication_fit: parsed.publication_fit ?? 5,
-                      timeliness: parsed.timeliness ?? 5,
-                      actionability: parsed.actionability ?? 5,
-                      expertise_depth: parsed.expertise_depth ?? 5,
-                      readability: parsed.readability ?? 5,
-                      conclusion_cta: parsed.conclusion_cta ?? 5,
-                      overall: parsed.overall ?? 5,
-                    };
-                    setScores(aiScores);
-                    if (parsed.suggestions) setAiSuggestions(parsed.suggestions);
-                    toast.success(`AI scored via ${result.model} ($${result.cost.toFixed(4)})`);
-                  } catch (err: any) {
-                    toast.error('AI scoring failed: ' + (err.message || 'Unknown error'));
-                  } finally { setIsAiScoring(false); }
-                }}>
-                <Sparkles className="w-3 h-3" /> {isAiScoring ? 'Scoring...' : 'AI Score'}
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" disabled={isAiWriting || !title.trim()}
-                onClick={async () => {
-                  setIsAiWriting(true);
-                  try {
-                    const tmpl = TEMPLATES.find(t => t.id === selectedTemplate);
-                    const brand = BRAND_VOICES.find(b => b.id === selectedBrand);
-                    const result = await aiGenerate('draft', DRAFT_SYSTEM_PROMPT,
-                      buildDraftPrompt(title, '', content.slice(0, 2000), tmpl?.name || 'General', brand?.name || 'Professional'),
-                      { temperature: 0.7, maxTokens: 4000 }
-                    );
-                    setContent(prev => prev ? prev + '\n\n---\n\n' + result.text : result.text);
-                    toast.success(`Draft generated via ${result.model} ($${result.cost.toFixed(4)})`);
-                  } catch (err: any) {
-                    toast.error('AI writing failed: ' + (err.message || 'Unknown error'));
-                  } finally { setIsAiWriting(false); }
-                }}>
-                <Zap className="w-3 h-3" /> {isAiWriting ? 'Writing...' : 'AI Draft'}
-              </Button>
-            </>
-          )}
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+            disabled={scoreMutation.isPending || wordCount < 50}
+            onClick={handleAiScore}>
+            {scoreMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {scoreMutation.isPending ? 'Scoring...' : 'AI Score'}
+          </Button>
+
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+            disabled={draftMutation.isPending || !title.trim()}
+            onClick={handleAiDraft}>
+            {draftMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+            {draftMutation.isPending ? 'Writing...' : 'AI Draft'}
+          </Button>
 
           <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => handleExport('md')}>
             <Download className="w-3 h-3" /> Export
@@ -333,30 +366,25 @@ export default function Writer() {
               </div>
             )}
 
-            {/* AI Suggestions */}
-            {aiSuggestions.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-primary">AI Suggestions</p>
-                {aiSuggestions.map((s, i) => (
-                  <Card key={i} className="border-border">
-                    <CardContent className="p-2.5">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium">{s.title}</span>
-                        <Badge variant="outline" className="text-[10px]">
-                          Impact: {'★'.repeat(s.impact)}
-                        </Badge>
+            {/* AI Score Details */}
+            {aiScoreResult && (
+              <div className="space-y-3 border-t border-border pt-3">
+                <p className="text-xs font-medium text-purple-400">AI Editorial Assessment</p>
+                <p className="text-xs text-muted-foreground">{aiScoreResult.summary}</p>
+                {aiScoreResult.improvements && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium">Improvements:</p>
+                    {aiScoreResult.improvements.map((imp: string, i: number) => (
+                      <div key={i} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                        <ChevronRight className="w-3 h-3 shrink-0 mt-0.5 text-purple-400" />
+                        {imp}
                       </div>
-                      <ul className="space-y-0.5">
-                        {s.action_items.map((item, j) => (
-                          <li key={j} className="text-[11px] text-muted-foreground flex items-start gap-1">
-                            <ChevronRight className="w-3 h-3 shrink-0 mt-0.5 text-primary" />
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                ))}
+                    ))}
+                  </div>
+                )}
+                {aiScoreResult.recommendedTier && (
+                  <Badge variant="outline" className="text-[10px]">Recommended: {aiScoreResult.recommendedTier}</Badge>
+                )}
               </div>
             )}
 
@@ -385,7 +413,7 @@ export default function Writer() {
                   value={pubSearch}
                   onChange={e => { setPubSearch(e.target.value); setShowPubDropdown(true); }}
                   onFocus={() => setShowPubDropdown(true)}
-                  placeholder="Search 174+ publications..."
+                  placeholder="Search 176+ publications..."
                   className="text-xs"
                 />
                 {showPubDropdown && pubResults.length > 0 && (
@@ -430,7 +458,6 @@ export default function Writer() {
               </Card>
             )}
 
-            {/* Template info */}
             {template && (
               <Card className="border-border">
                 <CardHeader className="pb-2 pt-3 px-3">

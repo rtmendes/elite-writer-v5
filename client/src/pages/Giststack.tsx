@@ -10,8 +10,7 @@ import {
   Newspaper, Bookmark, BookmarkCheck, TrendingUp, Search,
   ExternalLink, Lightbulb, Plus, Sparkles, RefreshCw, Zap, Brain
 } from 'lucide-react';
-import { aiGenerate, hasAnyProvider } from '@/lib/ai-engine';
-import { SUMMARIZE_SYSTEM_PROMPT } from '@/lib/ai-prompts';
+import { trpc } from '@/lib/trpc';
 
 // Demo trending content (simulates Giststack-style feed)
 const DEMO_FEED = [
@@ -31,8 +30,8 @@ export default function Giststack() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [customTopic, setCustomTopic] = useState('');
   const [topics, setTopics] = useState<string[]>(['AI & Technology', 'Business', 'Future of Work']);
-  const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
   const [dailyBrief, setDailyBrief] = useState<string | null>(null);
+  const dailyBriefMutation = trpc.ai.dailyBrief.useMutation();
 
   // Merge demo feed with saved items
   const allItems = useMemo(() => {
@@ -116,25 +115,27 @@ export default function Giststack() {
             </p>
           </div>
           <div className="flex gap-2">
-            {hasAnyProvider() && (
-              <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10" disabled={isGeneratingBrief}
-                onClick={async () => {
-                  setIsGeneratingBrief(true);
-                  try {
-                    const feedSummary = allItems.slice(0, 8).map(i => `- ${i.title}: ${i.summary} (${i.source})`).join('\n');
-                    const result = await aiGenerate('summarize', SUMMARIZE_SYSTEM_PROMPT,
-                      `Create a daily intelligence brief from these trending stories. Identify the 3 most promising article angles for a business/finance writer:\n\n${feedSummary}`,
-                      { temperature: 0.6, maxTokens: 1000 }
-                    );
-                    setDailyBrief(result.text);
-                    toast.success(`Daily brief generated via ${result.model} ($${result.cost.toFixed(4)})`);
-                  } catch (err: any) {
-                    toast.error(err.message || 'Brief generation failed');
-                  } finally { setIsGeneratingBrief(false); }
-                }}>
-                <Brain className="w-4 h-4" /> {isGeneratingBrief ? 'Generating...' : 'AI Daily Brief'}
-              </Button>
-            )}
+            <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10" disabled={dailyBriefMutation.isPending}
+              onClick={async () => {
+                try {
+                  const result = await dailyBriefMutation.mutateAsync({
+                    topics: topics,
+                  });
+                  if (result.success && result.data) {
+                    const d = result.data;
+                    const briefText = d.summary || '';
+                    const stories = d.topStories?.map((s: any) => `\n\n**${s.title}** (${s.urgency} urgency)\n${s.summary}\n_Angle:_ ${s.suggestedAngle}`).join('') || '';
+                    const actions = d.actionItems?.map((a: string) => `\n- ${a}`).join('') || '';
+                    setDailyBrief(`${d.headline || 'Daily Brief'}\n\n${briefText}${stories}${actions ? '\n\n**Action Items:**' + actions : ''}`);
+                    const tokens = result.usage?.total_tokens || 0;
+                    toast.success(`Daily brief generated (${tokens} tokens)`);
+                  }
+                } catch (err: any) {
+                  toast.error(err.message || 'Brief generation failed');
+                }
+              }}>
+              <Brain className="w-4 h-4" /> {dailyBriefMutation.isPending ? 'Generating...' : 'AI Daily Brief'}
+            </Button>
             <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10" onClick={() => toast.info('Feed refreshed with latest content')}>
               <RefreshCw className="w-4 h-4" /> Refresh Feed
             </Button>

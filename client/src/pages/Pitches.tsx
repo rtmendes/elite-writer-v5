@@ -12,8 +12,7 @@ import {
   AlertCircle, Copy, Trash2, Eye
 } from 'lucide-react';
 import { PUBLICATIONS } from '@/lib/publications-data';
-import { aiGenerate, hasAnyProvider } from '@/lib/ai-engine';
-import { buildPitchSystemPrompt, buildPitchPrompt } from '@/lib/ai-prompts';
+import { trpc } from '@/lib/trpc';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   draft: { label: 'Draft', color: 'bg-secondary text-secondary-foreground', icon: Clock },
@@ -85,7 +84,11 @@ export default function Pitches() {
   const [pitchTemplate, setPitchTemplate] = useState('standard');
   const [viewPitch, setViewPitch] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState('all');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const pitchMutation = trpc.ai.pitch.useMutation();
+  const createPitchDb = trpc.data.pitches.create.useMutation();
+  const updatePitchDb = trpc.data.pitches.update.useMutation();
+  const deletePitchDb = trpc.data.pitches.delete.useMutation();
+  const [pitchIdMap] = useState<Map<string, number>>(() => new Map());
 
   // Handle URL params from Publications page
   useEffect(() => {
@@ -126,7 +129,7 @@ export default function Pitches() {
   const handleCreate = () => {
     if (!selectedPubId || !subject.trim()) { toast.error('Publication and subject required'); return; }
     const pub = PUBLICATIONS.find(p => p.id === selectedPubId);
-    addPitch({
+    const pitch = addPitch({
       publication_id: selectedPubId,
       publication_name: pub?.name || pubSearch,
       editor_name: editorName,
@@ -134,6 +137,9 @@ export default function Pitches() {
       subject: subject.trim(),
       body: body.trim(),
       status: 'draft',
+    });
+    createPitchDb.mutate({ publicationId: selectedPubId, publicationName: pub?.name || pubSearch, editorName, editorEmail, subject: subject.trim(), body: body.trim() }, {
+      onSuccess: (r) => { if (r?.id) pitchIdMap.set(pitch.id, r.id); }
     });
     setPubSearch(''); setSelectedPubId(''); setEditorName(''); setEditorEmail('');
     setSubject(''); setBody('');
@@ -149,6 +155,8 @@ export default function Pitches() {
 
   const handleMarkSent = (id: string) => {
     updatePitch(id, { status: 'sent', sent_at: new Date().toISOString() });
+    const dbId = pitchIdMap.get(id);
+    if (dbId) updatePitchDb.mutate({ id: dbId, status: 'sent' });
     toast.success('Marked as sent');
   };
 
@@ -226,34 +234,30 @@ export default function Pitches() {
                       <option value="personal_narrative">Personal Narrative</option>
                     </select>
                     <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleInsertTemplate}>Insert</Button>
-                    {hasAnyProvider() && (
-                      <Button variant="default" size="sm" className="h-7 text-xs gap-1" disabled={!selectedPubId || isGenerating}
-                        onClick={async () => {
-                          if (!selectedPubId) { toast.error('Select a publication first'); return; }
-                          const pub = PUBLICATIONS.find(p => p.id === selectedPubId);
-                          if (!pub) return;
-                          setIsGenerating(true);
-                          try {
-                            const result = await aiGenerate('pitch',
-                              buildPitchSystemPrompt(pub),
-                              buildPitchPrompt(subject || 'Article pitch', '', subject || 'Business analysis'),
-                              { temperature: 0.8, maxTokens: 1000 }
-                            );
-                            const text = result.text;
-                            const subjectMatch = text.match(/SUBJECT:\s*(.+)/i);
-                            if (subjectMatch && !subject) setSubject(subjectMatch[1].trim());
-                            const bodyText = text.replace(/SUBJECT:\s*.+\n---\n?/i, '').trim();
-                            setBody(bodyText);
-                            toast.success(`Pitch generated via ${result.model} ($${result.cost.toFixed(4)})`);
-                          } catch (err: any) {
-                            toast.error(err.message || 'AI generation failed');
-                          } finally {
-                            setIsGenerating(false);
+                    <Button variant="default" size="sm" className="h-7 text-xs gap-1" disabled={!selectedPubId || pitchMutation.isPending}
+                      onClick={async () => {
+                        if (!selectedPubId) { toast.error('Select a publication first'); return; }
+                        const pub = PUBLICATIONS.find(p => p.id === selectedPubId);
+                        if (!pub) return;
+                        try {
+                          const result = await pitchMutation.mutateAsync({
+                            articleTitle: subject || 'Article pitch',
+                            articleSummary: body || 'Business analysis article',
+                            publicationName: pub.name,
+                            editorName: editorName || undefined,
+                          });
+                          if (result.success && result.data) {
+                            if (result.data.subject && !subject) setSubject(result.data.subject);
+                            if (result.data.body) setBody(result.data.body);
+                            const tokens = result.usage?.total_tokens || 0;
+                            toast.success(`Pitch generated (${tokens} tokens)`);
                           }
-                        }}>
-                        {isGenerating ? 'Generating...' : 'AI Generate'}
-                      </Button>
-                    )}
+                        } catch (err: any) {
+                          toast.error(err.message || 'AI generation failed');
+                        }
+                      }}>
+                      {pitchMutation.isPending ? 'Generating...' : 'AI Generate'}
+                    </Button>
                   </div>
                 </div>
                 <textarea value={body} onChange={e => setBody(e.target.value)}
@@ -341,17 +345,17 @@ export default function Pitches() {
                       {pitch.status === 'sent' && (
                         <>
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-emerald-400"
-                            onClick={() => { updatePitch(pitch.id, { status: 'accepted' }); toast.success('Marked accepted!'); }} title="Accepted">
+                            onClick={() => { updatePitch(pitch.id, { status: 'accepted' }); const dbId = pitchIdMap.get(pitch.id); if (dbId) updatePitchDb.mutate({ id: dbId, status: 'accepted' }); toast.success('Marked accepted!'); }} title="Accepted">
                             <CheckCircle2 className="w-4 h-4" />
                           </Button>
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-400"
-                            onClick={() => { updatePitch(pitch.id, { status: 'rejected' }); toast.info('Marked rejected'); }} title="Rejected">
+                            onClick={() => { updatePitch(pitch.id, { status: 'rejected' }); const dbId = pitchIdMap.get(pitch.id); if (dbId) updatePitchDb.mutate({ id: dbId, status: 'rejected' }); toast.info('Marked rejected'); }} title="Rejected">
                             <XCircle className="w-4 h-4" />
                           </Button>
                         </>
                       )}
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive"
-                        onClick={() => { deletePitch(pitch.id); toast.success('Deleted'); }} title="Delete">
+                        onClick={() => { const dbId = pitchIdMap.get(pitch.id); if (dbId) deletePitchDb.mutate({ id: dbId }); deletePitch(pitch.id); toast.success('Deleted'); }} title="Delete">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>

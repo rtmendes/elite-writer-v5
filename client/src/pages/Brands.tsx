@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { trpc } from '@/lib/trpc';
 import type { Brand, DigitalProduct, CustomerAvatar } from '@/lib/store';
 import { PUBLICATIONS, getPublicationTier } from '@/lib/publications-data';
 import { toast } from 'sonner';
@@ -33,6 +34,10 @@ const BRAND_COLORS = ['#e879a0', '#a78bfa', '#60a5fa', '#34d399', '#fbbf24', '#f
 
 export default function Brands() {
   const { state, addBrand, updateBrand, deleteBrand, addProduct, updateProduct, deleteProduct } = useApp();
+  const createBrandDb = trpc.data.brands.create.useMutation();
+  const deleteBrandDb = trpc.data.brands.delete.useMutation();
+  const createProductDb = trpc.data.products.create.useMutation();
+  const [brandIdMap] = useState<Map<string, number>>(() => new Map());
   const [expandedBrand, setExpandedBrand] = useState<string | null>(state.brands[0]?.id ?? null);
   const [activeTab, setActiveTab] = useState<'overview' | 'avatar' | 'products' | 'publications' | 'funnel'>('overview');
   const [showNewBrand, setShowNewBrand] = useState(false);
@@ -84,6 +89,9 @@ export default function Brands() {
       product_revenue_goal: 25000,
       monthly_content_revenue: 0,
       monthly_product_revenue: 0,
+    });
+    createBrandDb.mutate({ name: newBrand.name.trim(), niche: newBrand.niche.trim(), description: newBrand.description.trim(), website: newBrand.website.trim(), color }, {
+      onSuccess: (r: any) => { if (r?.id) brandIdMap.set(newBrand.name.trim(), r.id); }
     });
     setNewBrand({ name: '', niche: '', description: '', website: '' });
     setShowNewBrand(false);

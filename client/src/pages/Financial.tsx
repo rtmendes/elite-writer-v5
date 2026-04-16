@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,9 @@ const ALL_STREAMS = [...CONTENT_STREAMS, ...PRODUCT_STREAMS];
 
 export default function Financial() {
   const { state, addEarning, deleteEarning } = useApp();
+  const createEarningDb = trpc.data.earnings.create.useMutation();
+  const deleteEarningDb = trpc.data.earnings.delete.useMutation();
+  const [earningIdMap] = useState<Map<string, number>>(() => new Map());
   const [showNew, setShowNew] = useState(false);
   const [amount, setAmount] = useState('');
   const [source, setSource] = useState('freelance');
@@ -89,9 +93,12 @@ export default function Financial() {
   const handleCreate = () => {
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) { toast.error('Enter a valid amount'); return; }
-    addEarning({
+    const earning = addEarning({
       amount: amt, source, publication: publication.trim(), description: description.trim(),
       date, type: earningType, brand_id: selectedBrandId || undefined,
+    });
+    createEarningDb.mutate({ type: earningType, source, amount: amt.toString(), description: description.trim() }, {
+      onSuccess: (r: any) => { if (r?.id) earningIdMap.set(earning.id, r.id); }
     });
     setAmount(''); setPublication(''); setDescription('');
     setShowNew(false);
@@ -395,7 +402,7 @@ export default function Financial() {
                               ${earning.amount.toLocaleString()}
                             </span>
                             <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive shrink-0"
-                              onClick={() => { deleteEarning(earning.id); toast.success('Deleted'); }}>
+                              onClick={() => { const dbId = earningIdMap.get(earning.id); if (dbId) deleteEarningDb.mutate({ id: dbId }); deleteEarning(earning.id); toast.success('Deleted'); }}>
                               <Trash2 className="w-3 h-3" />
                             </Button>
                           </div>

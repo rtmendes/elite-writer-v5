@@ -15,8 +15,8 @@ import Financial from "./pages/Financial";
 import Settings from "./pages/Settings";
 import Brands from "./pages/Brands";
 import NotFound from "@/pages/NotFound";
-
 function Router() {
+  // make sure to consider if you need authentication for certain routes
   return (
     <AppLayout>
       <Switch>
