@@ -1,5 +1,9 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import { type AppState, type ArticleIdea, type ResearchNote, type Article, type Pitch, type GiststackItem, type Earning, loadState, saveState, generateId } from '@/lib/store';
+import {
+  type AppState, type ArticleIdea, type ResearchNote, type Article, type Pitch,
+  type GiststackItem, type Earning, type Brand, type DigitalProduct, type FunnelMetric,
+  loadState, saveState, generateId,
+} from '@/lib/store';
 
 interface AppContextType {
   state: AppState;
@@ -25,6 +29,16 @@ interface AppContextType {
   // Earnings
   addEarning: (earning: Omit<Earning, 'id' | 'created_at'>) => Earning;
   deleteEarning: (id: string) => void;
+  // Brands
+  addBrand: (brand: Omit<Brand, 'id' | 'created_at' | 'updated_at'>) => Brand;
+  updateBrand: (id: string, updates: Partial<Brand>) => void;
+  deleteBrand: (id: string) => void;
+  // Products (nested under brand)
+  addProduct: (brandId: string, product: Omit<DigitalProduct, 'id' | 'created_at'>) => void;
+  updateProduct: (brandId: string, productId: string, updates: Partial<DigitalProduct>) => void;
+  deleteProduct: (brandId: string, productId: string) => void;
+  // Funnel Metrics
+  addFunnelMetric: (metric: Omit<FunnelMetric, 'id'>) => void;
   // Settings
   updateSettings: (updates: Partial<AppState['settings']>) => void;
 }
@@ -38,6 +52,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveState(state);
   }, [state]);
 
+  // ── Ideas ──
   const addIdea = useCallback((idea: Omit<ArticleIdea, 'id' | 'created_at' | 'updated_at'>) => {
     const now = new Date().toISOString();
     const newIdea: ArticleIdea = { ...idea, id: generateId(), created_at: now, updated_at: now };
@@ -56,6 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, ideas: s.ideas.filter(i => i.id !== id) }));
   }, []);
 
+  // ── Research ──
   const addResearch = useCallback((note: Omit<ResearchNote, 'id' | 'created_at'>) => {
     const newNote: ResearchNote = { ...note, id: generateId(), created_at: new Date().toISOString() };
     setState(s => ({ ...s, research: [newNote, ...s.research] }));
@@ -73,6 +89,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, research: s.research.filter(r => r.id !== id) }));
   }, []);
 
+  // ── Articles ──
   const addArticle = useCallback((article: Omit<Article, 'id' | 'created_at' | 'updated_at'>) => {
     const now = new Date().toISOString();
     const newArticle: Article = { ...article, id: generateId(), created_at: now, updated_at: now };
@@ -91,6 +108,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, articles: s.articles.filter(a => a.id !== id) }));
   }, []);
 
+  // ── Pitches ──
   const addPitch = useCallback((pitch: Omit<Pitch, 'id' | 'created_at'>) => {
     const newPitch: Pitch = { ...pitch, id: generateId(), created_at: new Date().toISOString() };
     setState(s => ({ ...s, pitches: [newPitch, ...s.pitches] }));
@@ -108,6 +126,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, pitches: s.pitches.filter(p => p.id !== id) }));
   }, []);
 
+  // ── Giststack ──
   const addGiststackItem = useCallback((item: Omit<GiststackItem, 'id' | 'created_at'>) => {
     setState(s => ({
       ...s,
@@ -122,6 +141,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  // ── Earnings ──
   const addEarning = useCallback((earning: Omit<Earning, 'id' | 'created_at'>) => {
     const newEarning: Earning = { ...earning, id: generateId(), created_at: new Date().toISOString() };
     setState(s => ({ ...s, earnings: [newEarning, ...s.earnings] }));
@@ -132,6 +152,68 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, earnings: s.earnings.filter(e => e.id !== id) }));
   }, []);
 
+  // ── Brands ──
+  const addBrand = useCallback((brand: Omit<Brand, 'id' | 'created_at' | 'updated_at'>) => {
+    const now = new Date().toISOString();
+    const newBrand: Brand = { ...brand, id: generateId(), created_at: now, updated_at: now };
+    setState(s => ({ ...s, brands: [newBrand, ...s.brands] }));
+    return newBrand;
+  }, []);
+
+  const updateBrand = useCallback((id: string, updates: Partial<Brand>) => {
+    setState(s => ({
+      ...s,
+      brands: s.brands.map(b => b.id === id ? { ...b, ...updates, updated_at: new Date().toISOString() } : b),
+    }));
+  }, []);
+
+  const deleteBrand = useCallback((id: string) => {
+    setState(s => ({ ...s, brands: s.brands.filter(b => b.id !== id) }));
+  }, []);
+
+  // ── Products (nested under brand) ──
+  const addProduct = useCallback((brandId: string, product: Omit<DigitalProduct, 'id' | 'created_at'>) => {
+    setState(s => ({
+      ...s,
+      brands: s.brands.map(b => b.id === brandId ? {
+        ...b,
+        products: [...b.products, { ...product, id: generateId(), created_at: new Date().toISOString() }],
+        updated_at: new Date().toISOString(),
+      } : b),
+    }));
+  }, []);
+
+  const updateProduct = useCallback((brandId: string, productId: string, updates: Partial<DigitalProduct>) => {
+    setState(s => ({
+      ...s,
+      brands: s.brands.map(b => b.id === brandId ? {
+        ...b,
+        products: b.products.map(p => p.id === productId ? { ...p, ...updates } : p),
+        updated_at: new Date().toISOString(),
+      } : b),
+    }));
+  }, []);
+
+  const deleteProduct = useCallback((brandId: string, productId: string) => {
+    setState(s => ({
+      ...s,
+      brands: s.brands.map(b => b.id === brandId ? {
+        ...b,
+        products: b.products.filter(p => p.id !== productId),
+        updated_at: new Date().toISOString(),
+      } : b),
+    }));
+  }, []);
+
+  // ── Funnel Metrics ──
+  const addFunnelMetric = useCallback((metric: Omit<FunnelMetric, 'id'>) => {
+    setState(s => ({
+      ...s,
+      funnel_metrics: [{ ...metric, id: generateId() }, ...s.funnel_metrics],
+    }));
+  }, []);
+
+  // ── Settings ──
   const updateSettings = useCallback((updates: Partial<AppState['settings']>) => {
     setState(s => ({ ...s, settings: { ...s.settings, ...updates } }));
   }, []);
@@ -145,6 +227,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addPitch, updatePitch, deletePitch,
       addGiststackItem, toggleGiststackSave,
       addEarning, deleteEarning,
+      addBrand, updateBrand, deleteBrand,
+      addProduct, updateProduct, deleteProduct,
+      addFunnelMetric,
       updateSettings,
     }}>
       {children}

@@ -4,7 +4,7 @@ import { AppProvider } from '@/contexts/AppContext';
 import {
   LayoutDashboard, Newspaper, Lightbulb, Search, PenTool,
   BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
-  Zap, Menu
+  Zap, Menu, Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { path: '/writer', label: 'Writer', icon: PenTool, description: 'AI-enhanced editor' },
   { path: '/publications', label: 'Publications', icon: BookOpen, description: '174+ publication database' },
   { path: '/pitches', label: 'Pitches', icon: Send, description: 'Pitch management' },
+  { path: '/brands', label: 'Brands', icon: Building2, description: 'Brand & product engine' },
   { path: '/financial', label: 'Financial', icon: DollarSign, description: 'Revenue tracking' },
   { path: '/settings', label: 'Settings', icon: Settings, description: 'API keys & preferences' },
 ];

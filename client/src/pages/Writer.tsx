@@ -18,7 +18,8 @@ import { scoreArticleLocally, DIMENSION_LABELS, getScoreColor, getScoreBgColor, 
 import { TEMPLATES, BRAND_VOICES, type WritingTemplate } from '@/lib/templates';
 import { aiGenerate, hasAnyProvider } from '@/lib/ai-engine';
 import { SCORING_SYSTEM_PROMPT, buildScoringPrompt, DRAFT_SYSTEM_PROMPT, buildDraftPrompt, EDIT_SYSTEM_PROMPT } from '@/lib/ai-prompts';
-import type { ArticleScores } from '@/lib/store';
+import type { ArticleScores, Brand } from '@/lib/store';
+import { Building2 } from 'lucide-react';
 
 export default function Writer() {
   const { state, addArticle, updateArticle } = useApp();
@@ -38,6 +39,10 @@ export default function Writer() {
   const [isAiScoring, setIsAiScoring] = useState(false);
   const [isAiWriting, setIsAiWriting] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<Array<{category: string; title: string; impact: number; action_items: string[]}>>([]);
+  const [selectedBrandId, setSelectedBrandId] = useState<string>(state.brands[0]?.id || '');
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
+
+  const activeBrandObj = useMemo(() => state.brands.find(b => b.id === selectedBrandId), [state.brands, selectedBrandId]);
 
   const wordCount = useMemo(() => content.trim().split(/\s+/).filter(Boolean).length, [content]);
   const template = TEMPLATES.find(t => t.id === selectedTemplate);
@@ -78,6 +83,9 @@ export default function Writer() {
       target_publication: selectedPub?.name,
       brand_voice: selectedBrand,
       template: selectedTemplate,
+      brand_id: selectedBrandId || undefined,
+      product_id: selectedProductId || undefined,
+      funnel_cta: activeBrandObj?.products.find(p => p.id === selectedProductId)?.cta_text,
       scores: scores || undefined,
       status: 'draft' as const,
     };
@@ -151,6 +159,34 @@ export default function Writer() {
               ))}
             </SelectContent>
           </Select>
+
+          {state.brands.length > 0 && (
+            <Select value={selectedBrandId} onValueChange={v => { setSelectedBrandId(v); setSelectedProductId(''); }}>
+              <SelectTrigger className="w-40 h-8 text-xs">
+                <Building2 className="w-3 h-3 mr-1" />
+                <SelectValue placeholder="Brand" />
+              </SelectTrigger>
+              <SelectContent>
+                {state.brands.map(b => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {activeBrandObj && activeBrandObj.products.length > 0 && (
+            <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+              <SelectTrigger className="w-40 h-8 text-xs">
+                <SelectValue placeholder="Product CTA" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No product CTA</SelectItem>
+                {activeBrandObj.products.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.name} (${p.price})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={insertTemplate}>
             <FileText className="w-3 h-3" /> Insert Template

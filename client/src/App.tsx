@@ -13,6 +13,7 @@ import Publications from "./pages/Publications";
 import Pitches from "./pages/Pitches";
 import Financial from "./pages/Financial";
 import Settings from "./pages/Settings";
+import Brands from "./pages/Brands";
 import NotFound from "@/pages/NotFound";
 
 function Router() {
@@ -28,6 +29,7 @@ function Router() {
         <Route path="/publications" component={Publications} />
         <Route path="/pitches" component={Pitches} />
         <Route path="/financial" component={Financial} />
+        <Route path="/brands" component={Brands} />
         <Route path="/settings" component={Settings} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />

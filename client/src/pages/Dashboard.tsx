@@ -7,14 +7,14 @@ import { Link } from 'wouter';
 import {
   Lightbulb, PenTool, Send, DollarSign, TrendingUp,
   ArrowRight, CheckCircle2, Clock, FileText, Target, Zap,
-  BarChart3, BookOpen, Globe, Sparkles
+  BarChart3, BookOpen, Globe, Sparkles, Building2, ShoppingBag, Megaphone
 } from 'lucide-react';
 
 const HERO_IMG = 'https://d2xsxph8kpxj0f.cloudfront.net/97706254/hNgnrzmPgQMt5regq8X3Kp/hero-dashboard-bFnVAUYh9iFoEJUorwSuju.webp';
 
 export default function Dashboard() {
   const { state } = useApp();
-  const { ideas, articles, pitches, settings, earnings } = state;
+  const { ideas, articles, pitches, settings, earnings, brands } = state;
 
   const todayIdeas = ideas.filter(i => {
     const d = new Date(i.created_at);
@@ -26,7 +26,11 @@ export default function Dashboard() {
   const pitchesSent = pitches.filter(p => p.status === 'sent' || p.status === 'accepted').length;
   const accepted = pitches.filter(p => p.status === 'accepted');
   const totalRevenue = earnings.reduce((sum, e) => sum + e.amount, 0) || accepted.reduce((sum, p) => sum + (p.payment ?? 0), 0);
+  const contentRevenue = earnings.filter(e => e.type === 'content').reduce((s, e) => s + e.amount, 0);
+  const productRevenue = earnings.filter(e => e.type === 'product').reduce((s, e) => s + e.amount, 0);
   const acceptanceRate = pitches.length > 0 ? Math.round((accepted.length / pitches.length) * 100) : 0;
+  const contentGoal = settings.content_revenue_goal || 100000;
+  const productGoal = settings.product_revenue_goal || 100000;
 
   const pipelineStages = [
     { label: 'Ideas', count: ideas.length, icon: Lightbulb, color: 'text-amber-400', bgColor: 'bg-amber-500/10', href: '/ideas' },
@@ -215,6 +219,66 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dual Revenue Progress */}
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-emerald-400" />
+            Revenue Engine: $200K/mo Target
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Megaphone className="w-4 h-4 text-emerald-400" />
+                <span className="text-sm font-medium">Content Revenue</span>
+              </div>
+              <p className="text-2xl font-bold font-mono text-emerald-400">${contentRevenue.toLocaleString()}</p>
+              <div className="mt-2">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                  <span>Monthly Goal</span>
+                  <span>${contentGoal.toLocaleString()}</span>
+                </div>
+                <Progress value={Math.min(100, (contentRevenue / contentGoal) * 100)} className="h-1.5" />
+              </div>
+            </div>
+            <div className="p-4 rounded-lg bg-violet-500/5 border border-violet-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <ShoppingBag className="w-4 h-4 text-violet-400" />
+                <span className="text-sm font-medium">Product Revenue</span>
+              </div>
+              <p className="text-2xl font-bold font-mono text-violet-400">${productRevenue.toLocaleString()}</p>
+              <div className="mt-2">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                  <span>Monthly Goal</span>
+                  <span>${productGoal.toLocaleString()}</span>
+                </div>
+                <Progress value={Math.min(100, (productRevenue / productGoal) * 100)} className="h-1.5" />
+              </div>
+            </div>
+          </div>
+          {brands.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-xs font-medium mb-2 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-primary" /> Active Brands
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {brands.map(brand => (
+                  <Link key={brand.id} href="/brands">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border hover:border-primary/30 transition-colors cursor-pointer">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: brand.color }} />
+                      <span className="text-xs font-medium">{brand.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{brand.products.length} products</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <Card className="border-border/50">
