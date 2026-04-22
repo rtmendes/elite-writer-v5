@@ -4,21 +4,17 @@ import { type Server } from "http";
 import path from "path";
 
 export async function setupVite(app: Express, server: Server) {
-  // Dynamic imports — only loaded in development, not bundled in production
+  // Dynamic require to prevent esbuild from bundling vite and its config
   const { createServer: createViteServer } = await import("vite");
   const { nanoid } = await import("nanoid");
-  const viteConfig = (await import("../../vite.config")).default;
-
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true as const,
-  };
 
   const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
-    server: serverOptions,
+    configFile: path.resolve(import.meta.dirname, "../..", "vite.config.ts"),
+    server: {
+      middlewareMode: true,
+      hmr: { server },
+      allowedHosts: true as const,
+    },
     appType: "custom",
   });
 
