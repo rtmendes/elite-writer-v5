@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { streamLLM } from "./llm";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -30,11 +31,90 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
+
+  // CORS for API routes
+  app.use("/api", (req, res, next) => {
+    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-api-key");
+    res.header("Access-Control-Allow-Credentials", "true");
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+    next();
+  });
+
+  // Simple health endpoint for Docker/Traefik
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true, ts: Date.now() });
+  });
+
+  // Auth routes (login, check, hash)
   registerOAuthRoutes(app);
+
+  // Google OAuth callback (redirect handler)
+  app.get("/api/google-oauth-callback", async (req, res) => {
+    const { code, error, state } = req.query;
+    const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+
+    if (error || !code) {
+      res.redirect(`${appUrl}/settings?google=error&reason=${encodeURIComponent(String(error || "no_code"))}`);
+      return;
+    }
+
+    try {
+      // Exchange code via tRPC-like call
+      const { googleRouter } = await import("../routers/google");
+      // Use fetch to call our own tRPC endpoint
+      const resp = await fetch(`http://localhost:${process.env.PORT || 3000}/api/trpc/google.exchangeCode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          json: { code: String(code), state: String(state || "") }
+        }),
+      });
+      
+      if (resp.ok) {
+        res.redirect(`${appUrl}/settings?google=connected`);
+      } else {
+        res.redirect(`${appUrl}/settings?google=error&reason=token_exchange_failed`);
+      }
+    } catch (e: any) {
+      res.redirect(`${appUrl}/settings?google=error&reason=${encodeURIComponent(e.message)}`);
+    }
+  });
+
+  // Streaming AI endpoint (SSE - can't go through tRPC batch)
+  app.post("/api/stream", async (req, res) => {
+    try {
+      const { prompt, systemPrompt, maxTokens, temperature, model } = req.body;
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const messages = [];
+      if (systemPrompt) messages.push({ role: "system" as const, content: systemPrompt });
+      messages.push({ role: "user" as const, content: prompt });
+
+      for await (const chunk of streamLLM({ messages, maxTokens, temperature, model })) {
+        res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+      }
+
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+    } catch (error: any) {
+      console.error("[Stream] Error:", error.message);
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
@@ -43,6 +123,7 @@ async function startServer() {
       createContext,
     })
   );
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
@@ -57,8 +138,11 @@ async function startServer() {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`🚀 Elite Writer V5 running on http://0.0.0.0:${port}/`);
+    console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
+    console.log(`   Database: ${process.env.DATABASE_URL ? "configured" : "NOT configured"}`);
+    console.log(`   Anthropic: ${process.env.ANTHROPIC_API_KEY ? "configured" : "NOT configured"}`);
   });
 }
 
