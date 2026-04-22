@@ -1,41 +1,59 @@
-# ✒️ Elite Writer v5
+# Elite Writer v5
 
-**Enhanced writing command center with full workflow from intelligence gathering through publication matching, AI scoring, writing editor, pitch generation, and financial tracking. Upgrades the existing Elite Writer app with working Giststack intelligence, Visual Capitalist-caliber data visualization, 11-dimension scorecard rout... · Built with Manus.**
+Enhanced writing command center with full workflow from intelligence gathering through publication matching, AI scoring, writing editor, pitch generation, and financial tracking. Upgrades the existing Elite Writer app with working Giststack intelligence, Visual Capitalist-caliber data visualization, 11-dimension scorecard rout...
 
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) ![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat-square) ![Private](https://img.shields.io/badge/Private-🔒-red?style=flat-square)
+## Tech Stack
 
----
+- React
+- Vite
+- TypeScript
+- Tailwind CSS
+- Drizzle ORM
+- Express.js
+- shadcn/ui
+- Framer Motion
+- Recharts
 
-## 📋 What This Does
+## Features
 
-Enhanced writing command center with full workflow from intelligence gathering through publication matching, AI scoring, writing editor, pitch generation, and financial tracking. Upgrades the existing Elite Writer app with working Giststack intelligence, Visual Capitalist-caliber data visualization, 11-dimension scorecard rout... · Built with Manus. It takes you from blank page to published article with AI assistance at every step.
+- Full workflow from intelligence gathering through publication matching
+- AI scoring
+- Writing editor
+- Pitch generation
+- Financial tracking
 
-## 🛠️ Tech Stack
+## Project Structure
 
-| Technology | Role |
-|:---|:---|
-| **TypeScript** | Language |
+```
+├── client/
+├── drizzle/
+├── server/
+└── shared/
+```
 
-## ✨ Key Features
+## Getting Started
 
-- ✒️ **Multi-Stage Workflow** — From research to pitch to published article
-- 📰 **Publication Database** — Track 170+ publications, editors, and preferences
-- 🎯 **Score & Optimize** — AI scorecard ensures every piece meets top-tier standards
-- 🖼️ **Visual Content** — Generate graphics, charts, and video scripts
-- 🔀 **Smart Token Routing** — Uses the best AI model for each task
+### Prerequisites
 
-## 🚀 Getting Started
+- [Node.js](https://nodejs.org/) ≥ 18
+- [pnpm](https://pnpm.io/)
+
+### Installation
 
 ```bash
 git clone https://github.com/rtmendes/elite-writer-v5.git
 cd elite-writer-v5
-# Open index.html in your browser or deploy to your hosting provider
+pnpm install
 ```
 
-## 🔗 Related Projects
+### Development
 
-- [`elite-writer-app`](https://github.com/rtmendes/elite-writer-app)
+```bash
+pnpm dev
+```
 
----
+### Build
 
-*Part of the [Elite Writer](https://github.com/rtmendes) ecosystem by [@rtmendes](https://github.com/rtmendes).*
+```bash
+pnpm build
+```
