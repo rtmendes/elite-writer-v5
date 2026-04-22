@@ -388,7 +388,7 @@ export const intelligenceRouter = router({
   }),
 
   // Apply patterns to content
-  apply: protectedProcedure
+  applyPatterns: protectedProcedure
     .input(z.object({
       content: z.string(),
       patternIds: z.array(z.number()).optional(),
