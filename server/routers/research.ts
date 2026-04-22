@@ -173,16 +173,21 @@ export const researchRouter = router({
   // System status
   status: publicProcedure.query(() => ({
     ok: true,
-    version: "5.0.0",
+    version: "5.1.0",
     timestamp: new Date().toISOString(),
     apis: {
       anthropic: !!ENV.anthropicApiKey,
       openai: !!ENV.openaiApiKey,
+      openrouter: !!ENV.openrouterApiKey,
+      gemini: !!ENV.geminiApiKey,
       perplexity: !!ENV.perplexityApiKey,
       stabilityAi: !!ENV.stabilityAiKey,
       newsapi: !!ENV.newsapiKey,
       gnews: !!ENV.gnewsKey,
       mediastack: !!ENV.mediastackKey,
+      newsdata: !!ENV.newsdataKey,
+      piapi: !!ENV.piapiKey,
+      kie: !!ENV.kieApiKey,
       google: !!(ENV.googleClientId && ENV.googleClientSecret),
       youtube: !!ENV.youtubeApiKey,
     },

@@ -66,6 +66,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const temperature = params.temperature ?? 0.7;
   const model = params.model ?? "claude-sonnet-4-20250514";
 
+  // If model is explicitly OpenRouter or starts with a known OpenRouter pattern
+  if (params.model?.includes("/") && ENV.openrouterApiKey) {
+    return invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: params.model });
+  }
+
   // Try Anthropic first
   if (ENV.anthropicApiKey) {
     return invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model });
@@ -76,12 +81,17 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     return invokeOpenAI(params.messages, { maxTokens, format, temperature });
   }
 
+  // Fallback: OpenRouter (any model)
+  if (ENV.openrouterApiKey) {
+    return invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: "anthropic/claude-sonnet-4-20250514" });
+  }
+
   // Legacy: Forge API
   if (ENV.forgeApiKey && ENV.forgeApiUrl) {
     return invokeForge(params);
   }
 
-  throw new Error("No LLM API key configured (ANTHROPIC_API_KEY, OPENAI_API_KEY, or BUILT_IN_FORGE_API_KEY)");
+  throw new Error("No LLM API key configured (ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, or BUILT_IN_FORGE_API_KEY)");
 }
 
 async function invokeAnthropic(
@@ -191,6 +201,45 @@ async function invokeOpenAI(
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`OpenAI API error: ${response.status} – ${errorText}`);
+  }
+
+  return (await response.json()) as InvokeResult;
+}
+
+async function invokeOpenRouter(
+  messages: Message[],
+  opts: { maxTokens: number; format?: ResponseFormat; temperature: number; model: string }
+): Promise<InvokeResult> {
+  const oaiMessages = messages.map(m => ({
+    role: m.role,
+    content: extractText(m.content),
+  }));
+
+  const payload: Record<string, unknown> = {
+    model: opts.model,
+    messages: oaiMessages,
+    max_tokens: opts.maxTokens,
+    temperature: opts.temperature,
+  };
+
+  if (opts.format) {
+    payload.response_format = opts.format;
+  }
+
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${ENV.openrouterApiKey}`,
+      "HTTP-Referer": ENV.appUrl || "https://elitewriter.insightprofit.live",
+      "X-Title": "Elite Writer V5",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenRouter API error: ${response.status} – ${errorText}`);
   }
 
   return (await response.json()) as InvokeResult;

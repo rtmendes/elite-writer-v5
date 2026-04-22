@@ -16,6 +16,12 @@ export const ENV = {
   falAiApiKey: process.env.FAL_AI_API_KEY ?? "",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   piapiKey: process.env.PIAPI_KEY ?? "",
+  // Multi-model routing
+  openrouterApiKey: process.env.OPENROUTER_API_KEY ?? "",
+  // Additional news APIs
+  newsdataKey: process.env.NEWSDATA_KEY ?? "",
+  // KIE intelligence
+  kieApiKey: process.env.KIE_API_KEY ?? "",
   // Google OAuth
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",

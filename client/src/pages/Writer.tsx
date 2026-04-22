@@ -12,12 +12,16 @@ import { useLocation } from 'wouter';
 import { trpc } from '@/lib/trpc';
 import {
   PenTool, Save, Send, BarChart3, BookOpen, Target,
-  Sparkles, ChevronRight, FileText, Zap, Eye, Download, Building2, Loader2
+  Sparkles, ChevronRight, FileText, Zap, Eye, Download, Building2, Loader2,
+  Bot, Image, Package,
 } from 'lucide-react';
 import { PUBLICATIONS, matchPublications, type Publication } from '@/lib/publications-data';
 import { scoreArticleLocally, DIMENSION_LABELS, getScoreColor, getScoreBgColor, getTierFromScore } from '@/lib/scoring';
 import { TEMPLATES, BRAND_VOICES, type WritingTemplate } from '@/lib/templates';
 import type { ArticleScores } from '@/lib/store';
+import { AgenticPanel } from '@/components/writer/AgenticPanel';
+import { CreativePanel } from '@/components/writer/CreativePanel';
+import { ProductPanel } from '@/components/writer/ProductPanel';
 
 export default function Writer() {
   const { state, addArticle, updateArticle } = useApp();
@@ -326,11 +330,59 @@ export default function Writer() {
       {/* Sidebar */}
       <aside className="w-80 border-l border-border bg-card overflow-y-auto hidden lg:block">
         <Tabs value={sidebarTab} onValueChange={setSidebarTab}>
-          <TabsList className="w-full rounded-none border-b border-border bg-transparent h-10">
-            <TabsTrigger value="score" className="text-xs flex-1">Score</TabsTrigger>
-            <TabsTrigger value="pub" className="text-xs flex-1">Publication</TabsTrigger>
-            <TabsTrigger value="match" className="text-xs flex-1">Match</TabsTrigger>
+          <TabsList className="w-full rounded-none border-b border-border bg-transparent h-10 grid grid-cols-6">
+            <TabsTrigger value="ai" className="text-[10px] gap-0.5 px-1" title="Agentic AI">
+              <Bot className="w-3 h-3" /> <span className="hidden xl:inline">AI</span>
+            </TabsTrigger>
+            <TabsTrigger value="creative" className="text-[10px] gap-0.5 px-1" title="Creative">
+              <Image className="w-3 h-3" /> <span className="hidden xl:inline">Create</span>
+            </TabsTrigger>
+            <TabsTrigger value="products" className="text-[10px] gap-0.5 px-1" title="Products">
+              <Package className="w-3 h-3" /> <span className="hidden xl:inline">Prod</span>
+            </TabsTrigger>
+            <TabsTrigger value="score" className="text-[10px] gap-0.5 px-1" title="Score">
+              <Sparkles className="w-3 h-3" /> <span className="hidden xl:inline">Score</span>
+            </TabsTrigger>
+            <TabsTrigger value="pub" className="text-[10px] gap-0.5 px-1" title="Publication">
+              <BookOpen className="w-3 h-3" /> <span className="hidden xl:inline">Pub</span>
+            </TabsTrigger>
+            <TabsTrigger value="match" className="text-[10px] gap-0.5 px-1" title="Match">
+              <Target className="w-3 h-3" /> <span className="hidden xl:inline">Match</span>
+            </TabsTrigger>
           </TabsList>
+
+          {/* Agentic AI Tab */}
+          <TabsContent value="ai" className="mt-0">
+            <AgenticPanel
+              title={title}
+              content={content}
+              onContentUpdate={setContent}
+              onTitleUpdate={setTitle}
+              targetPublication={selectedPub?.name}
+              brandVoice={BRAND_VOICES.find(b => b.id === selectedBrand)?.name}
+              template={selectedTemplate}
+            />
+          </TabsContent>
+
+          {/* Creative Tab */}
+          <TabsContent value="creative" className="mt-0">
+            <CreativePanel
+              title={title}
+              content={content}
+              articleId={dbArticleId ?? undefined}
+              onInsertContent={(md) => setContent(prev => prev + md)}
+              targetPublication={selectedPub?.name}
+            />
+          </TabsContent>
+
+          {/* Products Tab */}
+          <TabsContent value="products" className="mt-0">
+            <ProductPanel
+              title={title}
+              content={content}
+              brandVoice={BRAND_VOICES.find(b => b.id === selectedBrand)?.name}
+            />
+          </TabsContent>
 
           {/* Score Tab */}
           <TabsContent value="score" className="p-4 space-y-4 mt-0">

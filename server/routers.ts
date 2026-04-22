@@ -13,6 +13,9 @@ import { assetsRouter } from "./routers/assets";
 import { feedsRouter, funnelsRouter } from "./routers/feeds";
 import { researchRouter } from "./routers/research";
 import { toolsRouter } from "./routers/tools";
+import { agenticRouter } from "./routers/agentic";
+import { productCreationRouter } from "./routers/products";
+import { creativeRouter } from "./routers/creative";
 
 export const appRouter = router({
   system: systemRouter,
@@ -43,6 +46,11 @@ export const appRouter = router({
   funnels: funnelsRouter,
   research: researchRouter,
   tools: toolsRouter,
+
+  // Integration features — Agentic Editor, Product Creation, Creative Generation
+  agentic: agenticRouter,
+  productCreation: productCreationRouter,
+  creative: creativeRouter,
 });
 
 export type AppRouter = typeof appRouter;
