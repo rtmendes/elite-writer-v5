@@ -9,7 +9,7 @@ export const ENV = {
   // News APIs
   newsapiKey: process.env.NEWSAPI_KEY ?? "",
   mediastackKey: process.env.MEDIASTACK_KEY ?? "",
-  gnewsKey: process.env.GNEWS_KEY ?? "",
+  gnewsKey: process.env.GNEWS_KEY ?? process.env.GNEWSAPI_KEY ?? "",
   // Image/Video generation
   stabilityAiKey: process.env.STABILITY_AI_KEY ?? "",
   runwareApiKey: process.env.RUNWARE_API_KEY ?? "",
