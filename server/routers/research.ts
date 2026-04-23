@@ -173,7 +173,7 @@ export const researchRouter = router({
   // System status
   status: publicProcedure.query(() => ({
     ok: true,
-    version: "5.1.0",
+    version: "5.2.0",
     timestamp: new Date().toISOString(),
     apis: {
       anthropic: !!ENV.anthropicApiKey,
@@ -192,5 +192,13 @@ export const researchRouter = router({
       youtube: !!ENV.youtubeApiKey,
     },
     database: true,
+    },
+    imageProviders: {
+      "gpt-image-1": !!ENV.openaiApiKey,
+      "dall-e-3": !!ENV.openaiApiKey,
+      gemini: !!ENV.geminiApiKey,
+      piapi: !!ENV.piapiKey,
+      openrouterEnhance: !!ENV.openrouterApiKey,
+    },
   })),
 });
