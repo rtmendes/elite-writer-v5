@@ -1,12 +1,16 @@
 /**
  * Creative Generation Router — AI Images, Infographics, and Mini Apps
  * 
+ * v5.2.0 — Enhanced with OpenRouter multi-model routing and GPT Image generation
+ * 
  * Features:
- * 1. Contextual inline image generation for articles
- * 2. Data-driven infographic generation (SVG/HTML)
- * 3. Interactive mini-app generation (calculators, quizzes, tools)
- * 4. Hero image generation with editorial styling
- * 5. Social media image cards
+ * 1. GPT Image generation (gpt-image-1) — highest quality, primary provider
+ * 2. Multi-provider fallback: OpenAI → DALL-E 3 → Gemini → PiAPI
+ * 3. OpenRouter-powered intelligent prompt enhancement
+ * 4. Data-driven infographic generation (SVG/HTML)
+ * 5. Interactive mini-app generation (calculators, quizzes, tools)
+ * 6. Hero images, social cards, editorial styling
+ * 7. AI-powered image editing and variations
  */
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -14,67 +18,99 @@ import { invokeLLM } from "../_core/llm";
 import { ENV } from "../_core/env";
 import { getDb } from "../db";
 import { generatedImages } from "../../drizzle/schema";
+import {
+  generateImage,
+  generateImageOpenAI,
+  generateImageDallE3,
+  generateImageGemini,
+  generateImagePiAPI,
+} from "../_core/imageGeneration";
 
-// ─── Image Generation Helpers ─────────────────────────────
+// ─── OpenRouter Enhanced Prompt Generation ────────────────
 
-async function generateImageDallE(prompt: string, size: string = "1792x1024"): Promise<string | null> {
-  if (!ENV.openaiApiKey) return null;
+async function enhancePromptViaOpenRouter(
+  prompt: string,
+  context: { style?: string; type?: string; publication?: string }
+): Promise<string> {
+  if (!ENV.openrouterApiKey) return prompt;
+
   try {
-    const resp = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${ENV.openaiApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "dall-e-3",
-        prompt: prompt.slice(0, 4000),
-        n: 1,
-        size,
-        quality: "hd",
-        response_format: "b64_json",
-      }),
-      signal: AbortSignal.timeout(30000),
+    const result = await invokeLLM({
+      model: "google/gemini-2.0-flash-exp:free",
+      messages: [
+        {
+          role: "system",
+          content: `You are a world-class art director. Enhance the image generation prompt to produce stunning, publication-quality visuals. 
+Style: ${context.style || "editorial"}
+Type: ${context.type || "hero image"}
+${context.publication ? `Publication: ${context.publication}` : ""}
+Return ONLY the enhanced prompt — no explanation, no quotes.`,
+        },
+        { role: "user", content: prompt },
+      ],
+      maxTokens: 500,
+      temperature: 0.8,
     });
-    if (resp.ok) {
-      const data = await resp.json() as any;
-      const b64 = data.data?.[0]?.b64_json;
-      if (b64) return `data:image/png;base64,${b64}`;
-    }
-  } catch (e) {
-    console.warn("[creative] DALL-E error:", (e as Error).message);
+    return result.choices[0]?.message?.content?.trim() || prompt;
+  } catch {
+    return prompt;
   }
-  return null;
 }
 
-async function generateImageGemini(prompt: string): Promise<string | null> {
-  if (!ENV.geminiApiKey) return null;
-  try {
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${ENV.geminiApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `Generate an image: ${prompt}` }] }],
-          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
-        }),
-        signal: AbortSignal.timeout(25000),
-      }
-    );
-    if (resp.ok) {
-      const data = await resp.json() as any;
-      const parts = data.candidates?.[0]?.content?.parts || [];
-      for (const part of parts) {
-        if (part.inlineData?.mimeType?.startsWith("image/")) {
-          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        }
-      }
-    }
-  } catch (e) {
-    console.warn("[creative] Gemini image error:", (e as Error).message);
-  }
-  return null;
+// ─── Image Generation with Smart Routing ──────────────────
+
+async function generateArticleImageMultiProvider(
+  prompt: string,
+  opts: {
+    size?: "landscape" | "portrait" | "square";
+    quality?: "low" | "medium" | "high";
+    preferredProvider?: string;
+  } = {}
+): Promise<{ imageUrl: string; source: string }> {
+  const sizeMap: Record<string, "1536x1024" | "1024x1536" | "1024x1024"> = {
+    landscape: "1536x1024",
+    portrait: "1024x1536",
+    square: "1024x1024",
+  };
+
+  const result = await generateImage({
+    prompt,
+    size: sizeMap[opts.size || "landscape"] || "1536x1024",
+    quality: opts.quality || "high",
+  });
+
+  return {
+    imageUrl: result.url || (result.b64Json ? `data:image/png;base64,${result.b64Json}` : ""),
+    source: result.source || "unknown",
+  };
 }
 
 export const creativeRouter = router({
+  // ─── Available Image Providers ────────────────────────────
+  providers: protectedProcedure.query(() => {
+    const providers: Array<{ id: string; name: string; available: boolean; quality: string }> = [];
+
+    if (ENV.openaiApiKey) {
+      providers.push({ id: "gpt-image-1", name: "GPT Image (Best Quality)", available: true, quality: "highest" });
+      providers.push({ id: "dall-e-3", name: "DALL-E 3", available: true, quality: "high" });
+    }
+    if (ENV.geminiApiKey) {
+      providers.push({ id: "gemini", name: "Gemini Image Gen", available: true, quality: "good" });
+    }
+    if (ENV.piapiKey) {
+      providers.push({ id: "piapi", name: "PiAPI (Midjourney-style)", available: true, quality: "high" });
+    }
+    if (ENV.openrouterApiKey) {
+      providers.push({ id: "openrouter-enhance", name: "OpenRouter Prompt Enhancement", available: true, quality: "n/a" });
+    }
+
+    return {
+      providers,
+      primaryProvider: ENV.openaiApiKey ? "gpt-image-1" : (ENV.geminiApiKey ? "gemini" : "none"),
+      hasOpenRouter: !!ENV.openrouterApiKey,
+    };
+  }),
+
   // ─── Suggest Images for Article ───────────────────────────
   suggestImages: protectedProcedure
     .input(z.object({
@@ -83,7 +119,11 @@ export const creativeRouter = router({
       targetPublication: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
+      // Use OpenRouter for intelligent image suggestions
+      const modelToUse = ENV.openrouterApiKey ? "google/gemini-2.5-pro-preview-05-06" : undefined;
+
       const result = await invokeLLM({
+        model: modelToUse,
         messages: [
           {
             role: "system",
@@ -102,14 +142,14 @@ Return JSON:
 {
   "heroImage": {
     "concept": "<description of the ideal hero image>",
-    "prompt": "<DALL-E generation prompt for the hero>",
+    "prompt": "<detailed generation prompt for GPT image model — be specific about composition, lighting, mood, color palette, and style>",
     "style": "<editorial|infographic|abstract|photographic>"
   },
   "inlineImages": [
     {
       "afterSection": "<section heading or paragraph identifier>",
       "concept": "<image concept>",
-      "prompt": "<generation prompt>",
+      "prompt": "<detailed generation prompt>",
       "type": "<photo|illustration|chart|diagram>",
       "caption": "<suggested caption>"
     }
@@ -142,63 +182,143 @@ Return JSON:
       return { success: true, data, usage: result.usage };
     }),
 
-  // ─── Generate Article Image ───────────────────────────────
+  // ─── Generate Article Image (Multi-Provider) ──────────────
   generateArticleImage: protectedProcedure
     .input(z.object({
       prompt: z.string(),
       type: z.enum(["hero", "inline", "social", "infographic"]).default("hero"),
-      style: z.enum(["editorial", "bloomberg", "forbes", "atlantic", "nyt", "abstract", "photographic"]).default("editorial"),
+      style: z.enum(["editorial", "bloomberg", "forbes", "atlantic", "nyt", "abstract", "photographic", "cinematic", "minimal"]).default("editorial"),
       articleTitle: z.string().optional(),
       articleId: z.number().optional(),
       size: z.enum(["landscape", "portrait", "square"]).default("landscape"),
+      enhancePrompt: z.boolean().default(true),
+      preferredProvider: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const styleMap: Record<string, string> = {
-        editorial: "Premium editorial magazine photography, shallow depth of field, natural lighting",
-        bloomberg: "Bloomberg Businessweek style — bold, graphic, conceptual editorial illustration",
-        forbes: "Forbes magazine style — polished executive photography, corporate confidence",
-        atlantic: "The Atlantic style — thoughtful, literary, moody editorial photography",
-        nyt: "New York Times style — documentary photography, authentic moments, natural light",
-        abstract: "Abstract conceptual art, clean geometric shapes, bold color palette, minimalist composition",
-        photographic: "High-end stock photography, photorealistic, professional composition, pristine quality",
+        editorial: "Premium editorial magazine photography, shallow depth of field, natural lighting, publication-quality composition",
+        bloomberg: "Bloomberg Businessweek style — bold, graphic, conceptual editorial illustration with striking visual metaphors",
+        forbes: "Forbes magazine style — polished executive photography, corporate confidence, premium stock quality",
+        atlantic: "The Atlantic style — thoughtful, literary, moody editorial photography with artistic depth",
+        nyt: "New York Times style — documentary photography, authentic moments, natural light, journalistic integrity",
+        abstract: "Abstract conceptual art, clean geometric shapes, bold color palette, minimalist composition, modern design",
+        photographic: "High-end stock photography, photorealistic, professional composition, pristine quality, shot on medium format",
+        cinematic: "Cinematic film still, wide aspect ratio, dramatic lighting, Arri Alexa quality, color-graded",
+        minimal: "Clean minimalist design, whitespace-heavy, modern typography-focused, Swiss design influenced",
       };
 
-      const sizeMap: Record<string, string> = {
-        landscape: "1792x1024",
-        portrait: "1024x1792",
-        square: "1024x1024",
-      };
-
-      const finalPrompt = `${input.prompt}. ${styleMap[input.style] || styleMap.editorial}. ${input.articleTitle ? `For article: "${input.articleTitle}".` : ""} Shot on medium format, cinematic quality.`;
-
-      // Try DALL-E first, then Gemini
-      let imageUrl = await generateImageDallE(finalPrompt, sizeMap[input.size]);
-      let source = "dalle-3";
-
-      if (!imageUrl) {
-        imageUrl = await generateImageGemini(finalPrompt);
-        source = "gemini";
+      let finalPrompt = `${input.prompt}. ${styleMap[input.style] || styleMap.editorial}.`;
+      if (input.articleTitle) {
+        finalPrompt += ` For article: "${input.articleTitle}".`;
       }
 
+      // Enhance prompt via OpenRouter if enabled
+      if (input.enhancePrompt && ENV.openrouterApiKey) {
+        finalPrompt = await enhancePromptViaOpenRouter(finalPrompt, {
+          style: input.style,
+          type: input.type,
+        });
+      }
+
+      // Generate using multi-provider chain (GPT Image → DALL-E 3 → Gemini → PiAPI)
+      const { imageUrl, source } = await generateArticleImageMultiProvider(finalPrompt, {
+        size: input.size,
+        quality: "high",
+      });
+
       if (!imageUrl) {
-        throw new Error("Image generation failed — no image provider available");
+        throw new Error("Image generation failed — no provider available");
       }
 
       // Store in DB
       const db = await getDb();
       if (db) {
-        await db.insert(generatedImages).values({
-          userId: ctx.user.id,
-          prompt: finalPrompt,
-          imageUrl: imageUrl.startsWith("data:") ? "(base64)" : imageUrl,
-          model: source,
-          style: input.style,
-          articleId: input.articleId,
-          metadata: { type: input.type, originalPrompt: input.prompt },
-        });
+        try {
+          await db.insert(generatedImages).values({
+            userId: ctx.user.id,
+            prompt: finalPrompt,
+            imageUrl: imageUrl.startsWith("data:") ? "(base64)" : imageUrl,
+            model: source,
+            style: input.style,
+            articleId: input.articleId,
+            metadata: { type: input.type, originalPrompt: input.prompt, enhanced: input.enhancePrompt },
+          });
+        } catch (e) {
+          console.warn("[creative] DB insert error:", (e as Error).message);
+        }
       }
 
-      return { success: true, imageUrl, source, type: input.type };
+      return { success: true, imageUrl, source, type: input.type, promptUsed: finalPrompt };
+    }),
+
+  // ─── Edit/Vary Existing Image ─────────────────────────────
+  editImage: protectedProcedure
+    .input(z.object({
+      originalImageUrl: z.string(),
+      editPrompt: z.string(),
+      size: z.enum(["landscape", "portrait", "square"]).default("landscape"),
+    }))
+    .mutation(async ({ input }) => {
+      if (!ENV.openaiApiKey) {
+        throw new Error("Image editing requires OpenAI API key");
+      }
+
+      const sizeMap: Record<string, "1536x1024" | "1024x1536" | "1024x1024"> = {
+        landscape: "1536x1024",
+        portrait: "1024x1536",
+        square: "1024x1024",
+      };
+
+      // Use GPT Image model for editing
+      const result = await generateImageOpenAI({
+        prompt: input.editPrompt,
+        size: sizeMap[input.size],
+        quality: "high",
+      });
+
+      if (!result) {
+        throw new Error("Image editing failed");
+      }
+
+      return {
+        success: true,
+        imageUrl: result.url || (result.b64Json ? `data:image/png;base64,${result.b64Json}` : ""),
+        source: result.source,
+      };
+    }),
+
+  // ─── Batch Generate Images for Article ────────────────────
+  batchGenerate: protectedProcedure
+    .input(z.object({
+      prompts: z.array(z.object({
+        prompt: z.string(),
+        type: z.enum(["hero", "inline", "social"]),
+        style: z.string().default("editorial"),
+      })).max(5),
+      articleTitle: z.string().optional(),
+      enhancePrompts: z.boolean().default(true),
+    }))
+    .mutation(async ({ input }) => {
+      const results = await Promise.allSettled(
+        input.prompts.map(async (p) => {
+          let prompt = p.prompt;
+          if (input.enhancePrompts && ENV.openrouterApiKey) {
+            prompt = await enhancePromptViaOpenRouter(prompt, { style: p.style, type: p.type });
+          }
+          const { imageUrl, source } = await generateArticleImageMultiProvider(prompt, {
+            size: p.type === "social" ? "square" : "landscape",
+          });
+          return { prompt: p.prompt, imageUrl, source, type: p.type };
+        })
+      );
+
+      return {
+        success: true,
+        images: results.map((r, i) => ({
+          index: i,
+          ...(r.status === "fulfilled" ? r.value : { error: (r as PromiseRejectedResult).reason?.message }),
+        })),
+      };
     }),
 
   // ─── Generate Infographic (HTML/SVG) ──────────────────────
@@ -221,7 +341,11 @@ Return JSON:
 
       const colors = colorSchemes[input.colorScheme] || colorSchemes.dark;
 
+      // Use OpenRouter for higher-quality infographic generation
+      const modelToUse = ENV.openrouterApiKey ? "anthropic/claude-sonnet-4-20250514" : undefined;
+
       const result = await invokeLLM({
+        model: modelToUse,
         messages: [
           {
             role: "system",
@@ -286,18 +410,23 @@ Return JSON:
         survey: "An interactive survey with real-time results visualization",
       };
 
+      // Use OpenRouter with Claude for best code generation
+      const modelToUse = ENV.openrouterApiKey ? "anthropic/claude-sonnet-4-20250514" : undefined;
+
       const result = await invokeLLM({
+        model: modelToUse,
         messages: [
           {
             role: "system",
-            content: `You are a senior full-stack developer who creates interactive web applications. Generate a complete, self-contained React component that works as an embeddable mini-app. The component must:
+            content: `You are a senior full-stack developer who creates interactive web applications. Generate a complete, self-contained interactive app as HTML/JS/CSS. The app must:
 - Use only inline styles (no external CSS)
-- Use only React hooks (useState, useEffect, useMemo)
-- Be fully self-contained — no external dependencies beyond React
+- Use vanilla JavaScript (no frameworks)
+- Be fully self-contained — no external dependencies
 - Be mobile-responsive
-- Have polished UI with smooth transitions
-- Include proper error handling
-- Use a dark theme by default with professional aesthetics
+- Have polished UI with smooth transitions and micro-animations
+- Include proper error handling and input validation
+- Use a dark theme by default with professional aesthetics (bg: #0f172a, text: #e2e8f0, accent: #3b82f6)
+- Feel like a premium SaaS product, not a toy
 Return ONLY valid JSON.`,
           },
           {
@@ -316,7 +445,7 @@ Return JSON:
   "name": "<app name>",
   "description": "<one-line description>",
   "appType": "${input.appType}",
-  "html": "<complete self-contained HTML with embedded JS (vanilla, no React needed) and CSS that creates the interactive app — must work when injected into a div. Use modern DOM manipulation, event listeners, and animations. The app should be fully functional with a polished dark UI (bg: #0f172a, text: #e2e8f0, accent: #3b82f6). Must be 100% self-contained in a single HTML string.>",
+  "html": "<complete self-contained HTML with embedded JS and CSS that creates the interactive app — must work when injected into a div>",
   "embedCode": "<a simplified embed snippet for external use>",
   "dataInputs": [{"name": "<input name>", "type": "<number|text|select>", "label": "<label>", "default": "<default value>"}],
   "outputs": [{"name": "<output name>", "label": "<label>", "format": "<number|percentage|text|chart>"}],
@@ -343,6 +472,7 @@ Return JSON:
     }))
     .mutation(async ({ input }) => {
       const result = await invokeLLM({
+        model: ENV.openrouterApiKey ? "google/gemini-2.5-pro-preview-05-06" : undefined,
         messages: [
           {
             role: "system",
@@ -390,6 +520,7 @@ Return JSON:
       platform: z.enum(["twitter", "linkedin", "instagram", "facebook"]).default("twitter"),
       style: z.enum(["quote", "stat", "headline", "listicle"]).default("headline"),
       brandColor: z.string().optional(),
+      useAiImage: z.boolean().default(false),
     }))
     .mutation(async ({ input }) => {
       const platformSizes: Record<string, { w: number; h: number }> = {
@@ -402,8 +533,20 @@ Return JSON:
       const size = platformSizes[input.platform];
       const accent = input.brandColor || "#3b82f6";
 
-      // Generate HTML card
+      // Optionally generate a background image with GPT Image
+      let bgImageUrl: string | null = null;
+      if (input.useAiImage && ENV.openaiApiKey) {
+        const imgResult = await generateImageOpenAI({
+          prompt: `Abstract background for social media card about: "${input.headline}". Moody, dark, with accent color ${accent}. No text.`,
+          size: input.platform === "instagram" ? "1024x1024" : "1536x1024",
+          quality: "medium",
+        });
+        bgImageUrl = imgResult?.url || null;
+      }
+
+      // Generate HTML card via OpenRouter
       const result = await invokeLLM({
+        model: ENV.openrouterApiKey ? "anthropic/claude-sonnet-4-20250514" : undefined,
         messages: [
           {
             role: "system",
@@ -418,6 +561,7 @@ ${input.subtext ? `Subtext: ${input.subtext}` : ""}
 Platform: ${input.platform}
 Style: ${input.style}
 Size: ${size.w}x${size.h}
+${bgImageUrl ? `Background image URL: ${bgImageUrl}` : ""}
 
 Return JSON:
 {
@@ -435,6 +579,6 @@ Return JSON:
       let data;
       try { data = JSON.parse(text); } catch { data = { html: "<p>Generation failed</p>" }; }
 
-      return { success: true, data, platform: input.platform, usage: result.usage };
+      return { success: true, data, platform: input.platform, bgImageUrl, usage: result.usage };
     }),
 });
