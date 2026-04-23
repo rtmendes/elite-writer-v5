@@ -194,6 +194,7 @@ export const researchRouter = router({
     database: true,
     },
     imageProviders: {
+      "gpt-image-2": !!ENV.openaiApiKey,
       "gpt-image-1": !!ENV.openaiApiKey,
       "dall-e-3": !!ENV.openaiApiKey,
       gemini: !!ENV.geminiApiKey,
