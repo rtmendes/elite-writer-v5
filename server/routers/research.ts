@@ -192,7 +192,7 @@ export const researchRouter = router({
       youtube: !!ENV.youtubeApiKey,
     },
     database: true,
-    },
+
     imageProviders: {
       "gpt-image-2": !!ENV.openaiApiKey,
       "gpt-image-1": !!ENV.openaiApiKey,

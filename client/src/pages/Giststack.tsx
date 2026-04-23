@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import {
   Newspaper, Bookmark, BookmarkCheck, TrendingUp, Search,
-  ExternalLink, Lightbulb, Plus, Sparkles, RefreshCw, Zap, Brain
+  ExternalLink, Lightbulb, Plus, Sparkles, RefreshCw, Zap, Brain, Loader2
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 
-// Demo trending content (simulates Giststack-style feed)
+// Demo trending content (fallback when API data is unavailable)
 const DEMO_FEED = [
   { title: 'AI Agents Are Replacing Entire Marketing Departments', summary: 'New research from McKinsey shows 40% of marketing tasks can be fully automated by AI agents, with companies reporting 3x ROI within 6 months of implementation.', source: 'McKinsey Digital', url: '#', category: 'AI & Technology', relevance_score: 95 },
   { title: 'The $50B Creator Economy Is Shifting to Long-Form', summary: 'Substack and Medium report record-breaking engagement for 2000+ word articles, reversing the short-form trend. Advertisers are following with premium CPMs.', source: 'Bloomberg', url: '#', category: 'Business', relevance_score: 88 },
@@ -31,19 +31,124 @@ export default function Giststack() {
   const [customTopic, setCustomTopic] = useState('');
   const [topics, setTopics] = useState<string[]>(['AI & Technology', 'Business', 'Future of Work']);
   const [dailyBrief, setDailyBrief] = useState<string | null>(null);
-  const dailyBriefMutation = trpc.ai.dailyBrief.useMutation();
+  const [liveNews, setLiveNews] = useState<any[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Merge demo feed with saved items
+  // tRPC mutations
+  const dailyBriefMutation = trpc.ai.dailyBrief.useMutation();
+  const newsFetchMutation = trpc.news.fetch.useMutation();
+  const newsFetchAndStoreMutation = trpc.news.fetchAndStore.useMutation();
+
+  // Load stored news on mount (requires auth)
+  const newsListQuery = trpc.news.list.useQuery({ limit: 50 }, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  // Auto-load news from DB on mount
+  useEffect(() => {
+    if (newsListQuery.data && newsListQuery.data.length > 0) {
+      const mapped = newsListQuery.data.map((item: any) => ({
+        id: `db-${item.id}`,
+        title: item.title || 'Untitled',
+        summary: item.description || '',
+        source: item.sourceName || item.source || 'Unknown',
+        url: item.url || '#',
+        category: item.category || 'Business',
+        relevance_score: 70 + Math.floor(Math.random() * 25),
+        saved: false,
+        created_at: item.createdAt || new Date().toISOString(),
+      }));
+      setLiveNews(mapped);
+    }
+  }, [newsListQuery.data]);
+
+  // Refresh Feed — fetch real news from APIs and store
+  const handleRefreshFeed = async () => {
+    setIsRefreshing(true);
+    try {
+      // Fetch fresh news from all sources for each tracked topic
+      const queries = topics.map(t => t.toLowerCase().replace(/\s*&\s*/g, ' '));
+      const allArticles: any[] = [];
+
+      for (const query of queries.slice(0, 3)) {
+        try {
+          const result = await newsFetchMutation.mutateAsync({
+            source: 'all',
+            query,
+            limit: 10,
+          });
+          if (result.articles) {
+            allArticles.push(...result.articles.map((a: any) => ({
+              ...a,
+              category: topics.find(t => t.toLowerCase().includes(query.split(' ')[0])) || 'Business',
+            })));
+          }
+        } catch (e) {
+          // Individual topic may fail, continue
+        }
+      }
+
+      // Also try to store them
+      try {
+        await newsFetchAndStoreMutation.mutateAsync({ limit: 20 });
+      } catch {
+        // Store may fail on duplicates, that's fine
+      }
+
+      if (allArticles.length > 0) {
+        // Deduplicate by title
+        const seen = new Set(liveNews.map(n => n.title));
+        const newItems = allArticles
+          .filter(a => !seen.has(a.title))
+          .map((a, i) => ({
+            id: `live-${Date.now()}-${i}`,
+            title: a.title || 'Untitled',
+            summary: a.description || '',
+            source: a.sourceName || a.source || 'Unknown',
+            url: a.url || '#',
+            category: a.category || 'Business',
+            relevance_score: 70 + Math.floor(Math.random() * 25),
+            saved: false,
+            created_at: a.publishedAt || new Date().toISOString(),
+          }));
+
+        setLiveNews(prev => [...newItems, ...prev].slice(0, 100));
+        toast.success(`Fetched ${allArticles.length} articles (${newItems.length} new)`);
+      } else {
+        toast.info('No new articles found. APIs may be rate-limited.');
+      }
+
+      // Refetch stored list
+      newsListQuery.refetch();
+    } catch (err: any) {
+      toast.error(err.message || 'Feed refresh failed — are you logged in?');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Merge live news + saved items + demo fallback
   const allItems = useMemo(() => {
     const saved = state.giststack;
-    const demo = DEMO_FEED.map((item, i) => ({
+
+    // If we have live news, use it; otherwise fall back to demo
+    const feedItems = liveNews.length > 0 ? liveNews : DEMO_FEED.map((item, i) => ({
       ...item,
       id: `demo-${i}`,
-      saved: saved.some(s => s.title === item.title && s.saved),
+      saved: false,
       created_at: new Date().toISOString(),
     }));
-    return [...saved.filter(s => !demo.some(d => d.title === s.title)), ...demo];
-  }, [state.giststack]);
+
+    // Merge: saved items first (that aren't in feed), then feed items
+    const feedTitles = new Set(feedItems.map(f => f.title));
+    const uniqueSaved = saved.filter(s => !feedTitles.has(s.title));
+
+    return [...uniqueSaved, ...feedItems.map(item => ({
+      ...item,
+      saved: saved.some(s => s.title === item.title && s.saved),
+    }))];
+  }, [state.giststack, liveNews]);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(allItems.map(i => i.category)));
@@ -63,7 +168,7 @@ export default function Giststack() {
   const savedItems = allItems.filter(i => i.saved);
 
   const handleSave = (item: typeof allItems[0]) => {
-    if (item.id.startsWith('demo-')) {
+    if (item.id.startsWith('demo-') || item.id.startsWith('db-') || item.id.startsWith('live-')) {
       addGiststackItem({
         title: item.title,
         summary: item.summary,
@@ -98,6 +203,9 @@ export default function Giststack() {
     }
   };
 
+  const liveCount = liveNews.length;
+  const isLive = liveCount > 0;
+
   return (
     <div className="space-y-6">
       {/* Hero Banner */}
@@ -109,6 +217,11 @@ export default function Giststack() {
             <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
               <Newspaper className="w-6 h-6 text-cyan-400" />
               Intelligence Feed
+              {isLive && (
+                <Badge variant="outline" className="text-[10px] border-emerald-500/50 text-emerald-400 ml-2 animate-pulse">
+                  ● LIVE — {liveCount} articles
+                </Badge>
+              )}
             </h1>
             <p className="text-sm text-white/70 mt-1">
               Curate trending stories, extract article ideas, and track topics
@@ -131,13 +244,19 @@ export default function Giststack() {
                     toast.success(`Daily brief generated (${tokens} tokens)`);
                   }
                 } catch (err: any) {
-                  toast.error(err.message || 'Brief generation failed');
+                  toast.error(err.message || 'Brief generation failed — are you logged in?');
                 }
               }}>
               <Brain className="w-4 h-4" /> {dailyBriefMutation.isPending ? 'Generating...' : 'AI Daily Brief'}
             </Button>
-            <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10" onClick={() => toast.info('Feed refreshed with latest content')}>
-              <RefreshCw className="w-4 h-4" /> Refresh Feed
+            <Button
+              variant="outline"
+              className="gap-2 border-white/20 text-white hover:bg-white/10"
+              disabled={isRefreshing}
+              onClick={handleRefreshFeed}
+            >
+              {isRefreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              {isRefreshing ? 'Fetching...' : 'Refresh Feed'}
             </Button>
           </div>
         </div>
@@ -226,6 +345,14 @@ export default function Giststack() {
         </div>
 
         <TabsContent value="feed" className="space-y-3">
+          {newsListQuery.isLoading && liveNews.length === 0 && (
+            <Card className="border-border">
+              <CardContent className="p-8 text-center">
+                <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Loading intelligence feed...</p>
+              </CardContent>
+            </Card>
+          )}
           {filtered.map((item) => (
             <Card key={item.id} className="border-border hover:border-primary/30 transition-colors">
               <CardContent className="p-4">
@@ -251,9 +378,13 @@ export default function Giststack() {
                       title="Create article idea">
                       <Lightbulb className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Open source">
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
+                    {item.url && item.url !== '#' && (
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Open source" asChild>
+                        <a href={item.url} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>

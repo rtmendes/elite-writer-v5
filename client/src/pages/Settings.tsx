@@ -1,12 +1,12 @@
 // Settings — Multi-LLM Configuration, News APIs, Cost Routing, Token Usage, Enterprise
 // Design: Dark command center, frosted glass cards, violet accents
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { PUBLICATIONS } from '@/lib/publications-data';
 import { BRAND_VOICES } from '@/lib/templates';
 import {
-  loadAIConfig, saveAIConfig, getProviderStatus, getUsageSummary,
+  loadAIConfig, saveAIConfig, getProviderStatus, getUsageSummary, syncFromServer,
   loadUsage, type LLMConfig,
 } from '@/lib/ai-engine';
 import {
@@ -21,8 +21,26 @@ export default function Settings() {
   const [aiConfig, setAiConfig] = useState<LLMConfig>(loadAIConfig);
   const [activeTab, setActiveTab] = useState<'llm' | 'news' | 'writing' | 'financial' | 'usage' | 'data'>('llm');
 
-  const providerStatus = useMemo(() => getProviderStatus(), []);
+  const providerStatus = useMemo(() => getProviderStatus(), [aiConfig]);
   const usageSummary = useMemo(() => getUsageSummary(), []);
+
+  // Auto-sync API keys from server env vars on mount
+  const [synced, setSynced] = useState(false);
+  useEffect(() => {
+    if (synced) return;
+    const hasKeys = Object.entries(aiConfig).some(([k, v]) => k.endsWith("_key") && !!v);
+    if (!hasKeys) {
+      syncFromServer().then(updated => {
+        if (updated) {
+          setAiConfig(updated);
+          toast.success("API keys loaded from server");
+        }
+        setSynced(true);
+      });
+    } else {
+      setSynced(true);
+    }
+  }, [synced]);
   const usage = useMemo(() => loadUsage(), []);
 
   const [brandVoice, setBrandVoice] = useState(state.settings.brand_voice);
