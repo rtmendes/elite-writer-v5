@@ -4,7 +4,7 @@
  * v5.2.0 — Enhanced with OpenRouter multi-model routing and GPT Image generation
  * 
  * Features:
- * 1. GPT Image generation (gpt-image-1) — highest quality, primary provider
+ * 1. GPT Image 2 generation (gpt-image-2) — newest model (Apr 21 2026), highest quality
  * 2. Multi-provider fallback: OpenAI → DALL-E 3 → Gemini → PiAPI
  * 3. OpenRouter-powered intelligent prompt enhancement
  * 4. Data-driven infographic generation (SVG/HTML)
@@ -20,6 +20,7 @@ import { getDb } from "../db";
 import { generatedImages } from "../../drizzle/schema";
 import {
   generateImage,
+  generateImageGPT2,
   generateImageOpenAI,
   generateImageDallE3,
   generateImageGemini,
@@ -91,7 +92,8 @@ export const creativeRouter = router({
     const providers: Array<{ id: string; name: string; available: boolean; quality: string }> = [];
 
     if (ENV.openaiApiKey) {
-      providers.push({ id: "gpt-image-1", name: "GPT Image (Best Quality)", available: true, quality: "highest" });
+      providers.push({ id: "gpt-image-2", name: "GPT Image 2 (Latest — Best Quality)", available: true, quality: "highest" });
+      providers.push({ id: "gpt-image-1", name: "GPT Image 1", available: true, quality: "high" });
       providers.push({ id: "dall-e-3", name: "DALL-E 3", available: true, quality: "high" });
     }
     if (ENV.geminiApiKey) {
@@ -106,7 +108,7 @@ export const creativeRouter = router({
 
     return {
       providers,
-      primaryProvider: ENV.openaiApiKey ? "gpt-image-1" : (ENV.geminiApiKey ? "gemini" : "none"),
+      primaryProvider: ENV.openaiApiKey ? "gpt-image-2" : (ENV.geminiApiKey ? "gemini" : "none"),
       hasOpenRouter: !!ENV.openrouterApiKey,
     };
   }),
@@ -269,8 +271,8 @@ Return JSON:
         square: "1024x1024",
       };
 
-      // Use GPT Image model for editing
-      const result = await generateImageOpenAI({
+      // Use GPT Image 2 model for editing
+      const result = await generateImageGPT2({
         prompt: input.editPrompt,
         size: sizeMap[input.size],
         quality: "high",
@@ -536,7 +538,7 @@ Return JSON:
       // Optionally generate a background image with GPT Image
       let bgImageUrl: string | null = null;
       if (input.useAiImage && ENV.openaiApiKey) {
-        const imgResult = await generateImageOpenAI({
+        const imgResult = await generateImageGPT2({
           prompt: `Abstract background for social media card about: "${input.headline}". Moody, dark, with accent color ${accent}. No text.`,
           size: input.platform === "instagram" ? "1024x1024" : "1536x1024",
           quality: "medium",
