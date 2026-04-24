@@ -16,7 +16,9 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
+            git config --global --add safe.directory /opt/elite-writer-v5
             cd /opt/elite-writer-v5
+            sudo chown -R ubuntu:ubuntu .git
             git pull origin main
             docker compose build --no-cache elite-writer
             docker compose up -d elite-writer
