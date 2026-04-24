@@ -1,10 +1,11 @@
 import { type ReactNode, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { AppProvider } from '@/contexts/AppContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   LayoutDashboard, Newspaper, Lightbulb, Search, PenTool,
   BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
-  Zap, Menu, Building2
+  Zap, Menu, Building2, Moon, Sun
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +26,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme, toggleTheme, switchable } = useTheme();
 
   const currentItem = NAV_ITEMS.find(item => {
     if (item.path === '/') return location === '/';
@@ -121,6 +123,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
 
             <div className="flex-1" />
+
+            {/* Theme toggle */}
+            {switchable && toggleTheme && (
+              <button
+                onClick={toggleTheme}
+                className="flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+            )}
 
             {/* Status indicators */}
             <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
