@@ -1,8 +1,10 @@
 // Elite Writer V5 — 11-Dimension Scoring Engine
 // Provides local heuristic scoring when no API key is available,
 // and AI-powered scoring when OpenAI key is configured.
+// Now with publication-specific weights and content filter integration (Gap #3).
 
 import type { ArticleScores } from './store';
+import { getScoringWeights, checkContentFilters, getEnhancementPrompt } from './publication-sops';
 
 const DIMENSIONS = [
   'clarity_structure', 'hook_engagement', 'voice_tone', 'data_evidence',
@@ -137,12 +139,14 @@ export function scoreArticleLocally(content: string, targetPublication?: string)
     conclusion_cta: Math.round(conclusion * 10) / 10,
   };
 
-  // Calculate overall as weighted average
-  const weights: Record<string, number> = {
-    clarity_structure: 1, hook_engagement: 1.2, voice_tone: 1, data_evidence: 1.3,
-    originality_angle: 1.1, publication_fit: 1.2, timeliness: 0.8, actionability: 0.9,
-    expertise_depth: 1.1, readability: 1, conclusion_cta: 0.8,
-  };
+  // Calculate overall as weighted average — now uses publication-specific weights
+  const weights = targetPublication
+    ? getScoringWeights(targetPublication)
+    : {
+        clarity_structure: 1, hook_engagement: 1.2, voice_tone: 1, data_evidence: 1.3,
+        originality_angle: 1.1, publication_fit: 1.2, timeliness: 0.8, actionability: 0.9,
+        expertise_depth: 1.1, readability: 1, conclusion_cta: 0.8,
+      };
 
   let weightedSum = 0;
   let totalWeight = 0;
@@ -154,6 +158,45 @@ export function scoreArticleLocally(content: string, targetPublication?: string)
   scores.overall = Math.round((weightedSum / totalWeight) * 10) / 10;
 
   return scores;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CONTENT FILTER INTEGRATION (Gap #3)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export interface ContentFilterResult {
+  passed: boolean;
+  violations: Array<{
+    dimension: string;
+    rule: string;
+    threshold: number;
+    currentScore: number;
+    action: 'warn' | 'block' | 'enhance';
+    fix: string;
+  }>;
+  enhancementPrompt: string;
+}
+
+/** Score and filter article against publication standards */
+export function scoreAndFilter(
+  content: string,
+  publicationId: string,
+  publicationCategory?: string
+): { scores: ArticleScores; filterResult: ContentFilterResult } {
+  const scores = scoreArticleLocally(content, publicationId);
+  
+  const filterCheck = checkContentFilters(scores, publicationId, publicationCategory);
+  const weakDimensions = filterCheck.violations.map(v => v.dimension);
+  const enhancementPrompt = getEnhancementPrompt(publicationId, weakDimensions, publicationCategory);
+  
+  return {
+    scores,
+    filterResult: {
+      passed: filterCheck.passed,
+      violations: filterCheck.violations,
+      enhancementPrompt,
+    },
+  };
 }
 
 export function getScoreColor(score: number): string {

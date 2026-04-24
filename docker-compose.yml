@@ -1,0 +1,41 @@
+# Elite Writer V5 — Docker Compose for Oracle VPS
+# Uses existing MySQL container (thepopebot-mysql) on coolify network
+
+version: "3.8"
+
+services:
+  elite-writer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: elite-writer-v5
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.elite-writer.rule=Host(`elitewriter.insightprofit.live`)"
+      - "traefik.http.routers.elite-writer.entrypoints=https"
+      - "traefik.http.routers.elite-writer.tls=true"
+      - "traefik.http.routers.elite-writer.tls.certresolver=letsencrypt"
+      - "traefik.http.services.elite-writer.loadbalancer.server.port=3000"
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.elite-writer-http.rule=Host(`elitewriter.insightprofit.live`)"
+      - "traefik.http.routers.elite-writer-http.entrypoints=http"
+      - "traefik.http.routers.elite-writer-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+    networks:
+      - coolify
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+networks:
+  coolify:
+    external: true

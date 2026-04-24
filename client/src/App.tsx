@@ -14,27 +14,32 @@ import Pitches from "./pages/Pitches";
 import Financial from "./pages/Financial";
 import Settings from "./pages/Settings";
 import Brands from "./pages/Brands";
+import Login from "./pages/Login";
 import NotFound from "@/pages/NotFound";
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
-    <AppLayout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/giststack" component={Giststack} />
-        <Route path="/ideas" component={Ideas} />
-        <Route path="/research" component={Research} />
-        <Route path="/writer" component={Writer} />
-        <Route path="/writer/:id" component={Writer} />
-        <Route path="/publications" component={Publications} />
-        <Route path="/pitches" component={Pitches} />
-        <Route path="/financial" component={Financial} />
-        <Route path="/brands" component={Brands} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/404" component={NotFound} />
-        <Route component={NotFound} />
-      </Switch>
-    </AppLayout>
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route>
+        <AppLayout>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/giststack" component={Giststack} />
+            <Route path="/ideas" component={Ideas} />
+            <Route path="/research" component={Research} />
+            <Route path="/writer" component={Writer} />
+            <Route path="/writer/:id" component={Writer} />
+            <Route path="/publications" component={Publications} />
+            <Route path="/pitches" component={Pitches} />
+            <Route path="/financial" component={Financial} />
+            <Route path="/brands" component={Brands} />
+            <Route path="/settings" component={Settings} />
+            <Route path="/404" component={NotFound} />
+            <Route component={NotFound} />
+          </Switch>
+        </AppLayout>
+      </Route>
+    </Switch>
   );
 }
 

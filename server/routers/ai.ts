@@ -2,6 +2,81 @@ import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// GAP #2 + #3: Publication SOP data for server-side AI scoring & drafting
+// This is duplicated from client-side for server-side access.
+// Key publication SOPs that affect AI-powered scoring and content generation.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const PUBLICATION_INSTRUCTIONS: Record<string, { audience: string; format: string; tone: string; filters: string }> = {
+  'forbes': {
+    audience: 'Business leaders, entrepreneurs, investors. 150M+ monthly visitors.',
+    format: 'Thought leadership, first-person "I" voice, 800-1500 words, data + personal experience hybrid. Clear subheadings every 200-300 words.',
+    tone: 'Authoritative yet accessible. Expert positioning without academic jargon. Direct and actionable.',
+    filters: 'REQUIRES: data_evidence ≥ 6 (add 2-3 stats), expertise_depth ≥ 6, hook_engagement ≥ 6.5',
+  },
+  'bloomberg': {
+    audience: 'C-suite, institutional investors, policy makers. Terminal-level data literacy.',
+    format: 'Investigative/analytical journalism. 3+ named sources required. 2000-4000 words. Original analysis only.',
+    tone: 'Authoritative, measured. Financial terminology without definition. No superlatives without data.',
+    filters: 'REQUIRES: data_evidence ≥ 7 (financial data), publication_fit ≥ 7, originality_angle ≥ 7',
+  },
+  'harvard-business-review': {
+    audience: 'Senior leaders, MBA graduates, management consultants, researchers.',
+    format: 'Research-backed analysis with case studies. 1500-3000 words. Clear framework/model. Evidence-based.',
+    tone: 'Scholarly but accessible. Structured argumentation. Nuanced, acknowledge counterarguments.',
+    filters: 'REQUIRES: data_evidence ≥ 7 (research citations), actionability ≥ 7 (practical framework)',
+  },
+  'wired': {
+    audience: 'Tech-curious professionals, digital culture enthusiasts, long-form narrative readers.',
+    format: 'Long-form narrative tech journalism. 2000-5000 words. Scene-setting and character development. No listicles.',
+    tone: 'Narrative and literary. Scene-setting openings. Intellectual curiosity as default mode.',
+    filters: 'REQUIRES: hook_engagement ≥ 7 (narrative hooks), originality_angle ≥ 7, voice_tone ≥ 6.5',
+  },
+  'the-atlantic': {
+    audience: 'Educated general audience interested in ideas, policy, culture, society. Essay readers.',
+    format: 'Essay-length arguments (2000-6000 words). Historical context required. Contrarian viewpoints welcome.',
+    tone: 'Intellectual, measured. Historical awareness. Willingness to sit with complexity. Elegant prose.',
+    filters: 'REQUIRES: expertise_depth ≥ 7, originality_angle ≥ 7.5, clarity_structure ≥ 7',
+  },
+  'fast-company': {
+    audience: 'Innovation-focused professionals, designers, startup founders, creative leaders.',
+    format: 'Innovation profiles + analysis. 1000-2000 words. Design thinking angle. Company/person profiles with broader lessons.',
+    tone: 'Energetic and forward-looking. Optimistic about innovation but not naive. Design-aware.',
+    filters: 'REQUIRES: originality_angle ≥ 6.5 (innovation angle)',
+  },
+  'vox': {
+    audience: 'Curious general audience wanting to understand complex topics. Policy-interested.',
+    format: 'Explainer format: "Everything you need to know about X." 1500-3000 words. Question-based subheadings.',
+    tone: 'Accessible and explanatory. No assumed knowledge. Data-driven but conversational.',
+    filters: 'REQUIRES: clarity_structure ≥ 7 (explainer format)',
+  },
+  'new-york-times': {
+    audience: 'Educated general audience. Paper of record. Highest editorial standards.',
+    format: 'Feature reporting, investigative journalism. 1500-5000 words. 5+ named sources. Original reporting required.',
+    tone: 'Precise, authoritative, understated. "Show, don\'t tell" journalism.',
+    filters: 'REQUIRES: data_evidence ≥ 8 (original reporting), clarity_structure ≥ 7.5',
+  },
+  'cosmopolitan': {
+    audience: 'Young women (18-34). Relationships, career, wellness, beauty, pop culture.',
+    format: 'Voice-driven. 800-1500 words. Trend-forward. Personal experience + reported elements. Listicle format welcome.',
+    tone: 'Fun, confident, slightly irreverent. Best friend giving advice. Inclusive language.',
+    filters: 'REQUIRES: voice_tone ≥ 6.5 (match Cosmo voice)',
+  },
+  'scientific-american': {
+    audience: 'Science-literate general audience. Expect peer-reviewed research translation.',
+    format: 'Research translation. 1500-3000 words. Must cite specific studies. Expert-authored preferred.',
+    tone: 'Precise and measured. Scientific rigor without jargon overload.',
+    filters: 'REQUIRES: data_evidence ≥ 7.5 (research citations), expertise_depth ≥ 7',
+  },
+};
+
+function getPublicationInstructions(pubId: string): string {
+  const pub = PUBLICATION_INSTRUCTIONS[pubId];
+  if (!pub) return '';
+  return `\n\n=== PUBLICATION-SPECIFIC INSTRUCTIONS: ${pubId.toUpperCase()} ===\nAudience: ${pub.audience}\nFormat Requirements: ${pub.format}\nTone: ${pub.tone}\nQuality Gates: ${pub.filters}\n===\n\nApply these publication-specific standards strictly when scoring and generating content.`;
+}
+
 export const aiRouter = router({
   // Score an article against publication standards
   score: publicProcedure
@@ -18,7 +93,7 @@ export const aiRouter = router({
         messages: [
           {
             role: "system",
-            content: `You are a Bloomberg-caliber editorial scoring engine. Score articles on 11 dimensions used by top-tier publications. Return ONLY valid JSON with no markdown formatting.`,
+            content: `You are a Bloomberg-caliber editorial scoring engine. Score articles on 11 dimensions used by top-tier publications. Apply publication-specific standards when a target publication is specified. Return ONLY valid JSON with no markdown formatting.${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ''}`,
           },
           {
             role: "user",
@@ -89,7 +164,7 @@ Return JSON with this exact structure:
         messages: [
           {
             role: "system",
-            content: `You are an elite journalist and content strategist who writes for top-tier publications like Bloomberg, Forbes, Harvard Business Review, and The Atlantic. Write in a professional, authoritative voice with data-driven insights, compelling narratives, and expert-level analysis.${input.brandVoice ? ` Write in this brand voice: ${input.brandVoice}` : ""}`,
+            content: `You are an elite journalist and content strategist who writes for top-tier publications like Bloomberg, Forbes, Harvard Business Review, and The Atlantic. Write in a professional, authoritative voice with data-driven insights, compelling narratives, and expert-level analysis.${input.brandVoice ? ` Write in this brand voice: ${input.brandVoice}` : ""}${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ""}`,
           },
           {
             role: "user",
@@ -138,7 +213,7 @@ Return the full article in markdown format.`,
         messages: [
           {
             role: "system",
-            content: `You are an expert pitch writer who has successfully placed articles in top-tier publications. Write concise, compelling pitch emails that editors actually respond to. Return ONLY valid JSON with no markdown formatting.`,
+            content: `You are an expert pitch writer who has successfully placed articles in top-tier publications. Write concise, compelling pitch emails that editors actually respond to. Return ONLY valid JSON with no markdown formatting.${input.publicationName ? getPublicationInstructions(input.publicationName) : ''}`,
           },
           {
             role: "user",
