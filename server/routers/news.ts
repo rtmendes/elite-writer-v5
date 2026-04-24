@@ -10,7 +10,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { ENV } from "../_core/env";
 import { getDb } from "../db";
-import { newsItems, intelligenceItems, intelligenceLearnings, dailyBriefs } from "../../drizzle/schema";
+import { newsItems, intelligenceItems, intelligenceLearnings, dailyBriefs, feeds } from "../../drizzle/schema";
 
 // ─── News API Helpers ─────────────────────────────────────
 
@@ -228,14 +228,42 @@ export const newsRouter = router({
       return { success: true, items: allItems, count: allItems.length };
     }),
 
-  // Run full pipeline: fetch all → generate brief
+  // Run full pipeline: fetch all → score sentiment → persist intelligence → generate brief
+  // Gap #4: Trend-to-article automation + Gap #6: Sentiment persistence
   runPipeline: protectedProcedure
     .input(z.object({
       topics: z.array(z.string()).optional(),
       rssFeeds: z.array(z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Step 1: Fetch news
+      const db = await getDb();
+
+      // Step 0: If no RSS feeds provided, auto-load from user's saved feeds or use curated defaults
+      let rssFeeds = input.rssFeeds || [];
+      if (rssFeeds.length === 0 && db) {
+        try {
+          const userFeeds = await db.select().from(feeds)
+            .where(and(eq(feeds.userId, ctx.user.id), eq(feeds.active, 1)));
+          rssFeeds = userFeeds.map(f => f.url).filter((u): u is string => !!u);
+        } catch { /* skip */ }
+      }
+      // Fallback to curated defaults
+      if (rssFeeds.length === 0) {
+        rssFeeds = [
+          'https://feeds.reuters.com/reuters/businessNews',
+          'https://feeds.hbr.org/harvardbusiness',
+          'https://techcrunch.com/feed/',
+          'https://www.wired.com/feed/rss',
+          'https://www.theverge.com/rss/index.xml',
+          'https://www.fastcompany.com/latest/rss?format=xml',
+          'https://www.inc.com/rss/',
+          'https://rss.ap.org/article/topnews',
+          'https://www.vox.com/rss/index.xml',
+          'https://www.technologyreview.com/feed/',
+        ];
+      }
+
+      // Step 1: Fetch news from APIs
       const articles: any[] = [];
       if (ENV.newsapiKey) {
         for (const topic of (input.topics || ["business", "technology"])) {
@@ -248,28 +276,81 @@ export const newsRouter = router({
         }
       }
 
-      // Step 2: Fetch RSS
-      if (input.rssFeeds?.length) {
-        const rssResults = await Promise.allSettled(input.rssFeeds.map(url => fetchRSSFeed(url, 10)));
+      // Step 2: Fetch RSS — now uses curated feeds automatically
+      if (rssFeeds.length > 0) {
+        const rssResults = await Promise.allSettled(rssFeeds.map(url => fetchRSSFeed(url, 10)));
         for (const r of rssResults) {
           if (r.status === "fulfilled") articles.push(...r.value);
         }
       }
 
-      // Step 3: Generate intelligence brief
+      // Step 3: Score sentiment and viral potential for each article (Gap #6)
       const articleSummaries = articles.slice(0, 30).map((a, i) =>
         `${i + 1}. [${a.source}] ${a.title} — ${(a.description || "").slice(0, 150)}`
       ).join("\n");
 
+      // AI-powered sentiment + relevance scoring
+      let sentimentData: any = { items: [] };
+      try {
+        const sentimentResult = await invokeLLM({
+          messages: [
+            {
+              role: "system",
+              content: "You are a content intelligence engine. Score each news item for viral potential (1-100), sentiment (positive/negative/neutral/mixed), and relevance to freelance writing opportunities. Return ONLY valid JSON.",
+            },
+            {
+              role: "user",
+              content: `Score these articles:\n\n${articleSummaries}\n\nReturn JSON:\n{\n  "items": [\n    {\n      "index": <1-based>,\n      "viral_score": <1-100>,\n      "sentiment": "positive|negative|neutral|mixed",\n      "niche_tags": ["tag1", "tag2"],\n      "article_opportunity": "<brief pitch angle>",\n      "suggested_publications": ["pub1", "pub2"]\n    }\n  ]\n}`,
+            },
+          ],
+          response_format: { type: "json_object" },
+        });
+        const sentText = sentimentResult.choices[0]?.message?.content ?? "";
+        try { sentimentData = JSON.parse(sentText); } catch { /* skip */ }
+      } catch { /* skip sentiment scoring if LLM fails */ }
+
+      // Step 4: Persist scored items to intelligenceItems table (Gap #6)
+      let persistedCount = 0;
+      if (db && sentimentData.items) {
+        for (const scored of sentimentData.items) {
+          const articleIdx = (scored.index || 1) - 1;
+          const article = articles[articleIdx];
+          if (!article) continue;
+          try {
+            await db.insert(intelligenceItems).values({
+              userId: ctx.user.id,
+              title: article.title || "Untitled",
+              summary: (article.description || "").slice(0, 500),
+              source: article.source || "Unknown",
+              url: article.url || "",
+              category: scored.niche_tags?.[0] || article.category || "general",
+              relevanceScore: scored.viral_score || 50,
+              saved: false,
+              metadata: {
+                sentiment: scored.sentiment,
+                viral_score: scored.viral_score,
+                niche_tags: scored.niche_tags,
+                article_opportunity: scored.article_opportunity,
+                suggested_publications: scored.suggested_publications,
+                source_name: article.sourceName,
+                published_at: article.publishedAt,
+              },
+            });
+            persistedCount++;
+          } catch { /* skip duplicates */ }
+        }
+      }
+
+      // Step 5: Generate intelligence brief
       const result = await invokeLLM({
         messages: [
           {
             role: "system",
-            content: "You are a senior intelligence analyst producing an editorial brief. Return ONLY valid JSON.",
+            content: "You are a senior intelligence analyst producing an editorial brief for a premium freelance content team. Focus on high-viral-potential stories with clear article opportunities. Return ONLY valid JSON.",
           },
           {
             role: "user",
-            content: `Analyze these news items and generate an intelligence brief:\n\n${articleSummaries}\n\nReturn JSON:\n{\n  "date": "${new Date().toISOString().split("T")[0]}",\n  "headline": "<main opportunity>",\n  "summary": "<3-4 sentence overview>",\n  "topStories": [{"title": "", "summary": "", "articleOpportunity": "", "urgency": "high|medium|low"}],\n  "trendingTopics": ["<topic>"],\n  "actionItems": ["<action>"],\n  "totalArticlesAnalyzed": ${articles.length}\n}`,
+            content: `Analyze these news items and generate an intelligence brief:\n\n${articleSummaries}\n\nSentiment scores available:\n${JSON.stringify(sentimentData.items?.slice(0, 10) || [])}\n\nReturn JSON:\n{\n  "date": "${new Date().toISOString().split("T")[0]}",\n  "headline": "<main opportunity>",\n  "summary": "<3-4 sentence overview>",\n  "topStories": [{"title": "", "summary": "", "articleOpportunity": "", "suggestedAngle": "", "urgency": "high|medium|low", "sentiment": "positive|negative|neutral", "viralScore": 0}],\n  "trendingTopics": ["<topic>"],\n  "actionItems": ["<action>"],\n  "totalArticlesAnalyzed": ${articles.length},\n  "sentimentBreakdown": {"positive": 0, "negative": 0, "neutral": 0, "mixed": 0}\n}`,
           },
         ],
         response_format: { type: "json_object" },
@@ -280,7 +361,6 @@ export const newsRouter = router({
       try { briefData = JSON.parse(text); } catch { briefData = { summary: text }; }
 
       // Store brief
-      const db = await getDb();
       if (db) {
         await db.insert(dailyBriefs).values({
           userId: ctx.user.id,
@@ -289,7 +369,14 @@ export const newsRouter = router({
         });
       }
 
-      return { success: true, brief: briefData, articlesProcessed: articles.length };
+      return { 
+        success: true, 
+        brief: briefData, 
+        articlesProcessed: articles.length,
+        sentimentScored: sentimentData.items?.length || 0,
+        intelligencePersisted: persistedCount,
+        feedsUsed: rssFeeds.length,
+      };
     }),
 });
 

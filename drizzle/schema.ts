@@ -158,6 +158,16 @@ export const intelligenceItems = mysqlTable("intelligence_items", {
   category: varchar("category", { length: 100 }),
   relevanceScore: int("relevanceScore"),
   saved: int("saved").default(0),
+  // Gap #6: Sentiment persistence — stores sentiment, viral_score, niche_tags, etc.
+  metadata: json("metadata").$type<{
+    sentiment?: string;
+    viral_score?: number;
+    niche_tags?: string[];
+    article_opportunity?: string;
+    suggested_publications?: string[];
+    source_name?: string;
+    published_at?: string;
+  }>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

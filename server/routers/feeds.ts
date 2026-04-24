@@ -71,6 +71,75 @@ export const feedsRouter = router({
         .where(and(eq(feeds.id, input.id), eq(feeds.userId, ctx.user.id)));
       return { success: true };
     }),
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Gap #1 + #5: Seed curated feeds into the database
+  // Seeds 31 curated feeds with publication mapping
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  seed: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database unavailable");
+
+    // Check if already seeded
+    const existing = await db.select().from(feeds)
+      .where(eq(feeds.userId, ctx.user.id));
+    
+    if (existing.length >= 20) {
+      return { success: true, action: 'skipped', message: 'Feeds already seeded', count: existing.length };
+    }
+
+    const CURATED = [
+      { name: 'Reuters Business', url: 'https://feeds.reuters.com/reuters/businessNews', keywords: ['business', 'markets', 'economy'] },
+      { name: 'Bloomberg Markets', url: 'https://feeds.bloomberg.com/markets/news.rss', keywords: ['finance', 'markets', 'investing'] },
+      { name: 'Harvard Business Review', url: 'https://feeds.hbr.org/harvardbusiness', keywords: ['management', 'strategy', 'leadership'] },
+      { name: 'Fast Company', url: 'https://www.fastcompany.com/latest/rss?format=xml', keywords: ['innovation', 'design', 'leadership'] },
+      { name: 'Inc. Magazine', url: 'https://www.inc.com/rss/', keywords: ['startups', 'entrepreneurship', 'growth'] },
+      { name: 'Entrepreneur', url: 'https://www.entrepreneur.com/latest.rss', keywords: ['business', 'startups', 'growth'] },
+      { name: 'CNBC', url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114', keywords: ['finance', 'markets', 'economy'] },
+      { name: 'Forbes Innovation', url: 'https://www.forbes.com/innovation/feed/', keywords: ['tech', 'innovation', 'disruption'] },
+      { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', keywords: ['tech', 'startups', 'funding'] },
+      { name: 'Wired', url: 'https://www.wired.com/feed/rss', keywords: ['tech', 'culture', 'science'] },
+      { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', keywords: ['tech', 'gadgets', 'culture'] },
+      { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', keywords: ['tech', 'science', 'analysis'] },
+      { name: 'AP News', url: 'https://rss.ap.org/article/topnews', keywords: ['news', 'breaking', 'politics'] },
+      { name: 'The Conversation', url: 'https://theconversation.com/us/articles.atom', keywords: ['research', 'academia', 'analysis'] },
+      { name: 'Vox', url: 'https://www.vox.com/rss/index.xml', keywords: ['explainer', 'policy', 'analysis'] },
+      { name: 'NPR', url: 'https://feeds.npr.org/1001/rss.xml', keywords: ['news', 'culture', 'politics'] },
+      { name: 'Foreign Policy', url: 'https://foreignpolicy.com/feed/', keywords: ['geopolitics', 'international', 'policy'] },
+      { name: 'Healthline', url: 'https://www.healthline.com/rss', keywords: ['health', 'wellness', 'nutrition'] },
+      { name: 'Psychology Today', url: 'https://www.psychologytoday.com/us/blog/rss', keywords: ['psychology', 'mental-health', 'behavior'] },
+      { name: 'The Cut', url: 'https://www.thecut.com/feed/rss/', keywords: ['culture', 'style', 'power'] },
+      { name: 'Refinery29', url: 'https://www.refinery29.com/rss.xml', keywords: ['lifestyle', 'fashion', 'culture'] },
+      { name: 'Scientific American', url: 'https://rss.sciam.com/ScientificAmerican-Global', keywords: ['science', 'research', 'discovery'] },
+      { name: 'Nature News', url: 'https://www.nature.com/nature.rss', keywords: ['research', 'science', 'biology'] },
+      { name: 'Conde Nast Traveler', url: 'https://www.cntraveler.com/feed/rss', keywords: ['travel', 'destinations', 'luxury'] },
+      { name: 'Eater', url: 'https://www.eater.com/rss/index.xml', keywords: ['food', 'restaurants', 'dining'] },
+      { name: 'Nieman Lab', url: 'https://www.niemanlab.org/feed/', keywords: ['journalism', 'media', 'writing'] },
+      { name: 'The Write Life', url: 'https://thewritelife.com/feed/', keywords: ['freelance', 'writing', 'publishing'] },
+      { name: 'Contently', url: 'https://contently.com/feed/', keywords: ['content-strategy', 'marketing', 'writing'] },
+      { name: 'MIT Technology Review', url: 'https://www.technologyreview.com/feed/', keywords: ['ai', 'biotech', 'emerging-tech'] },
+      { name: 'Rest of World', url: 'https://restofworld.org/feed/', keywords: ['global', 'technology', 'emerging-markets'] },
+      { name: 'Hacker News', url: 'https://hnrss.org/frontpage', keywords: ['tech', 'startups', 'programming'] },
+    ];
+
+    let seeded = 0;
+    for (const feed of CURATED) {
+      try {
+        await db.insert(feeds).values({
+          userId: ctx.user.id,
+          name: feed.name,
+          type: 'rss',
+          url: feed.url,
+          emailFrom: null,
+          keywords: feed.keywords,
+          active: feed.name === 'Hacker News' ? 0 : 1,
+        });
+        seeded++;
+      } catch { /* skip duplicates */ }
+    }
+
+    return { success: true, action: 'seeded', count: seeded, total: CURATED.length };
+  }),
 });
 
 // ─── Funnels Router ───────────────────────────────────────
