@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { CURATED_FEEDS, type CuratedFeed, type FeedCategory, FEED_CATEGORY_COLORS, getActiveFeedUrls, getFeedsForPublication } from '@/lib/curated-feeds';
+import ArticleDetailModal, { type FeedItemForModal } from '@/components/giststack/ArticleDetailModal';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TYPES
@@ -52,6 +53,8 @@ export default function Giststack() {
   const [showFeedManager, setShowFeedManager] = useState(false);
   const [sentimentFilter, setSentimentFilter] = useState<string>('all');
   const [hotOnly, setHotOnly] = useState(false);
+  const [modalItem, setModalItem] = useState<FeedItemForModal | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const dailyBriefMutation = trpc.ai.dailyBrief.useMutation();
   const fetchRSSMutation = trpc.news.fetchRSS.useMutation();
@@ -524,7 +527,7 @@ export default function Giststack() {
             </Card>
           ) : (
             filtered.map((item) => (
-              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} />
+              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
             ))
           )}
         </TabsContent>
@@ -540,7 +543,7 @@ export default function Giststack() {
             </Card>
           ) : (
             hotItems.map((item) => (
-              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} />
+              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
             ))
           )}
         </TabsContent>
@@ -556,11 +559,18 @@ export default function Giststack() {
             </Card>
           ) : (
             savedItems.map((item) => (
-              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} />
+              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
             ))
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Article Detail Modal — V4-style deep research view */}
+      <ArticleDetailModal
+        item={modalItem}
+        open={modalOpen}
+        onOpenChange={(open) => { setModalOpen(open); if (!open) setModalItem(null); }}
+      />
     </div>
   );
 }
@@ -569,13 +579,15 @@ export default function Giststack() {
 // FEED ITEM CARD COMPONENT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function FeedItemCard({ item, onSave, onCreateIdea }: {
+function FeedItemCard({ item, onSave, onCreateIdea, onOpenDetail }: {
   item: FeedItem;
   onSave: (item: FeedItem) => void;
   onCreateIdea: (item: FeedItem) => void;
+  onOpenDetail?: (item: FeedItem) => void;
 }) {
   return (
-    <Card className={`border-border hover:border-primary/30 transition-colors ${item.hot ? 'border-l-2 border-l-amber-500' : ''}`}>
+    <Card className={`border-border hover:border-primary/30 transition-colors cursor-pointer ${item.hot ? 'border-l-2 border-l-amber-500' : ''}`}
+      onClick={() => onOpenDetail?.(item)}>
       <CardContent className="p-4">
         <div className="flex gap-4">
           <div className="flex-1 min-w-0">
@@ -613,15 +625,15 @@ function FeedItemCard({ item, onSave, onCreateIdea }: {
             )}
           </div>
           <div className="flex flex-col gap-1.5 shrink-0">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => onSave(item)}
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); onSave(item); }}
               title={item.saved ? 'Unsave' : 'Save'}>
               {item.saved ? <BookmarkCheck className="w-4 h-4 text-primary" /> : <Bookmark className="w-4 h-4" />}
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => onCreateIdea(item)}
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); onCreateIdea(item); }}
               title="Create article idea">
               <Lightbulb className="w-4 h-4" />
             </Button>
-            <a href={item.url} target="_blank" rel="noopener noreferrer">
+            <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Open source">
                 <ExternalLink className="w-4 h-4" />
               </Button>

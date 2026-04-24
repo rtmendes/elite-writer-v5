@@ -378,6 +378,126 @@ export const newsRouter = router({
         feedsUsed: rssFeeds.length,
       };
     }),
+
+  // ── Per-Article AI Scoring (V4 Giststack port) ──────────
+  scoreArticle: protectedProcedure
+    .input(z.object({
+      title: z.string(),
+      description: z.string().optional(),
+      source: z.string().optional(),
+      url: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const result = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: "You are an editorial analyst. Score this article for viral potential and sentiment. Return ONLY valid JSON.",
+          },
+          {
+            role: "user",
+            content: `Score this article:\n\nTitle: "${input.title}"\nDescription: "${(input.description || '').slice(0, 280)}"\nSource: "${input.source || ''}"\n\nReturn JSON:\n{\n  "viral_score": <1-100>,\n  "sentiment": "<positive|negative|neutral|mixed>",\n  "niche_tags": ["tag1", "tag2", "tag3"],\n  "reasoning": "<one sentence>",\n  "hook_suggestions": ["<suggested hook/angle 1>", "<suggested hook/angle 2>"],\n  "suggested_publications": ["<pub1>", "<pub2>"]\n}\n\nScoring factors: timeliness, emotional resonance, data uniqueness, counterintuitive angle, shareability for tier-1 publications (Forbes, Fast Company, Inc.).`,
+          },
+        ],
+        response_format: { type: "json_object" },
+        maxTokens: 300,
+      });
+
+      const text = result.choices[0]?.message?.content ?? "";
+      let scoreData;
+      try { scoreData = JSON.parse(text); } catch { scoreData = { viral_score: 50, sentiment: "neutral", niche_tags: [], reasoning: "", hook_suggestions: [], suggested_publications: [] }; }
+      
+      return {
+        success: true,
+        viral_score: Math.max(1, Math.min(100, parseInt(scoreData.viral_score) || 50)),
+        sentiment: ["positive", "negative", "neutral", "mixed"].includes(scoreData.sentiment) ? scoreData.sentiment : "neutral",
+        niche_tags: (Array.isArray(scoreData.niche_tags) ? scoreData.niche_tags : []).slice(0, 5),
+        reasoning: String(scoreData.reasoning || "").slice(0, 200),
+        hook_suggestions: (Array.isArray(scoreData.hook_suggestions) ? scoreData.hook_suggestions : []).slice(0, 3),
+        suggested_publications: (Array.isArray(scoreData.suggested_publications) ? scoreData.suggested_publications : []).slice(0, 5),
+        usage: result.usage,
+      };
+    }),
+
+  // ── Deep Research / Enrich Article (V4 "_enrichArticleInModal" port) ──
+  enrichArticle: protectedProcedure
+    .input(z.object({
+      url: z.string().url(),
+      title: z.string(),
+      description: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      // Step 1: Scrape the full article text
+      let articleText = "";
+      try {
+        const resp = await fetch(input.url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          },
+          redirect: "follow",
+          signal: AbortSignal.timeout(10000),
+        });
+        const html = await resp.text();
+        articleText = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+          .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, "")
+          .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, "")
+          .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, "")
+          .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/\s+/g, " ")
+          .trim();
+      } catch {
+        articleText = input.description || "";
+      }
+
+      if (articleText.length < 80) {
+        articleText = input.description || input.title;
+      }
+
+      // Step 2: AI extraction of research intelligence
+      const result = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: "You are a research intelligence extractor. Extract actionable editorial intelligence from articles. Return ONLY valid JSON.",
+          },
+          {
+            role: "user",
+            content: `Extract research intelligence from this article for a freelance writer looking for story angles:\n\nTitle: "${input.title}"\n\nArticle text (truncated):\n${articleText.slice(0, 3000)}\n\nReturn JSON:\n{\n  "expert_quotes": ["Quote — Attribution, Title, Org"],\n  "key_statistics": ["Stat with source context"],\n  "contradictory_viewpoints": ["Alternative perspective or counter-argument"],\n  "key_entities": {\n    "people": ["Name — Role"],\n    "organizations": ["Org — context"]\n  },\n  "content_brief": {\n    "recommended_angle": "<best angle for a freelance article>",\n    "news_peg": "<why this matters now>",\n    "unique_angle": "<what makes this different>",\n    "editor_pitch": "<1-2 sentence pitch to editor>",\n    "competitive_angle": "<how to differentiate from existing coverage>",\n    "suggested_headline": "<proposed article headline>",\n    "target_word_count": <800-2500>,\n    "urgency": "<high|medium|low>"\n  }\n}`,
+          },
+        ],
+        response_format: { type: "json_object" },
+        maxTokens: 1200,
+      });
+
+      const text = result.choices[0]?.message?.content ?? "";
+      let intelligence;
+      try { intelligence = JSON.parse(text); } catch { intelligence = { expert_quotes: [], key_statistics: [], contradictory_viewpoints: [], key_entities: { people: [], organizations: [] }, content_brief: {} }; }
+
+      return {
+        success: true,
+        intelligence: {
+          expert_quotes: Array.isArray(intelligence.expert_quotes) ? intelligence.expert_quotes.slice(0, 10) : [],
+          key_statistics: Array.isArray(intelligence.key_statistics) ? intelligence.key_statistics.slice(0, 10) : [],
+          contradictory_viewpoints: Array.isArray(intelligence.contradictory_viewpoints) ? intelligence.contradictory_viewpoints.slice(0, 5) : [],
+          key_entities: {
+            people: Array.isArray(intelligence.key_entities?.people) ? intelligence.key_entities.people.slice(0, 8) : [],
+            organizations: Array.isArray(intelligence.key_entities?.organizations) ? intelligence.key_entities.organizations.slice(0, 8) : [],
+          },
+          content_brief: intelligence.content_brief || {},
+        },
+        article_text_length: articleText.length,
+        usage: result.usage,
+      };
+    }),
 });
 
 // ─── Intelligence Router ──────────────────────────────────
