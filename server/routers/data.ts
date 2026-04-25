@@ -4,7 +4,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   ideas, articles, pitches, researchNotes,
-  brands, products, earnings, intelligenceItems,
+  brands, products, earnings, intelligenceItems, userSettings,
   type InsertIdea, type InsertArticle, type InsertPitch,
   type InsertResearchNote, type InsertBrand, type InsertProduct,
   type InsertEarning, type InsertIntelligenceItem,
@@ -378,6 +378,33 @@ const intelligenceRouter = router({
   }),
 });
 
+
+// ─── User Settings (DB-persisted) ─────────────────────────
+const settingsRouter = router({
+  get: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return null;
+    const rows = await db.select().from(userSettings).where(eq(userSettings.userId, ctx.user.id)).limit(1);
+    return rows.length > 0 ? rows[0].settings : null;
+  }),
+  upsert: protectedProcedure.input(z.object({
+    settings: z.record(z.any()),
+  })).mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database unavailable");
+    // Try update first, then insert
+    const existing = await db.select().from(userSettings).where(eq(userSettings.userId, ctx.user.id)).limit(1);
+    if (existing.length > 0) {
+      // Merge with existing settings to avoid overwriting
+      const merged = { ...(existing[0].settings || {}), ...input.settings };
+      await db.update(userSettings).set({ settings: merged }).where(eq(userSettings.userId, ctx.user.id));
+    } else {
+      await db.insert(userSettings).values({ userId: ctx.user.id, settings: input.settings as any });
+    }
+    return { success: true };
+  }),
+});
+
 // ─── Combined Data Router ─────────────────────────────────
 export const dataRouter = router({
   ideas: ideasRouter,
@@ -388,4 +415,5 @@ export const dataRouter = router({
   products: productsRouter,
   earnings: earningsRouter,
   intelligence: intelligenceRouter,
+  settings: settingsRouter,
 });

@@ -5,6 +5,7 @@ import {
   loadState, saveState, generateId,
 } from '@/lib/store';
 import { useDbHydration } from '@/hooks/useDbHydration';
+import { trpc } from '@/lib/trpc';
 
 interface AppContextType {
   state: AppState;
@@ -54,6 +55,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // DB hydration — loads persisted data from MySQL when authenticated
   const { data: dbData, isLoading: dbLoading, isAuthenticated } = useDbHydration();
+  const settingsMutation = trpc.data.settings.upsert.useMutation();
 
   // Merge DB data into state on first successful load
   useEffect(() => {
@@ -87,6 +89,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (dbData.brands.length > 0) {
           const localOnly = prev.brands.filter(b => !b.id.startsWith('db_'));
           merged.brands = [...dbData.brands, ...localOnly];
+        }
+        // Merge DB settings (overrides localStorage defaults)
+        if (dbData.settings) {
+          merged.settings = { ...merged.settings, ...dbData.settings };
         }
         return merged;
       });
@@ -265,10 +271,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  // ── Settings ──
+  // ── Settings ── (persisted to DB)
   const updateSettings = useCallback((updates: Partial<AppState['settings']>) => {
-    setState(s => ({ ...s, settings: { ...s.settings, ...updates } }));
-  }, []);
+    setState(s => {
+      const newSettings = { ...s.settings, ...updates };
+      // Persist to DB (fire-and-forget, localStorage is the fast cache)
+      settingsMutation.mutate({ settings: newSettings });
+      return { ...s, settings: newSettings };
+    });
+  }, [settingsMutation]);
 
   return (
     <AppContext.Provider value={{

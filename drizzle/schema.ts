@@ -380,3 +380,23 @@ export const generatedImages = mysqlTable("generated_images", {
 
 export type GeneratedImage = typeof generatedImages.$inferSelect;
 export type InsertGeneratedImage = typeof generatedImages.$inferInsert;
+
+// ─── User Settings (DB-persisted) ─────────────────────────
+export const userSettings = mysqlTable("user_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  settings: json("settings").$type<{
+    openai_key?: string;
+    brand_voice?: string;
+    daily_target?: number;
+    monthly_revenue_goal?: number;
+    content_revenue_goal?: number;
+    product_revenue_goal?: number;
+    tracked_topics?: string[];
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserSettings = typeof userSettings.$inferSelect;
+export type InsertUserSettings = typeof userSettings.$inferInsert;

@@ -122,6 +122,7 @@ export type HydrationData = {
   research: ResearchNote[];
   earnings: Earning[];
   brands: Brand[];
+  settings: Record<string, any> | null;
 };
 
 /**
@@ -138,10 +139,11 @@ export function useDbHydration(): { data: HydrationData | null; isLoading: boole
   const researchQuery = trpc.data.research.list.useQuery(undefined, { enabled: isAuthenticated });
   const earningsQuery = trpc.data.earnings.list.useQuery(undefined, { enabled: isAuthenticated });
   const brandsQuery = trpc.data.brands.list.useQuery(undefined, { enabled: isAuthenticated });
+  const settingsQuery = trpc.data.settings.get.useQuery(undefined, { enabled: isAuthenticated });
 
   const isLoading = authLoading || 
     (isAuthenticated && (ideasQuery.isLoading || articlesQuery.isLoading || pitchesQuery.isLoading || 
-     researchQuery.isLoading || earningsQuery.isLoading || brandsQuery.isLoading));
+     researchQuery.isLoading || earningsQuery.isLoading || brandsQuery.isLoading || settingsQuery.isLoading));
 
   if (!isAuthenticated || isLoading) {
     return { data: null, isLoading, isAuthenticated };
@@ -154,6 +156,7 @@ export function useDbHydration(): { data: HydrationData | null; isLoading: boole
     research: (researchQuery.data || []).map(mapResearch),
     earnings: (earningsQuery.data || []).map(mapEarning),
     brands: (brandsQuery.data || []).map(mapBrand),
+    settings: settingsQuery.data || null,
   };
 
   return { data, isLoading: false, isAuthenticated };
