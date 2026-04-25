@@ -56,19 +56,19 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 space-y-3">
       {/* Hero Banner */}
-      <div className="relative rounded-xl overflow-hidden h-48 md:h-56">
+      <div className="relative rounded-xl overflow-hidden h-28 md:h-32">
         <img src={HERO_IMG} alt="Command Center" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
-        <div className="absolute inset-0 flex items-center p-6 md:p-8">
+        <div className="absolute inset-0 flex items-center p-4 md:p-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Badge variant="outline" className="text-xs border-violet-500/50 text-violet-300 bg-violet-500/10">
                 <Sparkles className="w-3 h-3 mr-1" /> Elite Writer V5
               </Badge>
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Command Center</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">Command Center</h1>
             <p className="text-sm text-white/70 mt-1 max-w-md">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
               {' '}&mdash; 176 publications loaded
@@ -78,7 +78,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         {[
           { label: 'Total Ideas', value: ideas.length, icon: Lightbulb, color: 'text-amber-400', bgColor: 'bg-amber-500/10' },
           { label: 'Active Drafts', value: activeDrafts, icon: FileText, color: 'text-blue-400', bgColor: 'bg-blue-500/10' },
@@ -86,14 +86,14 @@ export default function Dashboard() {
           { label: 'Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: DollarSign, color: 'text-violet-400', bgColor: 'bg-violet-500/10' },
         ].map((stat) => (
           <Card key={stat.label} className="border-border/50 bg-card/50 backdrop-blur-sm">
-            <CardContent className="p-4">
+            <CardContent className="p-3">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
-                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                <div className={`w-8 h-8 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
+                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">{stat.label}</p>
-                  <p className="text-xl font-bold font-mono">{stat.value}</p>
+                  <p className="text-lg font-bold font-mono">{stat.value}</p>
                 </div>
               </div>
             </CardContent>
@@ -103,7 +103,7 @@ export default function Dashboard() {
 
       {/* Daily Progress */}
       <Card className="border-border/50">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2 pt-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
               <Target className="w-4 h-4 text-primary" />
@@ -131,7 +131,7 @@ export default function Dashboard() {
 
       {/* Workflow Steps */}
       <Card className="border-border/50">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-primary" />
             Complete Workflow Pipeline
@@ -143,7 +143,7 @@ export default function Dashboard() {
               <Link key={ws.step} href={ws.href}>
                 <div className="relative p-2 rounded-lg hover:bg-secondary/50 transition-all cursor-pointer text-center group">
                   <div className="flex items-center justify-center mb-1.5">
-                    <div className="w-8 h-8 rounded-full bg-secondary/80 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                    <div className="w-7 h-7 rounded-full bg-secondary/80 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                       <ws.icon className={`w-4 h-4 ${ws.color}`} />
                     </div>
                   </div>
@@ -160,10 +160,10 @@ export default function Dashboard() {
       </Card>
 
       {/* Pipeline + Activity */}
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-3">
         {/* Pipeline Flow */}
         <Card className="border-border/50">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2 pt-3">
             <CardTitle className="text-base">Article Pipeline</CardTitle>
           </CardHeader>
           <CardContent>
@@ -188,7 +188,7 @@ export default function Dashboard() {
 
         {/* Recent Activity */}
         <Card className="border-border/50">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2 pt-3">
             <CardTitle className="text-base">Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
@@ -222,7 +222,7 @@ export default function Dashboard() {
 
       {/* Dual Revenue Progress */}
       <Card className="border-border/50">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-emerald-400" />
             Revenue Engine: $200K/mo Target
@@ -282,7 +282,7 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <Card className="border-border/50">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2 pt-3">
           <CardTitle className="text-base">Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
@@ -295,7 +295,7 @@ export default function Dashboard() {
               { label: 'Create Pitch', href: '/pitches', icon: Send, color: 'text-violet-400' },
             ].map((action) => (
               <Link key={action.href} href={action.href}>
-                <div className="flex flex-col items-center gap-2 p-4 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer group border border-transparent hover:border-border/50">
+                <div className="flex flex-col items-center gap-1.5 p-3 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer group border border-transparent hover:border-border/50">
                   <action.icon className={`w-5 h-5 ${action.color} group-hover:scale-110 transition-transform`} />
                   <span className="text-xs text-center">{action.label}</span>
                 </div>

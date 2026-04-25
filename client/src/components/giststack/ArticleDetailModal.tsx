@@ -9,7 +9,7 @@
  * - Per-article AI scoring with viral_score, sentiment, niche_tags, hook suggestions
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
@@ -22,8 +22,9 @@ import { Separator } from '@/components/ui/separator';
 import {
   Brain, Sparkles, PenTool, Bookmark, ExternalLink, Users, Building2,
   BarChart3, Zap, Quote, AlertTriangle, Target, Clock, Loader2,
-  Lightbulb, TrendingUp, BookOpen, Send, Star,
+  Lightbulb, TrendingUp, BookOpen, Send, Star, DollarSign, Percent, FileText,
 } from 'lucide-react';
+import { matchArticleToPublications, type PublicationMatch } from '@/lib/publication-matcher';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TYPES
@@ -142,6 +143,12 @@ export default function ArticleDetailModal({ item, open, onOpenChange }: Props) 
 
   if (!item) return null;
 
+  // Publication match intelligence
+  const pubMatches = useMemo(() => 
+    matchArticleToPublications(item.title, item.summary, item.category, item.source, item.relevance_score),
+    [item.title, item.summary, item.category, item.source, item.relevance_score]
+  );
+
   const text = `${item.title} ${item.summary}`;
   const entities = extractEntities(text);
   const dataSignals = extractDataSignals(text);
@@ -236,7 +243,7 @@ export default function ArticleDetailModal({ item, open, onOpenChange }: Props) 
       news_peg: brief.news_peg || score?.reasoning || item.source,
       status: 'researching',
       score: score?.viral_score,
-      matched_publications: score?.suggested_publications,
+      matched_publications: score?.suggested_publications || pubMatches.slice(0, 5).map(m => m.publication.name),
     });
 
     onOpenChange(false);
@@ -487,6 +494,80 @@ export default function ArticleDetailModal({ item, open, onOpenChange }: Props) 
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Publication Match Intelligence */}
+          {pubMatches.length > 0 && (
+            <div className="rounded-lg border border-emerald-500/15 bg-emerald-500/[0.03] p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <Target className="w-4 h-4" /> Publication Match Intelligence
+                </div>
+                <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">
+                  {pubMatches.length} matches
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {pubMatches.slice(0, 5).map((m, i) => (
+                  <div key={i} className={`p-2.5 rounded-md border transition-colors ${
+                    i === 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border/50 hover:border-emerald-500/20'
+                  }`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        {i === 0 && <span className="text-[10px]">🏆</span>}
+                        <span className="text-sm font-semibold">{m.publication.name}</span>
+                        <Badge variant="outline" className={`text-[9px] ${
+                          m.tier === 'Tier 1' ? 'border-amber-500/30 text-amber-400' :
+                          m.tier === 'Tier 2' ? 'border-blue-500/30 text-blue-400' :
+                          'border-muted-foreground/30 text-muted-foreground'
+                        }`}>{m.tier}</Badge>
+                        <Badge variant="outline" className={`text-[9px] ${
+                          m.newsPegStrength === 'strong' ? 'border-emerald-500/30 text-emerald-400' :
+                          m.newsPegStrength === 'moderate' ? 'border-amber-500/30 text-amber-400' :
+                          'border-muted-foreground/30 text-muted-foreground'
+                        }`}>
+                          {m.newsPegStrength === 'strong' ? '⚡' : m.newsPegStrength === 'moderate' ? '◐' : '○'} peg
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-emerald-400">{m.matchScore}%</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-foreground/70 mb-1.5">{m.whyItFits}</p>
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                      <span className="flex items-center gap-0.5">
+                        <DollarSign className="w-2.5 h-2.5" /> {m.payRange}
+                      </span>
+                      <span className="flex items-center gap-0.5">
+                        <Percent className="w-2.5 h-2.5" /> {m.acceptanceRate} acceptance
+                      </span>
+                      {m.publication.traffic_monthly && (
+                        <span className="flex items-center gap-0.5">
+                          <Users className="w-2.5 h-2.5" /> {m.publication.traffic_monthly}/mo
+                        </span>
+                      )}
+                      {m.hasSOP && (
+                        <span className="flex items-center gap-0.5 text-emerald-400">
+                          <FileText className="w-2.5 h-2.5" /> SOP ready
+                        </span>
+                      )}
+                    </div>
+                    {i < 3 && (
+                      <div className="mt-1.5 pl-2.5 border-l-2 border-emerald-500/20">
+                        <p className="text-[10px] text-foreground/60 italic">{m.suggestedAngle}</p>
+                      </div>
+                    )}
+                    {m.topicAlignment.length > 0 && (
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {m.topicAlignment.map((kw, j) => (
+                          <span key={j} className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-400/80">{kw}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

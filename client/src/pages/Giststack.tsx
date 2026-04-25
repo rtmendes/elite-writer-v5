@@ -9,11 +9,12 @@ import { toast } from 'sonner';
 import {
   Newspaper, Bookmark, BookmarkCheck, TrendingUp, Search,
   ExternalLink, Lightbulb, Plus, Sparkles, RefreshCw, Zap, Brain,
-  Rss, Filter, ArrowUpRight, Settings2, Flame, Clock, ChevronDown
+  Rss, Filter, ArrowUpRight, Settings2, Flame, Clock, ChevronDown, Target
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { CURATED_FEEDS, type CuratedFeed, type FeedCategory, FEED_CATEGORY_COLORS, getActiveFeedUrls, getFeedsForPublication } from '@/lib/curated-feeds';
 import ArticleDetailModal, { type FeedItemForModal } from '@/components/giststack/ArticleDetailModal';
+import { quickMatchPublications } from '@/lib/publication-matcher';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TYPES
@@ -295,15 +296,15 @@ export default function Giststack() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Hero Banner */}
-      <div className="relative rounded-xl overflow-hidden h-36">
+      <div className="relative rounded-xl overflow-hidden h-20">
         <img src="https://d2xsxph8kpxj0f.cloudfront.net/97706254/hNgnrzmPgQMt5regq8X3Kp/hero-giststack-6BJYHCT7KetMgJMqF4T6PJ.webp" alt="Intelligence Feed" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
         <div className="absolute inset-0 flex items-center justify-between p-6">
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Newspaper className="w-6 h-6 text-cyan-400" />
+            <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              <Newspaper className="w-5 h-5 text-cyan-400" />
               Intelligence Feed
             </h1>
             <p className="text-sm text-white/70 mt-1">
@@ -410,9 +411,9 @@ export default function Giststack() {
 
       {/* Topic Tracker */}
       <Card className="border-border">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2 pt-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-sm flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" />
               Tracked Topics
             </CardTitle>
@@ -585,11 +586,15 @@ function FeedItemCard({ item, onSave, onCreateIdea, onOpenDetail }: {
   onCreateIdea: (item: FeedItem) => void;
   onOpenDetail?: (item: FeedItem) => void;
 }) {
+  const pubMatches = useMemo(() => 
+    quickMatchPublications(item.title, item.summary, item.category, item.source),
+    [item.title, item.summary, item.category, item.source]
+  );
   return (
     <Card className={`border-border hover:border-primary/30 transition-colors cursor-pointer ${item.hot ? 'border-l-2 border-l-amber-500' : ''}`}
       onClick={() => onOpenDetail?.(item)}>
-      <CardContent className="p-4">
-        <div className="flex gap-4">
+      <CardContent className="p-3">
+        <div className="flex gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge variant="outline" className="text-[10px] shrink-0"
@@ -622,6 +627,19 @@ function FeedItemCard({ item, onSave, onCreateIdea, onOpenDetail }: {
                 <Clock className="w-2.5 h-2.5" />
                 {new Date(item.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </p>
+            )}
+            {/* Publication Match Intelligence */}
+            {pubMatches.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <Target className="w-3 h-3 text-emerald-500 shrink-0" />
+                {pubMatches.map((m, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 text-emerald-400" title={m.whyItFits}>
+                    <span className="font-medium">{m.publication.name}</span>
+                    <span className="opacity-60">{m.payRange}</span>
+                    <span className="text-[8px] font-mono opacity-50">{m.matchScore}%</span>
+                  </span>
+                ))}
+              </div>
             )}
           </div>
           <div className="flex flex-col gap-1.5 shrink-0">
