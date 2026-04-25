@@ -41,11 +41,13 @@ interface FeedItem {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export default function Giststack() {
-  const { state, addGiststackItem, toggleGiststackSave, addIdea } = useApp();
+  const { state, addGiststackItem, toggleGiststackSave, addIdea, updateSettings } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [customTopic, setCustomTopic] = useState('');
-  const [topics, setTopics] = useState<string[]>(['AI & Technology', 'Business', 'Future of Work', 'Health', 'Finance']);
+  // Topics persisted via settings
+  const topics = state.settings.tracked_topics || ['AI & Technology', 'Business', 'Future of Work', 'Health', 'Finance'];
+  const setTopics = (newTopics: string[]) => updateSettings({ tracked_topics: newTopics });
   const [dailyBrief, setDailyBrief] = useState<string | null>(null);
   const [liveItems, setLiveItems] = useState<FeedItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -296,54 +298,7 @@ export default function Giststack() {
   };
 
   return (
-    <div className="space-y-3">
-      {/* Hero Banner */}
-      <div className="relative rounded-xl overflow-hidden h-20">
-        <img src="https://d2xsxph8kpxj0f.cloudfront.net/97706254/hNgnrzmPgQMt5regq8X3Kp/hero-giststack-6BJYHCT7KetMgJMqF4T6PJ.webp" alt="Intelligence Feed" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
-        <div className="absolute inset-0 flex items-center justify-between p-6">
-          <div>
-            <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-              <Newspaper className="w-5 h-5 text-cyan-400" />
-              Intelligence Feed
-            </h1>
-            <p className="text-sm text-white/70 mt-1">
-              {activeFeeds.length} live feeds · {allItems.length} items · {hotItems.length} hot
-              {lastRefresh && <span className="ml-2 opacity-60">· Updated {lastRefresh.toLocaleTimeString()}</span>}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10"
-              onClick={handleRunPipeline} disabled={runPipelineMutation.isPending}>
-              <Zap className="w-4 h-4" /> {runPipelineMutation.isPending ? 'Running...' : 'Full Pipeline'}
-            </Button>
-            <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10" disabled={dailyBriefMutation.isPending}
-              onClick={async () => {
-                try {
-                  const result = await dailyBriefMutation.mutateAsync({ topics });
-                  if (result.success && result.data) {
-                    const d = result.data as any;
-                    const briefText = d.summary || '';
-                    const stories = d.topStories?.map((s: any) => `\n\n**${s.title}** (${s.urgency} urgency)\n${s.summary}\n_Angle:_ ${s.suggestedAngle}`).join('') || '';
-                    const actions = d.actionItems?.map((a: string) => `\n- ${a}`).join('') || '';
-                    setDailyBrief(`${d.headline || 'Daily Brief'}\n\n${briefText}${stories}${actions ? '\n\n**Action Items:**' + actions : ''}`);
-                    const tokens = (result.usage as any)?.total_tokens || 0;
-                    toast.success(`Daily brief generated (${tokens} tokens)`);
-                  }
-                } catch (err: any) {
-                  toast.error(err.message || 'Brief generation failed');
-                }
-              }}>
-              <Brain className="w-4 h-4" /> {dailyBriefMutation.isPending ? 'Generating...' : 'AI Daily Brief'}
-            </Button>
-            <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10"
-              onClick={fetchLiveFeeds} disabled={isLoading}>
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /> 
-              {isLoading ? 'Fetching...' : 'Refresh'}
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div className="p-3 space-y-2">
 
       {/* Feed Source Stats + Quick Filters */}
       <div className="flex flex-wrap gap-2 items-center">
@@ -409,24 +364,21 @@ export default function Giststack() {
         </Card>
       )}
 
-      {/* Topic Tracker */}
-      <Card className="border-border">
-        <CardHeader className="pb-2 pt-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary" />
-              Tracked Topics
-            </CardTitle>
+      {/* Topic Tracker — compact inline */}
+      <div className="rounded-lg border border-border/50 bg-card/30 p-2.5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            <TrendingUp className="w-3 h-3 text-primary" />
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Tracked Topics</span>
+          </div>
             {hotItems.length > 0 && (
-              <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+              <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
                 onClick={handleAutoGenerateFromHot}>
-                <Flame className="w-3 h-3" /> Auto-Generate {Math.min(hotItems.length, 5)} Hot → Ideas
+                <Flame className="w-3 h-3" /> Auto {Math.min(hotItems.length, 5)} Hot → Ideas
               </Button>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2 mb-3">
+          <div className="flex flex-wrap gap-1.5 mb-2">
             {topics.map(topic => (
               <Badge key={topic} variant="secondary" className="cursor-pointer hover:bg-primary/20"
                 onClick={() => setSelectedCategory(topic)}>
@@ -438,20 +390,19 @@ export default function Giststack() {
               </Badge>
             ))}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <Input
-              placeholder="Add topic to track..."
+              placeholder="Add topic..."
               value={customTopic}
               onChange={e => setCustomTopic(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addTopic()}
-              className="max-w-xs"
+              className="max-w-[200px] h-7 text-xs"
             />
-            <Button variant="outline" size="sm" onClick={addTopic}>
-              <Plus className="w-4 h-4" />
+            <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={addTopic}>
+              <Plus className="w-3 h-3" />
             </Button>
           </div>
-        </CardContent>
-      </Card>
+      </div>
 
       {/* AI Daily Brief */}
       {dailyBrief && (
