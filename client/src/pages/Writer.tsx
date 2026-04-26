@@ -21,7 +21,7 @@ import {
   Sparkles, ChevronRight, FileText, Zap, Eye, Download, Building2, Loader2,
   Bot, Image, Package, PanelRightClose, PanelRightOpen, Search,
   FileDown, FileType, FileCode, Globe, ChevronDown,
-  Microscope, FlaskConical,
+  Microscope, FlaskConical, ShieldCheck, AlertTriangle, Ban, CheckCircle2, Info,
 } from 'lucide-react';
 import { PUBLICATIONS, matchPublications, type Publication } from '@/lib/publications-data';
 import { scoreArticleLocally, DIMENSION_LABELS, getScoreColor, getScoreBgColor, getTierFromScore } from '@/lib/scoring';
@@ -31,6 +31,7 @@ import { AgenticPanel } from '@/components/writer/AgenticPanel';
 import { CreativePanel } from '@/components/writer/CreativePanel';
 import { ProductPanel } from '@/components/writer/ProductPanel';
 import { DataVizPanel } from '@/components/writer/DataVizPanel';
+import { checkContentQuality, getGradeColor, getGradeBgColor, type QualityReport, type QualityIssue } from '@/lib/quality-checker';
 import {
   WriterBlockNoteEditor,
   htmlToPlainText,
@@ -222,6 +223,9 @@ export default function Writer() {
   const wordCount = useMemo(() => content.trim().split(/\s+/).filter(Boolean).length, [content]);
   const template = TEMPLATES.find(t => t.id === selectedTemplate);
 
+  // Quality report state
+  const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
+
   // Auto-score locally on content change (debounced)
   useEffect(() => {
     if (wordCount < 50) { setScores(null); return; }
@@ -231,6 +235,16 @@ export default function Writer() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [content, selectedPub, wordCount]);
+
+  // Auto-check quality on content change (debounced)
+  useEffect(() => {
+    if (wordCount < 30) { setQualityReport(null); return; }
+    const timer = setTimeout(() => {
+      const report = checkContentQuality(content, { blockOnBritish: true });
+      setQualityReport(report);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [content, wordCount]);
 
   // Publication search
   const pubResults = useMemo(() => {
@@ -523,6 +537,95 @@ ${editorHtml}
             )}
             {aiScoreResult.recommendedTier && (
               <Badge variant="outline" className="text-[10px]">Recommended: {aiScoreResult.recommendedTier}</Badge>
+            )}
+          </div>
+        )}
+
+        {/* ─── Quality Enforcement ─── */}
+        {qualityReport && (
+          <div className="space-y-3 border-t border-border pt-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-blue-400" />
+                <span className="text-xs font-semibold">Content Quality</span>
+              </div>
+              <Badge className={`font-mono text-sm px-2 ${getGradeBgColor(qualityReport.grade)}`}>
+                {qualityReport.grade}
+              </Badge>
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-1.5 rounded bg-muted/30">
+                <p className={`text-lg font-mono font-bold ${qualityReport.stats.slopCount > 3 ? 'text-red-400' : qualityReport.stats.slopCount > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+                  {qualityReport.stats.slopCount}
+                </p>
+                <p className="text-[9px] text-muted-foreground">AI Slop</p>
+              </div>
+              <div className="p-1.5 rounded bg-muted/30">
+                <p className={`text-lg font-mono font-bold ${qualityReport.stats.britishCount > 0 ? 'text-orange-400' : 'text-green-400'}`}>
+                  {qualityReport.stats.britishCount}
+                </p>
+                <p className="text-[9px] text-muted-foreground">British</p>
+              </div>
+              <div className="p-1.5 rounded bg-muted/30">
+                <p className={`text-lg font-mono font-bold ${qualityReport.stats.fillerCount > 10 ? 'text-yellow-400' : 'text-green-400'}`}>
+                  {qualityReport.stats.fillerCount}
+                </p>
+                <p className="text-[9px] text-muted-foreground">Filler</p>
+              </div>
+            </div>
+
+            {/* Readability stats */}
+            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+              <span>Avg sentence: {qualityReport.stats.avgSentenceLength} words</span>
+              <span>·</span>
+              <span>Grade level: {qualityReport.stats.readingGradeLevel}</span>
+              <span>·</span>
+              <span>{qualityReport.stats.paragraphs} ¶</span>
+            </div>
+
+            {/* Gate status */}
+            {qualityReport.passesGate ? (
+              <div className="flex items-center gap-1.5 p-2 rounded bg-green-500/10 border border-green-500/20">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                <span className="text-[10px] text-green-400 font-medium">Passes quality gate — ready to export</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 p-2 rounded bg-red-500/10 border border-red-500/20">
+                <Ban className="w-3.5 h-3.5 text-red-400" />
+                <span className="text-[10px] text-red-400 font-medium">Blocked — fix issues below before exporting</span>
+              </div>
+            )}
+
+            {/* Issues list */}
+            {qualityReport.issues.length > 0 && (
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {qualityReport.issues.slice(0, 20).map((issue, i) => (
+                  <div key={i} className={`p-2 rounded border text-[10px] ${
+                    issue.severity === 'high' ? 'border-red-500/20 bg-red-500/5' :
+                    issue.severity === 'medium' ? 'border-yellow-500/20 bg-yellow-500/5' :
+                    'border-border bg-muted/20'
+                  }`}>
+                    <div className="flex items-start gap-1.5">
+                      {issue.severity === 'high' ? <Ban className="w-3 h-3 text-red-400 shrink-0 mt-0.5" /> :
+                       issue.severity === 'medium' ? <AlertTriangle className="w-3 h-3 text-yellow-400 shrink-0 mt-0.5" /> :
+                       <Info className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />}
+                      <div>
+                        <p className="font-medium">{issue.message}</p>
+                        <p className="text-muted-foreground mt-0.5">→ {issue.fix}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {qualityReport.issues.length === 0 && (
+              <div className="text-center py-3">
+                <CheckCircle2 className="w-6 h-6 mx-auto text-green-400 mb-1" />
+                <p className="text-[10px] text-green-400 font-medium">Clean copy — no quality issues detected</p>
+              </div>
             )}
           </div>
         )}
@@ -858,6 +961,16 @@ ${editorHtml}
             >
               <Sparkles className="w-3 h-3 mr-1" />
               {scores.overall}/10
+            </Badge>
+          )}
+
+          {qualityReport && (
+            <Badge
+              className={`font-mono text-xs cursor-pointer hover:opacity-80 ${getGradeBgColor(qualityReport.grade)}`}
+              onClick={() => { setSidebarOpen(true); setSidebarTab('score'); }}
+            >
+              <ShieldCheck className="w-3 h-3 mr-1" />
+              {qualityReport.grade}{qualityReport.stats.slopCount > 0 ? ` · ${qualityReport.stats.slopCount} slop` : ''}
             </Badge>
           )}
 
