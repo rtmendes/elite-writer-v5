@@ -208,6 +208,15 @@ export default function Writer() {
     const newText = typeof updater === 'function' ? updater(htmlToPlainText(editorHtml)) : updater;
     setEditorHtml(parseContentToHtml(newText));
   }, [editorHtml]);
+
+  // Insert rich content (markdown or HTML) at end of editor without lossy round-trip
+  const insertRichContent = useCallback((mdOrHtml: string) => {
+    const htmlChunk = parseContentToHtml(mdOrHtml);
+    setEditorHtml(prev => {
+      const trimmed = prev.replace(/<p>\s*<\/p>\s*$/, '');
+      return trimmed + htmlChunk;
+    });
+  }, []);
   const [selectedTemplate, setSelectedTemplate] = useState('data-journalism');
   const [selectedVoice, setSelectedVoice] = useState('insight-profit');
   const [selectedPub, setSelectedPub] = useState<Publication | null>(null);
@@ -730,7 +739,7 @@ ${editorHtml}
             <ResearchPanel
               title={title}
               content={content}
-              onInsertContent={(text) => setContent(prev => prev + text)}
+              onInsertContent={(text) => insertRichContent(text)}
             />
           </TabsContent>
         </Tabs>
@@ -752,7 +761,7 @@ ${editorHtml}
               title={title}
               content={content}
               articleId={dbArticleId ?? undefined}
-              onInsertContent={(md) => setContent(prev => prev + md)}
+              onInsertContent={(md) => insertRichContent(md)}
               targetPublication={selectedPub?.name}
             />
           </TabsContent>
@@ -760,7 +769,7 @@ ${editorHtml}
             <DataVizPanel
               title={title}
               content={content}
-              onInsertContent={(md) => setContent(prev => prev + md)}
+              onInsertContent={(md) => insertRichContent(md)}
             />
           </TabsContent>
         </Tabs>
