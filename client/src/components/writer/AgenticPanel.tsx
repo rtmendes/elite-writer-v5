@@ -1,6 +1,7 @@
 /**
  * AgenticPanel — AI-powered autonomous writing panel
  * Controls: model selection, autonomous draft, enhance, rewrite, fact-check, SEO, continue
+ * Each action is visually tied to a named AI agent with a headshot avatar.
  */
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,10 +13,29 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { trpc } from '@/lib/trpc';
+import { AGENTS, type Agent } from '@/lib/agents';
 import {
   Sparkles, Bot, Zap, RefreshCw, ShieldCheck, Search,
   PenTool, ArrowRight, Loader2, Wand2, Brain, RotateCcw,
 } from 'lucide-react';
+
+/** Compact agent avatar with name + role tooltip */
+function AgentAvatar({ agent, busy, size = 'sm' }: { agent: Agent; busy?: boolean; size?: 'sm' | 'md' }) {
+  const px = size === 'md' ? 'w-8 h-8' : 'w-6 h-6';
+  return (
+    <div className="flex items-center gap-1.5 group relative" title={`${agent.name} — ${agent.role}`}>
+      <div className={`${px} rounded-full overflow-hidden ring-1 ring-border/50 shrink-0 ${busy ? 'ring-2 ring-primary animate-pulse' : ''}`}>
+        <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
+      </div>
+      {size === 'md' && (
+        <div className="min-w-0">
+          <p className="text-[10px] font-medium leading-tight truncate">{agent.name}</p>
+          <p className="text-[9px] text-muted-foreground leading-tight truncate">{agent.role}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface AgenticPanelProps {
   title: string;
@@ -190,6 +210,24 @@ export function AgenticPanel({
 
         {/* Autonomous Draft Tab */}
         <TabsContent value="draft" className="space-y-2 mt-2">
+          {/* Agent pipeline visual */}
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-0.5">
+              {['researcher', 'outliner', 'drafter'].map((id, i) => (
+                <div key={id} className="flex items-center">
+                  <AgentAvatar
+                    agent={AGENTS[id]}
+                    busy={autonomousDraft.isPending && (
+                      i === 0 ? true : i === 1 ? true : i === 2
+                    )}
+                  />
+                  {i < 2 && <ArrowRight className="w-2.5 h-2.5 text-muted-foreground/40 mx-0.5" />}
+                </div>
+              ))}
+            </div>
+            <span className="text-[9px] text-muted-foreground">Research → Outline → Draft</span>
+          </div>
+
           <Input
             placeholder="Topic for autonomous draft..."
             value={topic}
@@ -204,19 +242,19 @@ export function AgenticPanel({
             {autonomousDraft.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
             {autonomousDraft.isPending ? 'Researching & Writing...' : 'Autonomous Draft'}
           </Button>
-          <p className="text-[10px] text-muted-foreground text-center">
-            AI researches the topic, creates an outline, and writes a complete article
-          </p>
 
-          <Button
-            variant="outline" size="sm"
-            className="w-full h-8 text-xs gap-1.5"
-            onClick={handleContinue}
-            disabled={isBusy || !content.trim()}
-          >
-            {continueWriting.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
-            Continue Writing (+300 words)
-          </Button>
+          <div className="flex items-center gap-1.5 px-1">
+            <AgentAvatar agent={AGENTS.continuator} busy={continueWriting.isPending} />
+            <Button
+              variant="outline" size="sm"
+              className="flex-1 h-8 text-xs gap-1.5"
+              onClick={handleContinue}
+              disabled={isBusy || !content.trim()}
+            >
+              {continueWriting.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
+              Continue Writing (+300 words)
+            </Button>
+          </div>
 
           {/* Research results from last draft */}
           {lastResult?.type === 'draft' && lastResult.research && (
@@ -241,6 +279,9 @@ export function AgenticPanel({
 
         {/* Enhance Tab */}
         <TabsContent value="enhance" className="space-y-2 mt-2">
+          <div className="flex items-center gap-1.5 px-1">
+            <AgentAvatar agent={AGENTS.editor} busy={enhanceSection.isPending} size="md" />
+          </div>
           <Input
             placeholder="Enhancement instruction..."
             value={enhanceInstruction}
@@ -257,6 +298,9 @@ export function AgenticPanel({
             Enhance Content
           </Button>
 
+          <div className="flex items-center gap-1.5 px-1 pt-1">
+            <AgentAvatar agent={AGENTS.rewriter} busy={rewrite.isPending} size="md" />
+          </div>
           <div className="grid grid-cols-2 gap-1.5">
             <Select value={rewriteStyle} onValueChange={setRewriteStyle}>
               <SelectTrigger className="h-8 text-[10px]">
@@ -287,25 +331,31 @@ export function AgenticPanel({
 
         {/* Tools Tab */}
         <TabsContent value="tools" className="space-y-2 mt-2">
-          <Button
-            variant="outline" size="sm"
-            className="w-full h-8 text-xs gap-1.5 border-green-500/30 text-green-400 hover:bg-green-500/10"
-            onClick={handleFactCheck}
-            disabled={isBusy || !content.trim()}
-          >
-            {factCheck.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
-            Fact Check
-          </Button>
+          <div className="flex items-center gap-2">
+            <AgentAvatar agent={AGENTS.factchecker} busy={factCheck.isPending} />
+            <Button
+              variant="outline" size="sm"
+              className="flex-1 h-8 text-xs gap-1.5 border-green-500/30 text-green-400 hover:bg-green-500/10"
+              onClick={handleFactCheck}
+              disabled={isBusy || !content.trim()}
+            >
+              {factCheck.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+              Fact Check
+            </Button>
+          </div>
 
-          <Button
-            variant="outline" size="sm"
-            className="w-full h-8 text-xs gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-            onClick={handleSEO}
-            disabled={isBusy || !content.trim() || !title.trim()}
-          >
-            {optimizeSEO.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
-            SEO Optimization
-          </Button>
+          <div className="flex items-center gap-2">
+            <AgentAvatar agent={AGENTS.seo} busy={optimizeSEO.isPending} />
+            <Button
+              variant="outline" size="sm"
+              className="flex-1 h-8 text-xs gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+              onClick={handleSEO}
+              disabled={isBusy || !content.trim() || !title.trim()}
+            >
+              {optimizeSEO.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+              SEO Optimization
+            </Button>
+          </div>
 
           {/* Fact Check Results */}
           {lastResult?.type === 'factCheck' && lastResult.data && (

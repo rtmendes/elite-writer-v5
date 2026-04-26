@@ -31,6 +31,8 @@ export const ENV = {
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   // App config
+  braveApiKey: process.env.BRAVE_API_KEY ?? "",
+  activepiecesWebhook: process.env.ACTIVEPIECES_WEBHOOK_URL ?? "",
   appUrl: process.env.APP_URL ?? "https://elitewriter.insightprofit.live",
   adminEmail: process.env.ADMIN_EMAIL ?? "",
   adminPasswordHash: process.env.ADMIN_PASSWORD_HASH ?? "",

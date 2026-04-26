@@ -170,6 +170,94 @@ export const researchRouter = router({
       };
     }),
 
+  // Brave Search — direct web search (no LLM overhead, real-time results)
+  braveSearch: protectedProcedure
+    .input(z.object({
+      query: z.string().min(1),
+      count: z.number().min(1).max(20).default(10),
+      freshness: z.enum(["day", "week", "month", "year", "all"]).default("week"),
+    }))
+    .mutation(async ({ input }) => {
+      if (!ENV.braveApiKey) throw new Error("BRAVE_API_KEY not configured — add it in Settings or .env");
+
+      const params = new URLSearchParams({
+        q: input.query,
+        count: String(input.count),
+        freshness: input.freshness === "all" ? "" : `p${input.freshness[0]}`, // pd, pw, pm, py
+        text_decorations: "false",
+        result_filter: "web",
+      });
+      // Remove empty freshness param
+      if (input.freshness === "all") params.delete("freshness");
+
+      const resp = await fetch(`https://api.search.brave.com/res/v1/web/search?${params.toString()}`, {
+        headers: {
+          "Accept": "application/json",
+          "Accept-Encoding": "gzip",
+          "X-Subscription-Token": ENV.braveApiKey,
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!resp.ok) {
+        const body = await resp.text();
+        throw new Error(`Brave Search error (${resp.status}): ${body.slice(0, 200)}`);
+      }
+
+      const data = await resp.json() as any;
+      const results = (data.web?.results || []).map((r: any) => ({
+        title: r.title || "",
+        url: r.url || "",
+        description: r.description || "",
+        age: r.age || "",
+        thumbnail: r.thumbnail?.src || r.profile?.img || "",
+        siteName: r.meta_url?.hostname || new URL(r.url || "https://example.com").hostname,
+        publishedDate: r.page_age || "",
+      }));
+
+      return {
+        success: true,
+        query: data.query?.original || input.query,
+        totalResults: data.web?.total_count || results.length,
+        results,
+        news: (data.news?.results || []).slice(0, 5).map((n: any) => ({
+          title: n.title || "",
+          url: n.url || "",
+          description: n.description || "",
+          age: n.age || "",
+          thumbnail: n.thumbnail?.src || "",
+          source: n.meta_url?.hostname || "",
+        })),
+      };
+    }),
+
+  // ActivePieces webhook — fire events to external automations
+  triggerWebhook: protectedProcedure
+    .input(z.object({
+      event: z.enum(["article_published", "article_scored", "research_complete", "pitch_sent", "custom"]),
+      payload: z.record(z.any()),
+    }))
+    .mutation(async ({ input }) => {
+      if (!ENV.activepiecesWebhook) throw new Error("ACTIVEPIECES_WEBHOOK_URL not configured");
+
+      const resp = await fetch(ENV.activepiecesWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: input.event,
+          timestamp: new Date().toISOString(),
+          ...input.payload,
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      return {
+        success: resp.ok,
+        status: resp.status,
+        message: resp.ok ? "Webhook delivered" : `Webhook failed (${resp.status})`,
+      };
+    }),
+
   // System status
   status: publicProcedure.query(() => ({
     ok: true,
@@ -181,6 +269,8 @@ export const researchRouter = router({
       openrouter: !!ENV.openrouterApiKey,
       gemini: !!ENV.geminiApiKey,
       perplexity: !!ENV.perplexityApiKey,
+      brave: !!ENV.braveApiKey,
+      activepieces: !!ENV.activepiecesWebhook,
       stabilityAi: !!ENV.stabilityAiKey,
       newsapi: !!ENV.newsapiKey,
       gnews: !!ENV.gnewsKey,

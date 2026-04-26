@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { getScoreBgColor } from '@/lib/scoring';
 import { checkContentQuality, getGradeBgColor } from '@/lib/quality-checker';
+import { AGENTS } from '@/lib/agents';
 
 // Article status in the queue pipeline
 type QueueStatus = 'researching' | 'drafting' | 'scoring' | 'queued' | 'review' | 'approved' | 'rejected';
@@ -264,21 +265,29 @@ export default function Queue() {
               <PipelineStat icon={BarChart3} label="Avg Score" value={`${stats.avgScore}/10`} color="text-yellow-400" />
             </div>
 
-            {/* Pipeline visual */}
+            {/* Pipeline visual with agent headshots */}
             <div className="flex items-center gap-1 mt-4 text-[10px]">
-              <PipelineStep label="Topics" done={true} />
-              <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              <PipelineStep label="Research" active={stats.inPipeline > 0} />
-              <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              <PipelineStep label="AI Draft" active={stats.inPipeline > 0} />
-              <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              <PipelineStep label="Score" active={stats.inPipeline > 0} />
-              <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              <PipelineStep label="Queue" count={stats.queued} />
-              <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              <PipelineStep label="Review" />
-              <ChevronRight className="w-3 h-3 text-muted-foreground" />
-              <PipelineStep label="Publish" done={stats.approved > 0} />
+              {[
+                { agent: AGENTS.scout, label: 'Topics', done: true },
+                { agent: AGENTS.researcher, label: 'Research', active: stats.inPipeline > 0 },
+                { agent: AGENTS.drafter, label: 'AI Draft', active: stats.inPipeline > 0 },
+                { agent: AGENTS.scorer, label: 'Score', active: stats.inPipeline > 0 },
+                { agent: AGENTS.proofreader, label: 'Queue', count: stats.queued },
+                { agent: AGENTS.editor, label: 'Review' },
+                { agent: AGENTS.quality, label: 'Publish', done: stats.approved > 0 },
+              ].map((step, i, arr) => (
+                <div key={step.label} className="flex items-center">
+                  <div className="flex flex-col items-center gap-0.5" title={`${step.agent.name} — ${step.agent.role}`}>
+                    <div className={`w-7 h-7 rounded-full overflow-hidden ring-1 ${step.active ? 'ring-2 ring-primary animate-pulse' : step.done ? 'ring-green-500/50' : 'ring-border/50'}`}>
+                      <img src={step.agent.avatar} alt={step.agent.name} className="w-full h-full object-cover" />
+                    </div>
+                    <span className={`${step.active ? 'text-primary font-medium' : step.done ? 'text-green-400' : 'text-muted-foreground'}`}>
+                      {step.label}{(step as any).count ? ` (${(step as any).count})` : ''}
+                    </span>
+                  </div>
+                  {i < arr.length - 1 && <ChevronRight className="w-3 h-3 text-muted-foreground mx-0.5" />}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -391,13 +400,19 @@ function QueueCard({ item, onOpenInWriter, onDelete, onUpdateStatus }: {
     <Card className="border-border hover:border-primary/30 transition-colors group">
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
-          {/* Score circle */}
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 border-2 ${
-            item.score ? getScoreBgColor(item.score) : 'bg-muted/30 border-border'
-          }`}>
-            <span className="text-lg font-bold font-mono">
-              {item.score ? item.score : '—'}
-            </span>
+          {/* Score circle with agent overlay */}
+          <div className="relative shrink-0">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${
+              item.score ? getScoreBgColor(item.score) : 'bg-muted/30 border-border'
+            }`}>
+              <span className="text-lg font-bold font-mono">
+                {item.score ? item.score : '—'}
+              </span>
+            </div>
+            {/* Agent that drafted this article */}
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full overflow-hidden ring-2 ring-background" title={`${AGENTS.drafter.name} — ${AGENTS.drafter.role}`}>
+              <img src={AGENTS.drafter.avatar} alt="" className="w-full h-full object-cover" />
+            </div>
           </div>
 
           {/* Main content */}

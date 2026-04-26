@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Search, Plus, Database, Link2, BarChart3, Trash2, Copy,
   FileText, ExternalLink, BookOpen, Sparkles, Loader2,
-  ArrowRight, Clock, AlertTriangle, TrendingUp, Zap
+  ArrowRight, Clock, AlertTriangle, TrendingUp, Zap, Globe, Image as ImageIcon
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 
@@ -173,6 +174,11 @@ export default function Research() {
   const deleteResearchDb = trpc.data.research.delete.useMutation();
   const [researchIdMap] = useState<Map<string, number>>(() => new Map());
   const [aiResult, setAiResult] = useState<any>(null);
+  const [braveQuery, setBraveQuery] = useState('');
+  const [braveFreshness, setBraveFreshness] = useState<string>('week');
+  const [braveResults, setBraveResults] = useState<any[]>([]);
+  const [braveNews, setBraveNews] = useState<any[]>([]);
+  const braveSearchMutation = trpc.research.braveSearch.useMutation();
 
   const addSource = () => {
     if (sourceUrl.trim()) {
@@ -239,6 +245,40 @@ export default function Research() {
     } catch (err: any) {
       toast.error(err.message || 'AI research failed');
     }
+  };
+
+  const handleBraveSearch = async () => {
+    if (!braveQuery.trim()) { toast.error('Enter a search query'); return; }
+    try {
+      const result = await braveSearchMutation.mutateAsync({
+        query: braveQuery.trim(),
+        count: 10,
+        freshness: braveFreshness as any,
+      });
+      if (result.success) {
+        setBraveResults(result.results || []);
+        setBraveNews(result.news || []);
+        toast.success(`Found ${result.totalResults} results`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Brave Search failed');
+    }
+  };
+
+  const saveBraveResultAsNote = (item: any) => {
+    const note = addResearch({
+      title: item.title,
+      content: item.description,
+      sources: [item.url],
+      data_points: [],
+    });
+    createResearchDb.mutate({
+      title: item.title,
+      content: item.description,
+      sources: JSON.stringify([item.url]),
+      dataPoints: JSON.stringify([]),
+    }, { onSuccess: (r) => { if (r?.id) researchIdMap.set(note.id, r.id); } });
+    toast.success('Saved to research notes');
   };
 
   const filtered = state.research.filter(r =>
@@ -337,23 +377,125 @@ export default function Research() {
         </div>
       </div>
 
-      {/* Quick AI Research — the main action */}
-      <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary shrink-0" />
-          <Input
-            placeholder="Research any topic — AI generates a brief with sources, data points, and angles..."
-            value={quickTopic}
-            onChange={e => setQuickTopic(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !researchMutation.isPending && handleQuickResearch()}
-            className="flex-1 h-8 text-sm border-0 bg-transparent focus-visible:ring-0 px-0"
-          />
-          <Button size="sm" className="h-7 text-xs gap-1" disabled={researchMutation.isPending || !quickTopic.trim()} onClick={handleQuickResearch}>
-            {researchMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
-            {researchMutation.isPending ? 'Researching...' : 'Research'}
-          </Button>
-        </div>
-      </div>
+      {/* Research Tabs — AI Brief + Brave Web Search */}
+      <Tabs defaultValue="ai" className="space-y-2">
+        <TabsList className="h-8">
+          <TabsTrigger value="ai" className="text-[11px] gap-1"><Sparkles className="w-3 h-3" /> AI Research</TabsTrigger>
+          <TabsTrigger value="brave" className="text-[11px] gap-1"><Globe className="w-3 h-3" /> Web Search</TabsTrigger>
+        </TabsList>
+
+        {/* AI Research Tab */}
+        <TabsContent value="ai" className="mt-0">
+          <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary shrink-0" />
+              <Input
+                placeholder="Research any topic — AI generates a brief with sources, data points, and angles..."
+                value={quickTopic}
+                onChange={e => setQuickTopic(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !researchMutation.isPending && handleQuickResearch()}
+                className="flex-1 h-8 text-sm border-0 bg-transparent focus-visible:ring-0 px-0"
+              />
+              <Button size="sm" className="h-7 text-xs gap-1" disabled={researchMutation.isPending || !quickTopic.trim()} onClick={handleQuickResearch}>
+                {researchMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                {researchMutation.isPending ? 'Researching...' : 'Research'}
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Brave Web Search Tab */}
+        <TabsContent value="brave" className="mt-0 space-y-2">
+          <div className="rounded-lg border border-orange-500/20 bg-orange-500/[0.03] p-3">
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-orange-400 shrink-0" />
+              <Input
+                placeholder="Search the web — real-time results via Brave Search API..."
+                value={braveQuery}
+                onChange={e => setBraveQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !braveSearchMutation.isPending && handleBraveSearch()}
+                className="flex-1 h-8 text-sm border-0 bg-transparent focus-visible:ring-0 px-0"
+              />
+              <select
+                value={braveFreshness}
+                onChange={e => setBraveFreshness(e.target.value)}
+                className="h-7 text-[10px] px-1.5 rounded bg-background border border-border text-foreground"
+              >
+                <option value="day">Past Day</option>
+                <option value="week">Past Week</option>
+                <option value="month">Past Month</option>
+                <option value="year">Past Year</option>
+                <option value="all">All Time</option>
+              </select>
+              <Button size="sm" className="h-7 text-xs gap-1 bg-orange-600 hover:bg-orange-700" disabled={braveSearchMutation.isPending || !braveQuery.trim()} onClick={handleBraveSearch}>
+                {braveSearchMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                Search
+              </Button>
+            </div>
+          </div>
+
+          {/* Brave News Results */}
+          {braveNews.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-orange-400 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" /> Top News
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1.5">
+                {braveNews.map((item, i) => (
+                  <div key={i} className="flex gap-2 p-2 rounded-lg border border-border/50 bg-card/30 hover:border-orange-500/20 transition-colors group">
+                    {item.thumbnail && (
+                      <img src={item.thumbnail} alt="" className="w-16 h-12 rounded object-cover shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[11px] font-medium hover:text-orange-400 line-clamp-2 leading-tight">{item.title}</a>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-[9px] text-muted-foreground">
+                        <span>{item.source}</span>
+                        {item.age && <><span>·</span><span>{item.age}</span></>}
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 shrink-0" onClick={() => saveBraveResultAsNote(item)}>
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Brave Web Results */}
+          {braveResults.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Globe className="w-3 h-3" /> Web Results
+              </p>
+              <div className="space-y-1">
+                {braveResults.map((item, i) => (
+                  <div key={i} className="flex items-start gap-2.5 p-2 rounded-lg border border-border/50 bg-card/30 hover:border-orange-500/20 transition-colors group">
+                    {item.thumbnail ? (
+                      <img src={item.thumbnail} alt="" className="w-12 h-12 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded bg-secondary/50 flex items-center justify-center shrink-0">
+                        <Globe className="w-4 h-4 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[11px] font-medium hover:text-orange-400 line-clamp-1">{item.title}</a>
+                      <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{item.description}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-[9px] text-muted-foreground">
+                        <span className="text-orange-400/60">{item.siteName}</span>
+                        {item.age && <><span>·</span><span>{item.age}</span></>}
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 shrink-0" title="Save as research note" onClick={() => saveBraveResultAsNote(item)}>
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <div className="grid lg:grid-cols-4 gap-2.5">
         {/* Main content — research notes */}

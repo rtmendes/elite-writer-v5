@@ -10,6 +10,7 @@ import {
   BarChart3, BookOpen, Globe, Sparkles, Building2, ShoppingBag, Megaphone,
   Newspaper, Search
 } from 'lucide-react';
+import { AGENTS } from '@/lib/agents';
 
 export default function Dashboard() {
   const { state } = useApp();
@@ -171,6 +172,21 @@ export default function Dashboard() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* AI Team — visual agent roster */}
+      <div className="rounded-lg border border-border/50 bg-card/30 p-3">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2.5">Your AI Editorial Team</p>
+        <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
+          {Object.values(AGENTS).map(agent => (
+            <div key={agent.id} className="flex flex-col items-center gap-1 group" title={`${agent.name} — ${agent.role}`}>
+              <div className="w-9 h-9 rounded-full overflow-hidden ring-1 ring-border/40 group-hover:ring-primary/50 transition-all">
+                <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" loading="lazy" />
+              </div>
+              <span className="text-[8px] text-muted-foreground leading-tight text-center truncate w-full">{agent.name.split(' ')[0]}</span>
+            </div>
+          ))}
         </div>
       </div>
 
