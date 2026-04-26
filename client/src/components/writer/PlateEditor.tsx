@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Value } from '@udecode/plate-common';
-import { Plate, PlateContent } from '@udecode/plate-common';
+import { useCallback, useMemo } from 'react';
+import { Plate, PlateEditable, PlateProvider, type Value } from '@udecode/plate-common';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
@@ -120,9 +119,8 @@ export function plainTextToPlate(text: string): Value {
     }
 
     const trimmed = line.trim();
-    if (!trimmed) continue; // skip blank lines
+    if (!trimmed) continue;
 
-    // Headings
     if (trimmed.startsWith('# ')) {
       nodes.push({ type: 'h1', children: [{ text: trimmed.slice(2) }] });
     } else if (trimmed.startsWith('## ')) {
@@ -134,17 +132,14 @@ export function plainTextToPlate(text: string): Value {
     } else if (trimmed.startsWith('> ')) {
       nodes.push({ type: 'blockquote', children: [{ text: trimmed.slice(2) }] });
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      // Collect consecutive list items
       nodes.push({ type: 'li', children: [{ text: trimmed.slice(2) }] });
     } else if (trimmed === '---' || trimmed === '***') {
       nodes.push({ type: 'hr', children: [{ text: '' }] });
     } else {
-      // Plain paragraph
       nodes.push({ type: 'p', children: [{ text: line }] });
     }
   }
 
-  // Handle unclosed code block
   if (inCodeBlock && codeLines.length) {
     nodes.push({ type: 'code_block', children: [{ text: codeLines.join('\n') }] });
   }
@@ -182,34 +177,43 @@ export function parseContent(content: string | null | undefined): Value {
 export function WriterPlateEditor({
   value,
   onValueChange,
-  placeholder = 'Start writing your article...\n\nTip: Type / for slash commands, or use the toolbar above.',
+  placeholder = 'Start writing your article... Type / for slash commands.',
   readOnly = false,
 }: PlateEditorProps) {
+  const handleChange = useCallback(
+    (next: Value) => {
+      onValueChange(next);
+    },
+    [onValueChange],
+  );
+
   return (
     <DndProvider backend={HTML5Backend}>
-      <Plate
+      <PlateProvider
         plugins={platePlugins}
         value={value}
-        onChange={(newValue: Value) => {
-          onValueChange(newValue);
-        }}
+        onChange={handleChange}
       >
         <div className="flex flex-col h-full">
           {!readOnly && <FixedToolbar />}
+          {!readOnly && <FloatingToolbar />}
+
           <div className="flex-1 overflow-y-auto px-6 pb-6 pt-4">
             <div className="mx-auto max-w-3xl">
-              <PlateContent
-                placeholder={placeholder}
-                readOnly={readOnly}
-                className="min-h-[500px] outline-none text-sm leading-relaxed"
-                style={{ fontFamily: "'Merriweather', serif", fontSize: '15px', lineHeight: '1.8' }}
-              />
+              <Plate>
+                <PlateEditable
+                  placeholder={placeholder}
+                  readOnly={readOnly}
+                  className="min-h-[500px] outline-none text-sm leading-relaxed"
+                  style={{ fontFamily: "'Merriweather', serif", fontSize: '15px', lineHeight: '1.8' }}
+                />
+              </Plate>
             </div>
           </div>
-          {!readOnly && <FloatingToolbar />}
+
           {!readOnly && <SlashCommandMenu />}
         </div>
-      </Plate>
+      </PlateProvider>
     </DndProvider>
   );
 }
