@@ -380,6 +380,39 @@ export default function Writer() {
     }
   }, [title, editorHtml, content, wordCount, selectedPub, selectedVoice, selectedTemplate, scores, activeArticleId, selectedBrandId, selectedProductId, activeBrandObj, addArticle, updateArticle, dbArticleId, saveArticleMutation, updateArticleMutation]);
 
+  // ─── Full Pipeline: Title → Research → Draft → Proof → Score → Save ────────
+  const fullPipelineMutation = trpc.queue.generateArticle.useMutation();
+  const [pipelineRunning, setPipelineRunning] = useState(false);
+
+  const handleFullPipeline = async () => {
+    if (!title.trim()) { toast.error('Add a title first'); return; }
+    setPipelineRunning(true);
+    try {
+      const tmpl = TEMPLATES.find(t => t.id === selectedTemplate);
+      const brand = BRAND_VOICES.find(b => b.id === selectedVoice);
+      toast.info('🔍 Full pipeline: researching → drafting → proofing → scoring...');
+      const result = await fullPipelineMutation.mutateAsync({
+        title: title.trim(),
+        targetPublication: selectedPub?.name,
+        template: tmpl?.name,
+        brandVoice: brand?.name,
+        model: writerSettings.ai?.model || 'claude-sonnet',
+        wordCount: template?.wordCountRange[1] || 2000,
+        saveToDb: true,
+      });
+      if (result.success && result.content) {
+        setEditorHtml(parseContentToHtml(result.content));
+        if (result.headline && result.headline !== title) setTitle(result.headline);
+        if (result.articleId) setDbArticleId(result.articleId);
+        toast.success(`✅ Full pipeline complete — ${result.wordCount} words, score: ${result.score}/10`);
+      }
+    } catch (err: any) {
+      toast.error('Pipeline failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setPipelineRunning(false);
+    }
+  };
+
   const handleCreatePitch = () => {
     if (!selectedPub) { toast.error('Select a target publication first'); return; }
     handleSave();
@@ -1012,6 +1045,13 @@ ${editorHtml}
             onClick={handleAiDraft}>
             {draftMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
             {draftMutation.isPending ? 'Writing...' : 'AI Draft'}
+          </Button>
+
+          <Button size="sm" className="h-8 text-xs gap-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
+            disabled={pipelineRunning || fullPipelineMutation.isPending || !title.trim()}
+            onClick={handleFullPipeline}>
+            {pipelineRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bot className="w-3 h-3" />}
+            {pipelineRunning ? 'Pipeline...' : 'Full Pipeline'}
           </Button>
 
           {/* Export Dropdown */}
