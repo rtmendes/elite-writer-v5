@@ -31,6 +31,7 @@ import { AgenticPanel } from '@/components/writer/AgenticPanel';
 import { CreativePanel } from '@/components/writer/CreativePanel';
 import { ProductPanel } from '@/components/writer/ProductPanel';
 import { DataVizPanel } from '@/components/writer/DataVizPanel';
+import { SettingsModal, loadSettings, type WriterSettings } from '@/components/writer/SettingsModal';
 import { checkContentQuality, getGradeColor, getGradeBgColor, type QualityReport, type QualityIssue } from '@/lib/quality-checker';
 import {
   WriterBlockNoteEditor,
@@ -218,6 +219,7 @@ export default function Writer() {
   const [selectedBrandId, setSelectedBrandId] = useState<string>(state.brands[0]?.id || '');
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [writerSettings, setWriterSettings] = useState<WriterSettings>(loadSettings);
 
   const activeBrandObj = useMemo(() => state.brands.find(b => b.id === selectedBrandId), [state.brands, selectedBrandId]);
   const wordCount = useMemo(() => content.trim().split(/\s+/).filter(Boolean).length, [content]);
@@ -1024,6 +1026,9 @@ ${editorHtml}
           <Button size="sm" className="h-8 text-xs gap-1" onClick={handleCreatePitch}>
             <Send className="w-3 h-3" /> Create Pitch
           </Button>
+
+          {/* Settings gear */}
+          <SettingsModal onSettingsChange={setWriterSettings} />
 
           {/* Sidebar toggle */}
           <Button
