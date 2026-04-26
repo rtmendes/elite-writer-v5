@@ -14,7 +14,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { toast } from 'sonner';
-import { useLocation } from 'wouter';
+import { useLocation, useRoute } from 'wouter';
 import { trpc } from '@/lib/trpc';
 import {
   PenTool, Save, Send, BarChart3, BookOpen, Target,
@@ -190,6 +190,7 @@ function ResearchPanel({ title, content, onInsertContent }: {
 export default function Writer() {
   const { state, addArticle, updateArticle } = useApp();
   const [, navigate] = useLocation();
+  const [matchRoute, routeParams] = useRoute('/writer/:id');
 
   // tRPC mutations
   const scoreMutation = trpc.ai.score.useMutation();
@@ -227,6 +228,29 @@ export default function Writer() {
 
   // Quality report state
   const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
+
+  // Load article by route param /writer/:id
+  const articlesQuery = trpc.data.articles.useQuery(undefined, { enabled: !!matchRoute });
+  useEffect(() => {
+    if (!matchRoute || !routeParams?.id) return;
+    const id = parseInt(routeParams.id, 10);
+    if (isNaN(id)) return;
+    const allArticles = articlesQuery.data;
+    if (!allArticles) return;
+    const article = allArticles.find((a: any) => a.id === id);
+    if (!article) { toast.error('Article not found'); return; }
+    // Hydrate writer with the article data
+    setTitle(article.title || '');
+    setEditorHtml(parseContentToHtml(article.content || ''));
+    setDbArticleId(article.id);
+    if (article.template) setSelectedTemplate(article.template);
+    if (article.brandVoice) setSelectedVoice(article.brandVoice);
+    if (article.targetPublication) {
+      const pub = PUBLICATIONS.find(p => p.name === article.targetPublication);
+      if (pub) setSelectedPub(pub);
+    }
+    toast.success(`Loaded: "${article.title}"`);
+  }, [matchRoute, routeParams?.id, articlesQuery.data]);
 
   // Auto-score locally on content change (debounced)
   useEffect(() => {

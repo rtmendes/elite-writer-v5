@@ -7,16 +7,14 @@
  * Pipeline: Trending Topic → Research → AI Draft → Score → Queue → Review → Export
  */
 
-import { useState, useMemo } from 'react';
-import { useApp } from '@/contexts/AppContext';
+import { useState, useMemo, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { trpc } from '@/lib/trpc';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -24,15 +22,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import {
-  Inbox, Clock, CheckCircle2, XCircle, Sparkles, ArrowUpDown,
+  Inbox, CheckCircle2, XCircle, ArrowUpDown,
   Filter, Search, PenTool, Send, Eye, Trash2, MoreHorizontal,
-  Zap, TrendingUp, BookOpen, Bot, RefreshCw, Play, Pause,
-  ChevronRight, BarChart3, Target, FileText, Layers,
-  AlertTriangle, Calendar, Timer,
+  Zap, BookOpen, Bot, RefreshCw,
+  ChevronRight, BarChart3, FileText, Layers,
+  Calendar, Timer, Sparkles,
 } from 'lucide-react';
-import { scoreArticleLocally, getScoreColor, getScoreBgColor, getTierFromScore } from '@/lib/scoring';
-import { checkContentQuality, getGradeBgColor, type QualityReport } from '@/lib/quality-checker';
-import { PUBLICATIONS } from '@/lib/publications-data';
+import { getScoreBgColor } from '@/lib/scoring';
+import { checkContentQuality, getGradeBgColor } from '@/lib/quality-checker';
 
 // Article status in the queue pipeline
 type QueueStatus = 'researching' | 'drafting' | 'scoring' | 'queued' | 'review' | 'approved' | 'rejected';
@@ -71,10 +68,17 @@ export default function Queue() {
   const [statusFilter, setStatusFilter] = useState<QueueStatus | 'all'>('all');
   const [sortBy, setSortBy] = useState<'score' | 'date' | 'publication'>('score');
   const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [pipelineStep, setPipelineStep] = useState('');
 
   // Fetch existing articles from the database
   const articlesQuery = trpc.data.articles.useQuery(undefined, { staleTime: 30_000 });
   const articles = articlesQuery.data ?? [];
+
+  // Backend mutations
+  const discoverTopics = trpc.queue.discoverTopics.useMutation();
+  const generateArticle = trpc.queue.generateArticle.useMutation();
+  const updateStatus = trpc.queue.updateStatus.useMutation();
+  const deleteArticle = trpc.queue.deleteArticle.useMutation();
 
   // Transform DB articles into queue items
   const queueItems: QueueItem[] = useMemo(() => {
@@ -133,15 +137,75 @@ export default function Queue() {
     navigate(`/writer/${id}`);
   };
 
-  const handleStartPipeline = () => {
-    setPipelineRunning(true);
-    toast.success('Article pipeline started — researching trending topics...');
-    // This will connect to the backend cron/queue system
-    setTimeout(() => {
-      setPipelineRunning(false);
-      toast.info('Pipeline demo complete. Backend cron integration coming next.');
-    }, 3000);
+  const handleUpdateStatus = async (id: number, status: 'draft' | 'review' | 'scored' | 'pitched' | 'published') => {
+    try {
+      await updateStatus.mutateAsync({ articleId: id, status });
+      await articlesQuery.refetch();
+      toast.success(`Article moved to ${status}`);
+    } catch (err: any) {
+      toast.error('Failed: ' + err.message);
+    }
   };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteArticle.mutateAsync({ articleId: id });
+      await articlesQuery.refetch();
+      toast.success('Article removed');
+    } catch (err: any) {
+      toast.error('Failed: ' + err.message);
+    }
+  };
+
+  const handleStartPipeline = useCallback(async () => {
+    setPipelineRunning(true);
+    try {
+      // Step 1: Discover topics
+      setPipelineStep('Discovering trending topics...');
+      toast.info('🔍 Discovering trending topics...');
+      const { topics } = await discoverTopics.mutateAsync({ count: 3 });
+
+      if (!topics || topics.length === 0) {
+        toast.error('No topics found. Try again.');
+        setPipelineRunning(false);
+        return;
+      }
+
+      toast.success(`Found ${topics.length} topics — generating articles...`);
+
+      // Step 2: Generate articles one by one
+      let generated = 0;
+      for (const topic of topics) {
+        setPipelineStep(`Writing: ${topic.title || topic.topic}...`);
+        toast.info(`✍️ Drafting: ${(topic.title || topic.topic).slice(0, 60)}...`);
+        try {
+          const result = await generateArticle.mutateAsync({
+            title: topic.title || topic.topic,
+            targetPublication: topic.suggestedPublication,
+            template: topic.suggestedTemplate,
+            model: 'claude-sonnet',
+            wordCount: topic.estimatedWords || 2000,
+          });
+          if (result.success) {
+            generated++;
+            toast.success(`✅ "${result.headline}" — score: ${result.score}/10, ${result.wordCount} words`);
+          }
+        } catch (err: any) {
+          toast.error(`Failed: ${(topic.title || topic.topic).slice(0, 40)}: ${err.message}`);
+        }
+      }
+
+      // Refresh the list
+      await articlesQuery.refetch();
+      setPipelineStep('');
+      toast.success(`Pipeline complete — ${generated} articles ready for review!`);
+    } catch (err: any) {
+      toast.error('Pipeline error: ' + (err.message || 'Unknown'));
+    } finally {
+      setPipelineRunning(false);
+      setPipelineStep('');
+    }
+  }, [discoverTopics, generateArticle, articlesQuery]);
 
   return (
     <div className="flex-1 overflow-auto bg-background">
@@ -177,7 +241,7 @@ export default function Queue() {
               {pipelineRunning ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  Running...
+                  {pipelineStep ? pipelineStep.slice(0, 30) : 'Running...'}
                 </>
               ) : (
                 <>
@@ -276,7 +340,7 @@ export default function Queue() {
             </Card>
           ) : (
             filteredItems.map(item => (
-              <QueueCard key={item.id} item={item} onOpenInWriter={handleOpenInWriter} />
+              <QueueCard key={item.id} item={item} onOpenInWriter={handleOpenInWriter} onDelete={handleDelete} onUpdateStatus={handleUpdateStatus} />
             ))
           )}
         </div>
@@ -314,7 +378,12 @@ function PipelineStep({ label, active, done, count }: {
   );
 }
 
-function QueueCard({ item, onOpenInWriter }: { item: QueueItem; onOpenInWriter: (id: number) => void }) {
+function QueueCard({ item, onOpenInWriter, onDelete, onUpdateStatus }: {
+  item: QueueItem;
+  onOpenInWriter: (id: number) => void;
+  onDelete: (id: number) => void;
+  onUpdateStatus: (id: number, status: 'draft' | 'review' | 'scored' | 'pitched' | 'published') => void;
+}) {
   const config = STATUS_CONFIG[item.status];
   const StatusIcon = config.icon;
 
@@ -394,11 +463,17 @@ function QueueCard({ item, onOpenInWriter }: { item: QueueItem; onOpenInWriter: 
                     <DropdownMenuItem onClick={() => onOpenInWriter(item.id)}>
                       <PenTool className="w-3.5 h-3.5 mr-2" /> Open in Writer
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onUpdateStatus(item.id, 'review')}>
+                      <Eye className="w-3.5 h-3.5 mr-2" /> Mark as Review
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onUpdateStatus(item.id, 'pitched')}>
                       <Send className="w-3.5 h-3.5 mr-2" /> Send to Pitch
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onUpdateStatus(item.id, 'published')}>
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Mark Published
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-red-400">
+                    <DropdownMenuItem className="text-red-400" onClick={() => onDelete(item.id)}>
                       <Trash2 className="w-3.5 h-3.5 mr-2" /> Remove
                     </DropdownMenuItem>
                   </DropdownMenuContent>

@@ -17,6 +17,7 @@ import { agenticRouter } from "./routers/agentic";
 import { productCreationRouter } from "./routers/products";
 import { creativeRouter } from "./routers/creative";
 import { giveRouter } from "./routers/give";
+import { queueRouter } from "./routers/queue";
 
 export const appRouter = router({
   system: systemRouter,
@@ -53,6 +54,7 @@ export const appRouter = router({
   productCreation: productCreationRouter,
   creative: creativeRouter,
   give: giveRouter,
+  queue: queueRouter,
 });
 
 export type AppRouter = typeof appRouter;
