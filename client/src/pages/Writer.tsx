@@ -90,13 +90,56 @@ function ResearchPanel({ title, content, onInsertContent }: {
                 key={note.id}
                 className="w-full text-left p-2 rounded-md bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 transition-colors"
                 onClick={() => {
-                  const imported = `\n\n## Research: ${note.title}\n\n${note.content}\n\n${note.data_points?.map((dp: any) => `- **${dp.label}**: ${dp.value} (${dp.source})`).join('\n') || ''}`;
+                  // Format content — if JSON, convert to readable markdown
+                  let body = note.content || '';
+                  try {
+                    const t = body.trim();
+                    if (t.startsWith('{') && t.endsWith('}')) {
+                      const d = JSON.parse(t);
+                      const parts: string[] = [];
+                      // Angle / headline
+                      if (d.recommended_angle) {
+                        const ra = typeof d.recommended_angle === 'object' ? d.recommended_angle : { angle: d.recommended_angle };
+                        if (ra.headline) parts.push(`**${ra.headline}**`);
+                        if (ra.angle && ra.angle !== ra.headline) parts.push(ra.angle);
+                        if (ra.why_now) parts.push(`*Why now: ${ra.why_now}*`);
+                      }
+                      if (d.suggested_headline && !d.recommended_angle) parts.push(`**${d.suggested_headline}**`);
+                      if (d.summary) parts.push(d.summary);
+                      if (d.story_angle) parts.push(d.story_angle);
+                      if (d.news_peg) parts.push(`News peg: ${d.news_peg}`);
+                      if (d.editor_pitch) parts.push(`> ${d.editor_pitch}`);
+                      if (Array.isArray(d.key_trends) && d.key_trends.length) parts.push(`Tags: ${d.key_trends.join(', ')}`);
+                      if (Array.isArray(d.hook_suggestions) && d.hook_suggestions.length) {
+                        parts.push('Hooks:\n' + d.hook_suggestions.map((h: string) => `- ${h}`).join('\n'));
+                      }
+                      if (Array.isArray(d.data_points) && d.data_points.length) {
+                        parts.push('Key data:\n' + d.data_points.map((dp: any) => `- ${typeof dp === 'string' ? dp : dp.stat || dp.value || ''}`).join('\n'));
+                      }
+                      if (Array.isArray(d.expert_sources) && d.expert_sources.length) {
+                        parts.push('Expert sources:\n' + d.expert_sources.map((e: any) => `- ${typeof e === 'string' ? e : `${e.name || ''}: ${e.why_them || e.title || ''}`}`).join('\n'));
+                      }
+                      if (d.competitive_angle) parts.push(`Competitive angle: ${d.competitive_angle}`);
+                      body = parts.join('\n\n');
+                    }
+                  } catch { /* keep raw */ }
+                  const imported = `\n\n## Research: ${note.title}\n\n${body}\n\n${note.data_points?.map((dp: any) => `- **${dp.label}**: ${dp.value} (${dp.source})`).join('\n') || ''}`;
                   onInsertContent(imported);
                   toast.success(`Imported: ${note.title}`);
                 }}
               >
                 <p className="text-[11px] font-medium truncate">{note.title}</p>
-                <p className="text-[9px] text-muted-foreground truncate">{note.content?.slice(0, 60)}</p>
+                <p className="text-[9px] text-muted-foreground truncate">{(() => {
+                  const c = note.content || '';
+                  try {
+                    const t = c.trim();
+                    if (t.startsWith('{') && t.endsWith('}')) {
+                      const d = JSON.parse(t);
+                      return d.recommended_angle?.angle || d.story_angle || d.summary || d.editor_pitch || c.slice(0, 60);
+                    }
+                  } catch {}
+                  return c.slice(0, 60);
+                })()}</p>
                 {note.data_points?.length > 0 && (
                   <Badge variant="outline" className="text-[8px] mt-0.5">{note.data_points.length} data points</Badge>
                 )}

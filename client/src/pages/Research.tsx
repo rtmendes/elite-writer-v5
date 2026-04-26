@@ -13,6 +13,135 @@ import {
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 
+// ── Render structured research content (detects JSON and formats for humans) ──
+function ResearchNoteContent({ content }: { content: string }) {
+  // Try to parse as JSON — if it's a structured brief, render nicely
+  try {
+    const trimmed = content.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      const data = JSON.parse(trimmed);
+      return (
+        <div className="space-y-1.5 text-[11px]">
+          {/* Recommended angle / headline */}
+          {data.recommended_angle && (
+            <div>
+              <span className="text-primary font-medium">
+                {typeof data.recommended_angle === 'object'
+                  ? data.recommended_angle.headline || data.recommended_angle.angle || ''
+                  : data.recommended_angle}
+              </span>
+              {typeof data.recommended_angle === 'object' && data.recommended_angle.angle &&
+                data.recommended_angle.angle !== data.recommended_angle.headline && (
+                <p className="text-muted-foreground mt-0.5">{data.recommended_angle.angle}</p>
+              )}
+              {typeof data.recommended_angle === 'object' && data.recommended_angle.why_now && (
+                <p className="text-muted-foreground/70 mt-0.5 italic">{data.recommended_angle.why_now}</p>
+              )}
+            </div>
+          )}
+          {/* Suggested headline */}
+          {data.suggested_headline && !data.recommended_angle && (
+            <p className="text-primary font-medium">{data.suggested_headline}</p>
+          )}
+          {/* Summary / story angle */}
+          {data.summary && <p className="text-muted-foreground">{data.summary}</p>}
+          {data.story_angle && <p className="text-muted-foreground">{data.story_angle}</p>}
+          {/* News peg / urgency */}
+          {data.news_peg && (
+            <p className="text-amber-400/80 text-[10px]">⏰ {data.news_peg}</p>
+          )}
+          {data.urgency && typeof data.urgency === 'string' && (
+            <p className="text-muted-foreground/70 text-[10px]">{data.urgency}</p>
+          )}
+          {/* Editor pitch */}
+          {data.editor_pitch && (
+            <p className="text-muted-foreground/80 italic">"{data.editor_pitch}"</p>
+          )}
+          {/* Key trends / tags */}
+          {Array.isArray(data.key_trends) && data.key_trends.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {data.key_trends.map((t: string, i: number) => (
+                <span key={i} className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px]">{t}</span>
+              ))}
+            </div>
+          )}
+          {/* Hook suggestions */}
+          {Array.isArray(data.hook_suggestions) && data.hook_suggestions.length > 0 && (
+            <div className="space-y-0.5">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Hooks</span>
+              {data.hook_suggestions.map((h: string, i: number) => (
+                <p key={i} className="text-muted-foreground/80 pl-2 border-l border-primary/20">• {h}</p>
+              ))}
+            </div>
+          )}
+          {/* Data points (from intelligence) */}
+          {Array.isArray(data.data_points) && data.data_points.length > 0 && (
+            <div className="space-y-0.5">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Key Data</span>
+              {data.data_points.slice(0, 4).map((dp: any, i: number) => (
+                <p key={i} className="text-muted-foreground/80 pl-2 border-l border-blue-500/20">
+                  📊 {typeof dp === 'string' ? dp : dp.stat || dp.value || JSON.stringify(dp)}
+                </p>
+              ))}
+            </div>
+          )}
+          {/* Expert sources */}
+          {Array.isArray(data.expert_sources) && data.expert_sources.length > 0 && (
+            <div className="space-y-0.5">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Sources</span>
+              {data.expert_sources.slice(0, 3).map((e: any, i: number) => (
+                <p key={i} className="text-muted-foreground/80 pl-2 border-l border-green-500/20">
+                  👤 {typeof e === 'string' ? e : `${e.name || ''} — ${e.why_them || e.title || ''}`}
+                </p>
+              ))}
+            </div>
+          )}
+          {/* Counterintuitive angles */}
+          {Array.isArray(data.counterintuitive_angles) && data.counterintuitive_angles.length > 0 && (
+            <div className="space-y-0.5">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Counter angles</span>
+              {data.counterintuitive_angles.slice(0, 2).map((a: string, i: number) => (
+                <p key={i} className="text-muted-foreground/80 pl-2 border-l border-amber-500/20">⚡ {a}</p>
+              ))}
+            </div>
+          )}
+          {/* Sources list */}
+          {Array.isArray(data.sources) && data.sources.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {data.sources.map((s: any, i: number) => {
+                const title = typeof s === 'string' ? s : s.title || s.name || s.url || '';
+                const url = typeof s === 'string' ? (s.startsWith('http') ? s : '') : s.url || '';
+                return url ? (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 text-[10px] text-blue-400 hover:text-blue-300 truncate max-w-[250px]">
+                    <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                    {title.length > 50 ? title.slice(0, 50) + '…' : title}
+                  </a>
+                ) : (
+                  <span key={i} className="text-[10px] text-muted-foreground">{title}</span>
+                );
+              })}
+            </div>
+          )}
+          {/* Competitive angle */}
+          {data.competitive_angle && (
+            <p className="text-muted-foreground/60 text-[10px]">🏁 {data.competitive_angle}</p>
+          )}
+        </div>
+      );
+    }
+  } catch {
+    // Not JSON — fall through to plain text
+  }
+
+  // Default: plain text rendering
+  return (
+    <p className="text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">
+      {content}
+    </p>
+  );
+}
+
 const DATA_SOURCES = [
   { name: 'FRED (Federal Reserve)', url: 'https://fred.stlouisfed.org/', category: 'Economics' },
   { name: 'World Bank Open Data', url: 'https://data.worldbank.org/', category: 'Global' },
@@ -287,7 +416,9 @@ export default function Research() {
                     </div>
                   </div>
                   {note.content && (
-                    <p className="text-[11px] text-muted-foreground leading-relaxed mb-2 whitespace-pre-wrap line-clamp-4">{note.content}</p>
+                    <div className="mb-2">
+                      <ResearchNoteContent content={note.content} />
+                    </div>
                   )}
                   {note.data_points.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-1.5">
