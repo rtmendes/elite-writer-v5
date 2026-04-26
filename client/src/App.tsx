@@ -14,6 +14,7 @@ import Pitches from "./pages/Pitches";
 import Financial from "./pages/Financial";
 import Settings from "./pages/Settings";
 import Brands from "./pages/Brands";
+import Queue from "./pages/Queue";
 import Login from "./pages/Login";
 import NotFound from "@/pages/NotFound";
 function Router() {
@@ -29,6 +30,7 @@ function Router() {
             <Route path="/research" component={Research} />
             <Route path="/writer" component={Writer} />
             <Route path="/writer/:id" component={Writer} />
+            <Route path="/queue" component={Queue} />
             <Route path="/publications" component={Publications} />
             <Route path="/pitches" component={Pitches} />
             <Route path="/financial" component={Financial} />

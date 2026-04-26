@@ -5,7 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import {
   LayoutDashboard, Newspaper, Lightbulb, Search, PenTool,
   BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
-  Zap, Menu, Building2, Moon, Sun
+  Zap, Menu, Building2, Moon, Sun, Inbox
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { path: '/ideas', label: 'Ideas', icon: Lightbulb, description: 'Article idea pipeline' },
   { path: '/research', label: 'Research', icon: Search, description: 'Data & source gathering' },
   { path: '/writer', label: 'Writer', icon: PenTool, description: 'AI-enhanced editor' },
+  { path: '/queue', label: 'Queue', icon: Inbox, description: 'Pre-written article pipeline' },
   { path: '/publications', label: 'Publications', icon: BookOpen, description: '174+ publication database' },
   { path: '/pitches', label: 'Pitches', icon: Send, description: 'Pitch management' },
   { path: '/brands', label: 'Brands', icon: Building2, description: 'Brand & product engine' },
