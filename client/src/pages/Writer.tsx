@@ -23,15 +23,12 @@ import { AgenticPanel } from '@/components/writer/AgenticPanel';
 import { CreativePanel } from '@/components/writer/CreativePanel';
 import { ProductPanel } from '@/components/writer/ProductPanel';
 import { DataVizPanel } from '@/components/writer/DataVizPanel';
-import type { Value } from '@udecode/plate-common';
 import {
-  WriterPlateEditor,
-  plateToPlainText,
-  plateToMarkdown,
-  plainTextToPlate,
-  parseContent,
-  isPlateJSON,
-} from '@/components/writer/PlateEditor';
+  WriterBlockNoteEditor,
+  htmlToPlainText,
+  htmlToMarkdown,
+  parseContentToHtml,
+} from '@/components/writer/BlockNoteEditor';
 
 export default function Writer() {
   const { state, addArticle, updateArticle } = useApp();
@@ -44,17 +41,16 @@ export default function Writer() {
   const updateArticleMutation = trpc.data.articles.update.useMutation();
   const [dbArticleId, setDbArticleId] = useState<number | null>(null);
 
-  // Editor state — Plate stores structured JSON; we derive plain text for scoring/AI
+  // Editor state — BlockNote stores HTML; we derive plain text for scoring/AI
   const [title, setTitle] = useState('');
-  const [editorValue, setEditorValue] = useState<Value>([{ type: 'p', children: [{ text: '' }] }]);
-  // Plain-text mirror for scoring, word count, AI, export (derived from editorValue)
-  const content = useMemo(() => plateToPlainText(editorValue), [editorValue]);
+  const [editorHtml, setEditorHtml] = useState('<p></p>');
+  // Plain-text mirror for scoring, word count, AI, export (derived from editorHtml)
+  const content = useMemo(() => htmlToPlainText(editorHtml), [editorHtml]);
   // Keep a setter alias for compatibility with existing code paths (AI draft, template insert)
   const setContent = useCallback((updater: string | ((prev: string) => string)) => {
-    // When external code sets content as string (e.g., AI draft), convert to Plate blocks
-    const newText = typeof updater === 'function' ? updater(plateToPlainText(editorValue)) : updater;
-    setEditorValue(plainTextToPlate(newText));
-  }, [editorValue]);
+    const newText = typeof updater === 'function' ? updater(htmlToPlainText(editorHtml)) : updater;
+    setEditorHtml(parseContentToHtml(newText));
+  }, [editorHtml]);
   const [selectedTemplate, setSelectedTemplate] = useState('data-journalism');
   const [selectedBrand, setSelectedBrand] = useState('insight-profit');
   const [selectedPub, setSelectedPub] = useState<Publication | null>(null);
@@ -163,7 +159,7 @@ export default function Writer() {
     if (!title.trim()) { toast.error('Please add a title'); return; }
     const articleData = {
       title: title.trim(),
-      content: JSON.stringify(editorValue),
+      content: editorHtml,
       word_count: wordCount,
       target_publication: selectedPub?.name,
       brand_voice: selectedBrand,
@@ -207,7 +203,7 @@ export default function Writer() {
   };
 
   const handleExport = (format: string) => {
-    const mdContent = plateToMarkdown(editorValue);
+    const mdContent = htmlToMarkdown(editorHtml);
     const blob = new Blob([`# ${title}\n\n${mdContent}`], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -334,11 +330,11 @@ export default function Writer() {
           />
         </div>
 
-        {/* Rich Text Editor (Plate) */}
+        {/* Rich Text Editor (BlockNote) */}
         <div className="flex-1 overflow-hidden">
-          <WriterPlateEditor
-            value={editorValue}
-            onValueChange={setEditorValue}
+          <WriterBlockNoteEditor
+            value={editorHtml}
+            onValueChange={setEditorHtml}
             placeholder="Start writing your article... Type / for slash commands."
           />
         </div>
