@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { useAuth } from '@/_core/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,7 @@ interface FeedItem {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export default function Giststack() {
+  const { isAuthenticated } = useAuth();
   const { state, addGiststackItem, toggleGiststackSave, addIdea, updateSettings } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -157,12 +159,12 @@ export default function Giststack() {
     }
   }, [activeFeeds, topics, fetchRSSMutation, fetchNewsMutation]);
 
-  // Auto-fetch on mount
+  // Auto-fetch on mount (only when authenticated)
   useEffect(() => {
-    if (liveItems.length === 0 && !isLoading) {
+    if (isAuthenticated && liveItems.length === 0 && !isLoading) {
       fetchLiveFeeds();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Merge live items with saved items ──
   const allItems = useMemo(() => {

@@ -2,10 +2,11 @@ import { type ReactNode, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { AppProvider } from '@/contexts/AppContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/_core/hooks/useAuth';
 import {
   LayoutDashboard, Newspaper, Lightbulb, Search, PenTool,
   BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
-  Zap, Menu, Building2, Moon, Sun, Inbox
+  Zap, Menu, Building2, Moon, Sun, Inbox, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +29,24 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggleTheme, switchable } = useTheme();
+  const { loading: authLoading, isAuthenticated } = useAuth({ redirectOnUnauthenticated: true });
+
+  // Show loading spinner while checking auth
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // useAuth will redirect if not authenticated, but guard rendering too
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const currentItem = NAV_ITEMS.find(item => {
     if (item.path === '/') return location === '/';
