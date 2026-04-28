@@ -400,3 +400,314 @@ export const userSettings = mysqlTable("user_settings", {
 
 export type UserSettings = typeof userSettings.$inferSelect;
 export type InsertUserSettings = typeof userSettings.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════
+// NEW TABLES — Blazly + GistStack Feature Integration
+// ═══════════════════════════════════════════════════════════
+
+// ─── Social Posts (GistStack: Social Content Engine) ──────
+export const socialPosts = mysqlTable("social_posts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  brandId: int("brandId"),
+  platform: mysqlEnum("platform", ["twitter", "linkedin", "facebook", "reddit", "threads", "instagram"]).notNull(),
+  postType: mysqlEnum("postType", ["single", "thread", "carousel", "poll"]).default("single").notNull(),
+  content: text("content").notNull(),
+  threadParts: json("threadParts").$type<string[]>(),
+  hashtags: json("hashtags").$type<string[]>(),
+  imageUrl: varchar("imageUrl", { length: 1000 }),
+  imagePrompt: text("imagePrompt"),
+  sourceArticleId: int("sourceArticleId"),
+  sourceUrl: varchar("sourceUrl", { length: 1000 }),
+  sourceTitle: varchar("sourceTitle", { length: 500 }),
+  tone: varchar("tone", { length: 100 }),
+  language: varchar("language", { length: 50 }).default("en"),
+  score: int("score"),
+  scoreData: json("scoreData").$type<{
+    engagement_potential?: number;
+    hook_strength?: number;
+    cta_clarity?: number;
+    brand_alignment?: number;
+    platform_fit?: number;
+  }>(),
+  status: mysqlEnum("socialPostStatus", ["draft", "approved", "scheduled", "published"]).default("draft").notNull(),
+  scheduledAt: timestamp("scheduledAt"),
+  publishedAt: timestamp("publishedAt"),
+  webhookUrl: varchar("webhookUrl", { length: 1000 }),
+  metadata: json("socialPostMeta").$type<{
+    context_ideas?: string[];
+    brand_lens?: string;
+    source_insights?: string[];
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SocialPost = typeof socialPosts.$inferSelect;
+export type InsertSocialPost = typeof socialPosts.$inferInsert;
+
+// ─── Content Sources (GistStack: YouTube, Reddit, Newsletter, Non-RSS) ──
+export const contentSources = mysqlTable("content_sources", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("sourceType", ["youtube", "reddit", "newsletter", "website", "rss"]).notNull(),
+  name: varchar("name", { length: 300 }).notNull(),
+  identifier: varchar("identifier", { length: 500 }).notNull(), // channel ID, subreddit, email, URL
+  iconUrl: varchar("iconUrl", { length: 1000 }),
+  description: text("description"),
+  category: varchar("category", { length: 100 }),
+  active: int("active").default(1),
+  fetchFrequency: mysqlEnum("fetchFrequency", ["hourly", "daily", "weekly"]).default("daily"),
+  lastFetched: timestamp("lastFetched"),
+  itemCount: int("itemCount").default(0),
+  metadata: json("sourceMeta").$type<{
+    subscriber_count?: number;
+    subreddit_members?: number;
+    newsletter_email?: string;
+    scrape_selector?: string;
+    youtube_playlist_id?: string;
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ContentSource = typeof contentSources.$inferSelect;
+export type InsertContentSource = typeof contentSources.$inferInsert;
+
+// ─── Source Items (fetched content from sources) ──────────
+export const sourceItems = mysqlTable("source_items", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  sourceId: int("sourceId").notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  content: text("content"),
+  summary: text("summary"),
+  url: varchar("url", { length: 1000 }),
+  imageUrl: varchar("imageUrl", { length: 1000 }),
+  author: varchar("author", { length: 200 }),
+  publishedAt: timestamp("publishedAt"),
+  relevanceScore: int("relevanceScore"),
+  viralScore: int("viralScore"),
+  sentiment: varchar("sentiment", { length: 20 }),
+  keyInsights: json("keyInsights").$type<string[]>(),
+  processed: int("processed").default(0),
+  saved: int("saved").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SourceItem = typeof sourceItems.$inferSelect;
+export type InsertSourceItem = typeof sourceItems.$inferInsert;
+
+// ─── Content Library (GistStack: My Content) ─────────────
+export const contentLibrary = mysqlTable("content_library", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("contentType", ["social_post", "article_excerpt", "quote", "idea", "template"]).notNull(),
+  platform: varchar("platform", { length: 50 }),
+  title: varchar("title", { length: 500 }),
+  content: text("content").notNull(),
+  tags: json("contentTags").$type<string[]>(),
+  brandId: int("brandId"),
+  sourcePostId: int("sourcePostId"),
+  usageCount: int("usageCount").default(0),
+  starred: int("starred").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ContentLibraryItem = typeof contentLibrary.$inferSelect;
+export type InsertContentLibraryItem = typeof contentLibrary.$inferInsert;
+
+// ─── Image Library (GistStack: Asset Library) ─────────────
+export const imageLibrary = mysqlTable("image_library", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 300 }).notNull(),
+  imageUrl: varchar("imageUrl", { length: 1000 }).notNull(),
+  thumbnailUrl: varchar("thumbnailUrl", { length: 1000 }),
+  prompt: text("prompt"),
+  model: varchar("model", { length: 100 }),
+  style: varchar("style", { length: 100 }),
+  tags: json("imageTags").$type<string[]>(),
+  brandId: int("brandId"),
+  width: int("width"),
+  height: int("height"),
+  presetName: varchar("presetName", { length: 200 }),
+  metadata: json("imageMeta").$type<{
+    reference_images?: string[];
+    character_consistency?: boolean;
+    brand_colors?: string[];
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ImageLibraryItem = typeof imageLibrary.$inferSelect;
+export type InsertImageLibraryItem = typeof imageLibrary.$inferInsert;
+
+// ─── Brand Contexts (GistStack: Brand Context/Lens) ──────
+export const brandContexts = mysqlTable("brand_contexts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  brandId: int("brandId"),
+  name: varchar("name", { length: 200 }).notNull(),
+  website: varchar("website", { length: 500 }),
+  voice: text("voice"),
+  tone: text("tone"),
+  audience: text("audience"),
+  values: json("brandValues").$type<string[]>(),
+  keywords: json("brandKeywords").$type<string[]>(),
+  competitors: json("competitors").$type<string[]>(),
+  contentPillars: json("contentPillars").$type<string[]>(),
+  avoidTopics: json("avoidTopics").$type<string[]>(),
+  sampleContent: json("sampleContent").$type<string[]>(),
+  languagePreferences: json("languagePreferences").$type<{
+    primary: string;
+    additional?: string[];
+    formality?: string;
+    jargon_level?: string;
+  }>(),
+  imagePreferences: json("imagePreferences").$type<{
+    style?: string;
+    colors?: string[];
+    reference_images?: string[];
+    character_refs?: string[];
+    custom_prompt_prefix?: string;
+  }>(),
+  autoResearched: int("autoResearched").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BrandContext = typeof brandContexts.$inferSelect;
+export type InsertBrandContext = typeof brandContexts.$inferInsert;
+
+// ─── GEO Projects (Blazly: GEO/AEO Suite) ───────────────
+export const geoProjects = mysqlTable("geo_projects", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 300 }).notNull(),
+  websiteUrl: varchar("websiteUrl", { length: 500 }).notNull(),
+  competitors: json("geoCompetitors").$type<string[]>(),
+  monitorKeywords: json("monitorKeywords").$type<string[]>(),
+  targetLocation: varchar("targetLocation", { length: 100 }).default("global"),
+  lastCrawled: timestamp("lastCrawled"),
+  lastMonitored: timestamp("lastMonitored"),
+  overallGeoScore: int("overallGeoScore"),
+  metadata: json("geoMeta").$type<{
+    pages_crawled?: number;
+    avg_geo_score?: number;
+    brand_sentiment?: Record<string, number>;
+    competitor_scores?: Record<string, number>;
+    llm_visibility?: Record<string, number>;
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type GeoProject = typeof geoProjects.$inferSelect;
+export type InsertGeoProject = typeof geoProjects.$inferInsert;
+
+// ─── GEO Scores (per-page tracking) ──────────────────────
+export const geoScores = mysqlTable("geo_scores", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("projectId").notNull(),
+  userId: int("userId").notNull(),
+  pageUrl: varchar("pageUrl", { length: 1000 }).notNull(),
+  pageTitle: varchar("pageTitle", { length: 500 }),
+  geoScore: int("geoScore"),
+  aeoScore: int("aeoScore"),
+  seoScore: int("seoScore"),
+  llmVisibility: json("llmVisibility").$type<{
+    chatgpt?: { position?: number; cited?: boolean; sentiment?: string };
+    gemini?: { position?: number; cited?: boolean; sentiment?: string };
+    claude?: { position?: number; cited?: boolean; sentiment?: string };
+    perplexity?: { position?: number; cited?: boolean; sentiment?: string };
+  }>(),
+  recommendations: json("recommendations").$type<string[]>(),
+  contentGaps: json("contentGaps").$type<string[]>(),
+  checkedAt: timestamp("checkedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type GeoScore = typeof geoScores.$inferSelect;
+export type InsertGeoScore = typeof geoScores.$inferInsert;
+
+// ─── Content Strategies (Blazly: Strategy Builder) ────────
+export const contentStrategies = mysqlTable("content_strategies", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  brandId: int("brandId"),
+  name: varchar("name", { length: 300 }).notNull(),
+  primaryKeyword: varchar("primaryKeyword", { length: 200 }).notNull(),
+  pillarTopic: varchar("pillarTopic", { length: 500 }),
+  pillarContent: text("pillarContent"),
+  clusters: json("clusters").$type<Array<{
+    keyword: string;
+    title: string;
+    status: "planned" | "drafted" | "published";
+    articleId?: number;
+    difficulty?: number;
+    volume?: number;
+    intent?: string;
+  }>>(),
+  enhanced: int("enhanced").default(0),
+  totalArticles: int("totalArticles").default(0),
+  publishedArticles: int("publishedArticles").default(0),
+  status: mysqlEnum("strategyStatus", ["draft", "active", "executing", "completed"]).default("draft").notNull(),
+  metadata: json("strategyMeta").$type<{
+    target_authority?: number;
+    estimated_traffic?: number;
+    competition_level?: string;
+    content_gap_analysis?: string;
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ContentStrategy = typeof contentStrategies.$inferSelect;
+export type InsertContentStrategy = typeof contentStrategies.$inferInsert;
+
+// ─── Keyword Research (Blazly: Keyword Discovery) ────────
+export const keywordResearch = mysqlTable("keyword_research", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  keyword: varchar("keyword", { length: 300 }).notNull(),
+  difficulty: int("difficulty"),
+  volume: int("volume"),
+  cpc: decimal("cpc", { precision: 6, scale: 2 }),
+  trend: varchar("trend", { length: 20 }),
+  intent: mysqlEnum("intent", ["informational", "navigational", "commercial", "transactional"]),
+  relatedKeywords: json("relatedKeywords").$type<string[]>(),
+  serps: json("serps").$type<Array<{ title: string; url: string; position: number }>>(),
+  aiVisibility: json("aiVisibility").$type<{
+    mentioned_in_chatgpt?: boolean;
+    mentioned_in_gemini?: boolean;
+    ai_competition?: string;
+  }>(),
+  saved: int("saved").default(0),
+  strategyId: int("strategyId"),
+  blogIdeas: json("blogIdeas").$type<string[]>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type KeywordResearchItem = typeof keywordResearch.$inferSelect;
+export type InsertKeywordResearchItem = typeof keywordResearch.$inferInsert;
+
+// ─── Image Presets (GistStack: Custom Image Prompts) ─────
+export const imagePresets = mysqlTable("image_presets", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  promptPrefix: text("promptPrefix"),
+  promptSuffix: text("promptSuffix"),
+  model: varchar("model", { length: 100 }),
+  style: varchar("style", { length: 100 }),
+  referenceImages: json("referenceImages").$type<string[]>(),
+  characterConsistency: int("characterConsistency").default(0),
+  brandId: int("brandId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ImagePreset = typeof imagePresets.$inferSelect;
+export type InsertImagePreset = typeof imagePresets.$inferInsert;
