@@ -17,8 +17,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { trpc } from '@/lib/trpc';
 import {
-  Sparkles, Shield, Globe, BookOpen, Package, Loader2,
-  ArrowUp, ArrowDown, CheckCircle2, Zap, TrendingUp,
+  Shield, Globe, BookOpen, Loader2,
+  ArrowUp, ArrowDown, CheckCircle2, Zap,
 } from 'lucide-react';
 
 interface EnhancementPanelProps {

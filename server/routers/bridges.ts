@@ -21,7 +21,7 @@ import {
   contentStrategies,
   brandContexts,
 } from "../../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 
 const GIVE_API_BASE = "https://give.insightprofit.live";
 
@@ -184,10 +184,12 @@ Tone: ${pubTemplate.toneRules}
 Format: ${pubTemplate.formatNotes}\n`;
       }
 
-      // 5. Generate articles
+      // 5. Generate articles (limit to 3 to avoid timeout — each needs 2-4 LLM calls)
       const savedArticles: Array<{ id: number; title: string; wordCount: number; score: number }> = [];
+      const errors: Array<{ title: string; error: string }> = [];
 
-      for (const cluster of targetClusters.slice(0, 5)) {
+      for (const cluster of targetClusters.slice(0, 3)) {
+        try {
         // Generate with full context
         const result = await invokeLLM({
           messages: [
@@ -315,6 +317,10 @@ GEO Enhancement Checklist:
           wordCount,
           score: scoreData.overall || 0,
         });
+        } catch (clusterErr: any) {
+          errors.push({ title: cluster.title, error: clusterErr.message || "Generation failed" });
+          continue;
+        }
       }
 
       // Update strategy status
@@ -326,7 +332,8 @@ GEO Enhancement Checklist:
         success: true,
         articlesCreated: savedArticles.length,
         articles: savedArticles,
-        message: `${savedArticles.length} articles saved to Queue${input.humanize ? " (humanized)" : ""}${input.geoEnhance ? " (GEO enhanced)" : ""}`,
+        errors: errors.length > 0 ? errors : undefined,
+        message: `${savedArticles.length} articles saved to Queue${errors.length > 0 ? ` (${errors.length} failed)` : ""}${input.humanize ? " (humanized)" : ""}${input.geoEnhance ? " (GEO enhanced)" : ""}`,
       };
     }),
 
@@ -395,7 +402,7 @@ Return ONLY the humanized article in markdown. Do not add commentary.`,
             content: `Humanize this article:\n\n${article.content}`,
           },
         ],
-        maxTokens: 8192,
+        maxTokens: Math.min(16384, Math.max(8192, Math.ceil(article.content.length / 3))),
         temperature: input.intensity === "heavy" ? 0.9 : input.intensity === "moderate" ? 0.8 : 0.7,
       });
 
@@ -644,10 +651,11 @@ Restructure the content to fit this template while preserving all facts, data, a
         .where(and(eq(articles.id, input.articleId), eq(articles.userId, ctx.user.id)));
       if (!article) throw new Error("Article not found");
 
-      // Load products
-      const allProducts = await db.select().from(products)
-        .where(eq(products.userId, ctx.user.id));
-      const selectedProducts = allProducts.filter(p => input.productIds.includes(p.id));
+      // Load products (filtered at query level)
+      const selectedProducts = input.productIds.length > 0
+        ? await db.select().from(products)
+            .where(and(eq(products.userId, ctx.user.id), inArray(products.id, input.productIds)))
+        : [];
 
       // Load brand if specified
       let brand: any = null;
@@ -793,7 +801,7 @@ Rules:
               data: viz.data || {},
               parameters: { style: "publication", theme: "light" },
             }),
-            signal: AbortSignal.timeout(60000),
+            signal: AbortSignal.timeout(30000),
           });
 
           if (!vizRes.ok) {

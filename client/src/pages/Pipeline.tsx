@@ -71,8 +71,8 @@ export default function Pipeline() {
     const delays = [200, 2000, 8000, 14000, 20000, 25000, 28000, 30000]; // estimated timing
 
     stepOrder.forEach((stepId, i) => {
-      const step = steps.find(s => s.id === stepId);
-      if (step?.status === 'skipped') return;
+      if (stepId === 'humanize' && !enableHumanize) return;
+      if (stepId === 'geoEnhance' && !enableGeo) return;
 
       setTimeout(() => {
         setSteps(prev => prev.map(s =>
@@ -84,7 +84,7 @@ export default function Pipeline() {
     try {
       const res = await pipelineMutation.mutateAsync({
         topic: topic.trim(),
-        targetPublication: publication || undefined,
+        targetPublication: publication && publication !== "general" ? publication : undefined,
         humanize: enableHumanize,
         geoEnhance: enableGeo,
         generateViz: enableViz,
@@ -158,7 +158,7 @@ export default function Pipeline() {
                     <SelectValue placeholder="Any publication..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">General</SelectItem>
+                    <SelectItem value="general">General</SelectItem>
                     {(templatesQuery.data?.templates || []).map(t => (
                       <SelectItem key={t.slug} value={t.slug}>{t.name}</SelectItem>
                     ))}
