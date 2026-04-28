@@ -15,6 +15,10 @@ import Financial from "./pages/Financial";
 import Settings from "./pages/Settings";
 import Brands from "./pages/Brands";
 import Queue from "./pages/Queue";
+import Social from "./pages/Social";
+import ContentLibrary from "./pages/Library";
+import Geo from "./pages/Geo";
+import Strategy from "./pages/Strategy";
 import Login from "./pages/Login";
 import NotFound from "@/pages/NotFound";
 function Router() {
@@ -34,6 +38,10 @@ function Router() {
             <Route path="/publications" component={Publications} />
             <Route path="/pitches" component={Pitches} />
             <Route path="/financial" component={Financial} />
+            <Route path="/social" component={Social} />
+            <Route path="/library" component={ContentLibrary} />
+            <Route path="/geo" component={Geo} />
+            <Route path="/strategy" component={Strategy} />
             <Route path="/brands" component={Brands} />
             <Route path="/settings" component={Settings} />
             <Route path="/404" component={NotFound} />

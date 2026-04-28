@@ -6,7 +6,8 @@ import { useAuth } from '@/_core/hooks/useAuth';
 import {
   LayoutDashboard, Newspaper, Lightbulb, Search, PenTool,
   BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
-  Zap, Menu, Building2, Moon, Sun, Inbox, Loader2
+  Zap, Menu, Building2, Moon, Sun, Inbox, Loader2,
+  MessageSquare, Library, Globe, Map,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,10 @@ const NAV_ITEMS = [
   { path: '/queue', label: 'Queue', icon: Inbox, description: 'Pre-written article pipeline' },
   { path: '/publications', label: 'Publications', icon: BookOpen, description: '174+ publication database' },
   { path: '/pitches', label: 'Pitches', icon: Send, description: 'Pitch management' },
+  { path: '/social', label: 'Social Engine', icon: MessageSquare, description: 'Multi-platform content' },
+  { path: '/library', label: 'Library', icon: Library, description: 'Content & asset library' },
+  { path: '/geo', label: 'GEO Suite', icon: Globe, description: 'AI visibility & humanizer' },
+  { path: '/strategy', label: 'Strategy', icon: Map, description: 'Keywords & content strategy' },
   { path: '/brands', label: 'Brands', icon: Building2, description: 'Brand & product engine' },
   { path: '/financial', label: 'Financial', icon: DollarSign, description: 'Revenue tracking' },
   { path: '/settings', label: 'Settings', icon: Settings, description: 'API keys & preferences' },

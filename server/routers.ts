@@ -18,6 +18,13 @@ import { productCreationRouter } from "./routers/products";
 import { creativeRouter } from "./routers/creative";
 import { giveRouter } from "./routers/give";
 import { queueRouter } from "./routers/queue";
+import { socialRouter } from "./routers/social";
+import { sourcesRouter } from "./routers/sources";
+import { brandContextRouter } from "./routers/brandContext";
+import { libraryRouter } from "./routers/library";
+import { geoRouter } from "./routers/geo";
+import { humanizerRouter } from "./routers/humanizer";
+import { strategyRouter } from "./routers/strategy";
 
 export const appRouter = router({
   system: systemRouter,
@@ -55,6 +62,15 @@ export const appRouter = router({
   creative: creativeRouter,
   give: giveRouter,
   queue: queueRouter,
+
+  // Blazly + GistStack feature integration
+  social: socialRouter,
+  sources: sourcesRouter,
+  brandContext: brandContextRouter,
+  library: libraryRouter,
+  geo: geoRouter,
+  humanizer: humanizerRouter,
+  strategy: strategyRouter,
 });
 
 export type AppRouter = typeof appRouter;
