@@ -31,6 +31,7 @@ import { AgenticPanel } from '@/components/writer/AgenticPanel';
 import { CreativePanel } from '@/components/writer/CreativePanel';
 import { ProductPanel } from '@/components/writer/ProductPanel';
 import { DataVizPanel } from '@/components/writer/DataVizPanel';
+import { EnhancementPanel } from '@/components/writer/EnhancementPanel';
 import { SettingsModal, loadSettings, type WriterSettings } from '@/components/writer/SettingsModal';
 import { checkContentQuality, getGradeColor, getGradeBgColor, type QualityReport, type QualityIssue } from '@/lib/quality-checker';
 import {
@@ -560,7 +561,7 @@ ${editorHtml}
   // ─── Sidebar Content (shared between inline & sheet) ──────
   const sidebarContent = (
     <Tabs value={sidebarTab} onValueChange={setSidebarTab}>
-      <TabsList className="w-full rounded-none border-b border-border bg-transparent h-10 grid grid-cols-4">
+      <TabsList className="w-full rounded-none border-b border-border bg-transparent h-10 grid grid-cols-5">
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -593,6 +594,14 @@ ${editorHtml}
               </TabsTrigger>
             </TooltipTrigger>
             <TooltipContent side="bottom"><p className="text-xs">Publication Match + Products</p></TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <TabsTrigger value="enhance" className="text-[10px] gap-1 px-1.5">
+                <Zap className="w-3.5 h-3.5" /> Enhance
+              </TabsTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom"><p className="text-xs">Humanize + GEO + Templates</p></TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </TabsList>
@@ -956,6 +965,21 @@ ${editorHtml}
             />
           </TabsContent>
         </Tabs>
+      </TabsContent>
+
+      {/* ═══ Enhance Tab ═══ */}
+      <TabsContent value="enhance" className="mt-0">
+        <EnhancementPanel
+          articleId={dbArticleId}
+          title={title}
+          content={content}
+          onContentUpdate={() => {
+            // Reload article content from DB after enhancement
+            if (dbArticleId) {
+              toast.info("Article enhanced — reload to see changes in editor");
+            }
+          }}
+        />
       </TabsContent>
     </Tabs>
   );

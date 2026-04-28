@@ -25,6 +25,7 @@ import { libraryRouter } from "./routers/library";
 import { geoRouter } from "./routers/geo";
 import { humanizerRouter } from "./routers/humanizer";
 import { strategyRouter } from "./routers/strategy";
+import { bridgesRouter } from "./routers/bridges";
 
 export const appRouter = router({
   system: systemRouter,
@@ -71,6 +72,9 @@ export const appRouter = router({
   geo: geoRouter,
   humanizer: humanizerRouter,
   strategy: strategyRouter,
+
+  // Cross-feature integration bridges
+  bridges: bridgesRouter,
 });
 
 export type AppRouter = typeof appRouter;
