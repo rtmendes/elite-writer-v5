@@ -19,6 +19,7 @@ import Social from "./pages/Social";
 import ContentLibrary from "./pages/Library";
 import Geo from "./pages/Geo";
 import Strategy from "./pages/Strategy";
+import Pipeline from "./pages/Pipeline";
 import Login from "./pages/Login";
 import NotFound from "@/pages/NotFound";
 function Router() {
@@ -42,6 +43,7 @@ function Router() {
             <Route path="/library" component={ContentLibrary} />
             <Route path="/geo" component={Geo} />
             <Route path="/strategy" component={Strategy} />
+            <Route path="/pipeline" component={Pipeline} />
             <Route path="/brands" component={Brands} />
             <Route path="/settings" component={Settings} />
             <Route path="/404" component={NotFound} />

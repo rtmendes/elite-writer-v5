@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { path: '/library', label: 'Library', icon: Library, description: 'Content & asset library' },
   { path: '/geo', label: 'GEO Suite', icon: Globe, description: 'AI visibility & humanizer' },
   { path: '/strategy', label: 'Strategy', icon: Map, description: 'Keywords & content strategy' },
+  { path: '/pipeline', label: 'Pipeline', icon: Zap, description: 'One-click article production' },
   { path: '/brands', label: 'Brands', icon: Building2, description: 'Brand & product engine' },
   { path: '/financial', label: 'Financial', icon: DollarSign, description: 'Revenue tracking' },
   { path: '/settings', label: 'Settings', icon: Settings, description: 'API keys & preferences' },
