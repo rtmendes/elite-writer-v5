@@ -1,6 +1,0 @@
-dist/
-build/
-node_modules/
-.vercel/
-*.test.ts
-*.test.tsx
