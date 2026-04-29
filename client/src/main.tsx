@@ -1,4 +1,6 @@
+import { StrictMode } from "react";
 import { trpc } from "@/lib/trpc";
+import { initSentry, SentryErrorBoundary } from "@/lib/sentry";
 import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
@@ -7,6 +9,9 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
+
+// Initialize Sentry before React renders — catches bootstrap errors too
+initSentry();
 
 const queryClient = new QueryClient();
 
@@ -53,9 +58,13 @@ const trpcClient = trpc.createClient({
 });
 
 createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </trpc.Provider>
+  <StrictMode>
+    <SentryErrorBoundary fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Something went wrong. Please refresh the page.</div>}>
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </trpc.Provider>
+    </SentryErrorBoundary>
+  </StrictMode>
 );

@@ -4,7 +4,19 @@ import path from "node:path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react({
+      babel: {
+        plugins: [
+          // React Compiler — auto-memoizes components, hooks, and JSX at build time.
+          // Eliminates the entire class of "unstable reference" bugs that cause #310.
+          // This is what Meta uses on facebook.com and instagram.com.
+          ['babel-plugin-react-compiler', {}],
+        ],
+      },
+    }),
+    tailwindcss(),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),

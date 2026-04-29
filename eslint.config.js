@@ -2,6 +2,7 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
+import reactCompilerPlugin from "eslint-plugin-react-compiler";
 import globals from "globals";
 
 export default tseslint.config(
@@ -29,6 +30,7 @@ export default tseslint.config(
     plugins: {
       react: reactPlugin,
       "react-hooks": reactHooksPlugin,
+      "react-compiler": reactCompilerPlugin,
     },
     languageOptions: {
       globals: {
@@ -50,6 +52,11 @@ export default tseslint.config(
       // React Hooks — critical
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
+
+      // React Compiler — flags purity violations that break auto-memoization.
+      // This catches side effects in useMemo, unstable refs in deps, etc.
+      // at lint time so they never reach production.
+      "react-compiler/react-compiler": "error",
 
       // TypeScript adjustments for React patterns
       "@typescript-eslint/no-unused-vars": ["warn", {
