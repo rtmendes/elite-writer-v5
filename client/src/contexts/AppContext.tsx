@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
   type AppState, type ArticleIdea, type ResearchNote, type Article, type Pitch,
   type GiststackItem, type Earning, type Brand, type DigitalProduct, type FunnelMetric,
@@ -272,30 +272,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Settings ── (persisted to DB)
+  // Use a ref for the mutation so the callback stays stable
+  const settingsMutationRef = useRef(settingsMutation);
+  settingsMutationRef.current = settingsMutation;
+
   const updateSettings = useCallback((updates: Partial<AppState['settings']>) => {
     setState(s => {
       const newSettings = { ...s.settings, ...updates };
-      // Persist to DB (fire-and-forget, localStorage is the fast cache)
-      settingsMutation.mutate({ settings: newSettings });
       return { ...s, settings: newSettings };
     });
-  }, [settingsMutation]);
+    // Persist to DB OUTSIDE setState to avoid side effects in state updater
+    settingsMutationRef.current.mutate({ settings: updates });
+  }, []);
+
+  // Memoize the context value so consumers only re-render when state/hydration changes
+  const contextValue = useMemo<AppContextType>(() => ({
+    state,
+    isHydrated,
+    addIdea, updateIdea, deleteIdea,
+    addResearch, updateResearch, deleteResearch,
+    addArticle, updateArticle, deleteArticle,
+    addPitch, updatePitch, deletePitch,
+    addGiststackItem, toggleGiststackSave,
+    addEarning, deleteEarning,
+    addBrand, updateBrand, deleteBrand,
+    addProduct, updateProduct, deleteProduct,
+    addFunnelMetric,
+    updateSettings,
+  }), [
+    state, isHydrated,
+    addIdea, updateIdea, deleteIdea,
+    addResearch, updateResearch, deleteResearch,
+    addArticle, updateArticle, deleteArticle,
+    addPitch, updatePitch, deletePitch,
+    addGiststackItem, toggleGiststackSave,
+    addEarning, deleteEarning,
+    addBrand, updateBrand, deleteBrand,
+    addProduct, updateProduct, deleteProduct,
+    addFunnelMetric,
+    updateSettings,
+  ]);
 
   return (
-    <AppContext.Provider value={{
-      state,
-      isHydrated,
-      addIdea, updateIdea, deleteIdea,
-      addResearch, updateResearch, deleteResearch,
-      addArticle, updateArticle, deleteArticle,
-      addPitch, updatePitch, deletePitch,
-      addGiststackItem, toggleGiststackSave,
-      addEarning, deleteEarning,
-      addBrand, updateBrand, deleteBrand,
-      addProduct, updateProduct, deleteProduct,
-      addFunnelMetric,
-      updateSettings,
-    }}>
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );

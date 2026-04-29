@@ -7,7 +7,7 @@
  * On first load, fetch all entities from DB and merge into local state.
  * Local state still provides instant reactivity; DB provides persistence.
  */
-import { useEffect, useRef } from 'react';
+import { useMemo } from 'react';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
 import type { ArticleIdea, ResearchNote, Article, Pitch, Earning, Brand } from '@/lib/store';
@@ -145,19 +145,24 @@ export function useDbHydration(): { data: HydrationData | null; isLoading: boole
     (isAuthenticated && (ideasQuery.isLoading || articlesQuery.isLoading || pitchesQuery.isLoading || 
      researchQuery.isLoading || earningsQuery.isLoading || brandsQuery.isLoading || settingsQuery.isLoading));
 
-  if (!isAuthenticated || isLoading) {
-    return { data: null, isLoading, isAuthenticated };
-  }
+  // Memoize mapped data so downstream effects don't re-fire on every render
+  const data = useMemo<HydrationData | null>(() => {
+    if (!isAuthenticated || isLoading) return null;
+    return {
+      ideas: (ideasQuery.data || []).map(mapIdea),
+      articles: (articlesQuery.data || []).map(mapArticle),
+      pitches: (pitchesQuery.data || []).map(mapPitch),
+      research: (researchQuery.data || []).map(mapResearch),
+      earnings: (earningsQuery.data || []).map(mapEarning),
+      brands: (brandsQuery.data || []).map(mapBrand),
+      settings: settingsQuery.data || null,
+    };
+  }, [
+    isAuthenticated, isLoading,
+    ideasQuery.data, articlesQuery.data, pitchesQuery.data,
+    researchQuery.data, earningsQuery.data, brandsQuery.data,
+    settingsQuery.data,
+  ]);
 
-  const data: HydrationData = {
-    ideas: (ideasQuery.data || []).map(mapIdea),
-    articles: (articlesQuery.data || []).map(mapArticle),
-    pitches: (pitchesQuery.data || []).map(mapPitch),
-    research: (researchQuery.data || []).map(mapResearch),
-    earnings: (earningsQuery.data || []).map(mapEarning),
-    brands: (brandsQuery.data || []).map(mapBrand),
-    settings: settingsQuery.data || null,
-  };
-
-  return { data, isLoading: false, isAuthenticated };
+  return { data, isLoading, isAuthenticated };
 }
