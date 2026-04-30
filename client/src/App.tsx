@@ -21,6 +21,7 @@ import Geo from "./pages/Geo";
 import Strategy from "./pages/Strategy";
 import Pipeline from "./pages/Pipeline";
 import Login from "./pages/Login";
+import Agents from "./pages/Agents";
 import NotFound from "@/pages/NotFound";
 function Router() {
   return (
@@ -36,6 +37,7 @@ function Router() {
             <Route path="/writer" component={Writer} />
             <Route path="/writer/:id" component={Writer} />
             <Route path="/queue" component={Queue} />
+            <Route path="/agents" component={Agents} />
             <Route path="/publications" component={Publications} />
             <Route path="/pitches" component={Pitches} />
             <Route path="/financial" component={Financial} />

@@ -11,6 +11,7 @@ import {
   Newspaper, Search
 } from 'lucide-react';
 import { AGENTS } from '@/lib/agents';
+import { useLocation } from 'wouter';
 
 export default function Dashboard() {
   const { state } = useApp();
@@ -175,17 +176,24 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* AI Team — visual agent roster */}
+      {/* AI Team — visual agent roster (clickable → Agents page) */}
       <div className="rounded-lg border border-border/50 bg-card/30 p-3">
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2.5">Your AI Editorial Team</p>
+        <div className="flex items-center justify-between mb-2.5">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Your AI Editorial Team</p>
+          <Link href="/agents">
+            <span className="text-[10px] text-primary hover:underline cursor-pointer">View all →</span>
+          </Link>
+        </div>
         <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
           {Object.values(AGENTS).map(agent => (
-            <div key={agent.id} className="flex flex-col items-center gap-1 group" title={`${agent.name} — ${agent.role}`}>
-              <div className="w-9 h-9 rounded-full overflow-hidden ring-1 ring-border/40 group-hover:ring-primary/50 transition-all">
-                <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" loading="lazy" />
+            <Link key={agent.id} href="/agents">
+              <div className="flex flex-col items-center gap-1 group cursor-pointer" title={`${agent.name} — ${agent.role}\nClick to chat or assign`}>
+                <div className="w-9 h-9 rounded-full overflow-hidden ring-1 ring-border/40 group-hover:ring-primary/50 group-hover:scale-110 transition-all">
+                  <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <span className="text-[8px] text-muted-foreground leading-tight text-center truncate w-full group-hover:text-primary transition-colors">{agent.name.split(' ')[0]}</span>
               </div>
-              <span className="text-[8px] text-muted-foreground leading-tight text-center truncate w-full">{agent.name.split(' ')[0]}</span>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

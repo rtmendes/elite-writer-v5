@@ -711,3 +711,52 @@ export const imagePresets = mysqlTable("image_presets", {
 
 export type ImagePreset = typeof imagePresets.$inferSelect;
 export type InsertImagePreset = typeof imagePresets.$inferInsert;
+
+// ─── Agent Chats (Interactive AI Agent Conversations) ────
+export const agentChats = mysqlTable("agent_chats", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 300 }),
+  agentIds: json("agentIds").$type<string[]>().notNull(), // 1+ agent IDs in conversation
+  mode: mysqlEnum("mode", ["one_on_one", "group", "meeting"]).default("one_on_one"),
+  status: mysqlEnum("status", ["active", "archived"]).default("active"),
+  messageCount: int("messageCount").default(0),
+  lastMessageAt: timestamp("lastMessageAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AgentChat = typeof agentChats.$inferSelect;
+export type InsertAgentChat = typeof agentChats.$inferInsert;
+
+export const agentMessages = mysqlTable("agent_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  chatId: int("chatId").notNull(),
+  role: mysqlEnum("role", ["user", "agent"]).notNull(),
+  agentId: varchar("agentId", { length: 50 }), // null for user messages
+  content: text("content").notNull(),
+  model: varchar("model", { length: 100 }),
+  tokens: int("tokens"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AgentMessage = typeof agentMessages.$inferSelect;
+export type InsertAgentMessage = typeof agentMessages.$inferInsert;
+
+// ─── Agent Assignments (Agents assigned to articles/projects) ──
+export const agentAssignments = mysqlTable("agent_assignments", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  agentId: varchar("agentId", { length: 50 }).notNull(),
+  targetType: mysqlEnum("targetType", ["article", "project", "idea", "research"]).notNull(),
+  targetId: int("targetId").notNull(),
+  targetTitle: varchar("targetTitle", { length: 500 }),
+  role: varchar("role", { length: 200 }), // what this agent does on this assignment
+  status: mysqlEnum("status", ["active", "completed", "removed"]).default("active"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AgentAssignment = typeof agentAssignments.$inferSelect;
+export type InsertAgentAssignment = typeof agentAssignments.$inferInsert;

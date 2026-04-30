@@ -26,6 +26,7 @@ import { geoRouter } from "./routers/geo";
 import { humanizerRouter } from "./routers/humanizer";
 import { strategyRouter } from "./routers/strategy";
 import { bridgesRouter } from "./routers/bridges";
+import { agentsRouter } from "./routers/agents";
 
 export const appRouter = router({
   system: systemRouter,
@@ -75,6 +76,9 @@ export const appRouter = router({
 
   // Cross-feature integration bridges
   bridges: bridgesRouter,
+
+  // Interactive AI agents — chat, assignments, profiles
+  agents: agentsRouter,
 });
 
 export type AppRouter = typeof appRouter;

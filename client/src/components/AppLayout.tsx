@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Newspaper, Lightbulb, Search, PenTool,
   BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
   Zap, Menu, Building2, Moon, Sun, Inbox, Loader2,
-  MessageSquare, Library, Globe, Map,
+  MessageSquare, Library, Globe, Map, Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { path: '/research', label: 'Research', icon: Search, description: 'Data & source gathering' },
   { path: '/writer', label: 'Writer', icon: PenTool, description: 'AI-enhanced editor' },
   { path: '/queue', label: 'Queue', icon: Inbox, description: 'Pre-written article pipeline' },
+  { path: '/agents', label: 'Agents', icon: Users, description: 'AI editorial team — chat & assign' },
   { path: '/publications', label: 'Publications', icon: BookOpen, description: '174+ publication database' },
   { path: '/pitches', label: 'Pitches', icon: Send, description: 'Pitch management' },
   { path: '/social', label: 'Social Engine', icon: MessageSquare, description: 'Multi-platform content' },
