@@ -18,10 +18,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import {
-  MessageSquare, Users, Send, Plus, Search, Briefcase,
-  Clock, Zap, BarChart3, Bot, ArrowRight, X, Check,
-  ChevronRight, Loader2, Sparkles, FileText, Lightbulb,
-  BookOpen, MoreHorizontal, Trash2, UserPlus, MessagesSquare,
+  MessageSquare, Users, Send, Search, Clock, Zap, X, Check,
+  Loader2, Sparkles, FileText, MoreHorizontal, Trash2, MessagesSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -448,8 +446,6 @@ function AgentProfile({ agent, assignments, onChat, onAssign, onClose }: {
   onAssign: (input: any) => Promise<any>;
   onClose: () => void;
 }) {
-  const [assignTarget, setAssignTarget] = useState('');
-
   return (
     <div className="space-y-6 pt-4">
       {/* Header */}

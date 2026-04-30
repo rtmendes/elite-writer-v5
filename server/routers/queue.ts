@@ -53,7 +53,7 @@ export const queueRouter = router({
 
   // ─── Get Queue Stats ──────────────────────────────────
   stats: protectedProcedure.query(async ({ ctx }) => {
-    const db = getDb();
+    const db = await getDb();
     const allArticles = await db.select().from(articles)
       .where(eq(articles.userId, ctx.user.id));
 
@@ -124,7 +124,7 @@ Return JSON:
       saveToDb: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
-      const db = getDb();
+      const db = await getDb();
       const steps: string[] = [];
 
       // Step 1: Research
@@ -308,7 +308,7 @@ Return JSON:
       for (const topic of input.topics) {
         try {
           // Use the same pipeline but call inline
-          const db = getDb();
+          const db = await getDb();
 
           // Research (fast model)
           const researchText = await callModel("gemini-flash", [
@@ -367,7 +367,7 @@ Return JSON:
       status: z.enum(["draft", "review", "scored", "pitched", "published"]),
     }))
     .mutation(async ({ ctx, input }) => {
-      const db = getDb();
+      const db = await getDb();
       await db.update(articles).set({ status: input.status })
         .where(and(eq(articles.id, input.articleId), eq(articles.userId, ctx.user.id)));
       return { success: true };
@@ -377,7 +377,7 @@ Return JSON:
   deleteArticle: protectedProcedure
     .input(z.object({ articleId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const db = getDb();
+      const db = await getDb();
       await db.delete(articles)
         .where(and(eq(articles.id, input.articleId), eq(articles.userId, ctx.user.id)));
       return { success: true };

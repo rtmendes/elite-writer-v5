@@ -11,7 +11,6 @@ import {
   Newspaper, Search
 } from 'lucide-react';
 import { AGENTS } from '@/lib/agents';
-import { useLocation } from 'wouter';
 
 export default function Dashboard() {
   const { state } = useApp();
