@@ -22,6 +22,7 @@ import {
   brandContexts,
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
+import { syncArticleToPipeline } from "../lib/supabase-sync";
 
 const GIVE_API_BASE = "https://give.insightprofit.live";
 
@@ -1044,6 +1045,11 @@ No AI clichés. US English. Every sentence earns its place.`;
       }).$returningId();
 
       steps.push({ step: "save", status: "complete", detail: `Article #${saved.id}` });
+      syncArticleToPipeline({
+        articleId: saved.id, title: input.topic, status: "scored",
+        brandId: input.brandContextId, score: scoreData.overall, wordCount,
+        targetPublication: input.targetPublication,
+      });
 
       return {
         success: true,

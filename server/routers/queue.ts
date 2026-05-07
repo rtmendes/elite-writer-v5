@@ -15,6 +15,7 @@ import { ENV } from "../_core/env";
 import { getDb } from "../db";
 import { articles, researchNotes } from "../../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { syncArticleToPipeline } from "../lib/supabase-sync";
 
 // ─── OpenRouter Models (shared with agentic) ────────────
 
@@ -264,6 +265,10 @@ Return JSON:
           targetPublication: input.targetPublication || null,
         }).$returningId();
         articleId = result.id;
+        syncArticleToPipeline({
+          articleId: result.id, title: outline.headline || input.title, status: "scored",
+          score: scoreData.overall, wordCount, targetPublication: input.targetPublication,
+        });
 
         // Save research notes
         await db.insert(researchNotes).values({
@@ -351,6 +356,10 @@ Return JSON:
             targetPublication: topic.targetPublication || null,
           }).$returningId();
 
+          syncArticleToPipeline({
+            articleId: result.id, title: topic.title, status: "scored",
+            score: scoreData.overall, wordCount, targetPublication: topic.targetPublication,
+          });
           results.push({ title: topic.title, success: true, articleId: result.id, score: scoreData.overall });
         } catch (err: any) {
           results.push({ title: topic.title, success: false, error: err.message || "Unknown error" });
@@ -370,6 +379,7 @@ Return JSON:
       const db = await getDb();
       await db.update(articles).set({ status: input.status })
         .where(and(eq(articles.id, input.articleId), eq(articles.userId, ctx.user.id)));
+      syncArticleToPipeline({ articleId: input.articleId, title: "", status: input.status });
       return { success: true };
     }),
 

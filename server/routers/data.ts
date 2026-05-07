@@ -2,6 +2,7 @@ import { z } from "zod";
 import { eq, desc, and } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { syncArticleToPipeline } from "../lib/supabase-sync";
 import {
   ideas, articles, pitches, researchNotes,
   brands, products, earnings, intelligenceItems, userSettings,
@@ -91,6 +92,11 @@ const articlesRouter = router({
       brandId: input.brandId ?? null, productId: input.productId ?? null,
     };
     const [result] = await db.insert(articles).values(vals).$returningId();
+    syncArticleToPipeline({
+      articleId: result.id, title: input.title, status: input.status ?? "draft",
+      brandId: input.brandId, score: input.overallScore, wordCount: input.wordCount,
+      targetPublication: input.targetPublication,
+    });
     return { id: result.id, ...input };
   }),
   update: protectedProcedure.input(z.object({
@@ -114,6 +120,13 @@ const articlesRouter = router({
     for (const [k, v] of Object.entries(updates)) { if (v !== undefined) setObj[k] = v; }
     if (Object.keys(setObj).length > 0) {
       await db.update(articles).set(setObj).where(and(eq(articles.id, id), eq(articles.userId, ctx.user.id)));
+    }
+    if (input.status || input.title || input.overallScore) {
+      syncArticleToPipeline({
+        articleId: id, title: input.title ?? "", status: input.status ?? "draft",
+        brandId: input.brandId, score: input.overallScore, wordCount: input.wordCount,
+        targetPublication: input.targetPublication,
+      });
     }
     return { success: true };
   }),
