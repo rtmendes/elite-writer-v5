@@ -9,6 +9,9 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
+import { bootInsightProfitEnterpriseShell } from './enterprise/insightprofit-enterprise-shell';
+
+bootInsightProfitEnterpriseShell({ appId: 'elitewriter' });
 
 // Initialize Sentry before React renders — catches bootstrap errors too
 initSentry();
