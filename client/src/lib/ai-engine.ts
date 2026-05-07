@@ -331,13 +331,22 @@ export { MODEL_CATALOG, getAvailableProviders };
 // Sync from server env vars — called once on Settings page mount
 export async function syncFromServer(): Promise<LLMConfig | null> {
   try {
-    const res = await fetch('/api/trpc/system.getServerKeys', {
+    let data: any = null;
+    const directRes = await fetch('/api/server-keys', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const data = json?.result?.data?.json ?? json?.result?.data ?? null;
+    if (directRes.ok) {
+      data = await directRes.json();
+    } else {
+      const trpcRes = await fetch('/api/trpc/system.getServerKeys', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!trpcRes.ok) return null;
+      const json = await trpcRes.json();
+      data = json?.result?.data?.json ?? json?.result?.data ?? null;
+    }
     if (!data) return null;
 
     const current = loadAIConfig();

@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { streamLLM } from "./llm";
+import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -87,6 +88,23 @@ async function startServer() {
     } catch (e: any) {
       res.redirect(`${appUrl}/settings?google=error&reason=${encodeURIComponent(e.message)}`);
     }
+  });
+
+  // Server-side provider status/key sync endpoint for the Settings page. The client already depended on
+  // public tRPC key sync; this direct endpoint removes raw tRPC response-shape fragility in production.
+  app.get("/api/server-keys", (_req, res) => {
+    res.json({
+      openai_key: ENV.openaiApiKey || "",
+      anthropic_key: ENV.anthropicApiKey || "",
+      openrouter_key: ENV.openrouterApiKey || "",
+      gemini_key: ENV.geminiApiKey || "",
+      newsapi_key: ENV.newsapiKey || "",
+      gnews_key: ENV.gnewsKey || "",
+      mediastack_key: ENV.mediastackKey || "",
+      perplexity_key: ENV.perplexityApiKey || "",
+      youtube_key: ENV.youtubeApiKey || "",
+      google_client_id: ENV.googleClientId || "",
+    });
   });
 
   // Streaming AI endpoint (SSE - can't go through tRPC batch)
