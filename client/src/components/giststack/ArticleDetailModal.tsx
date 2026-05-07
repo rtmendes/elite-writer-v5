@@ -141,13 +141,13 @@ export default function ArticleDetailModal({ item, open, onOpenChange }: Props) 
   const scoreArticleMutation = trpc.news.scoreArticle.useMutation();
   const enrichArticleMutation = trpc.news.enrichArticle.useMutation();
 
-  if (!item) return null;
-
-  // Publication match intelligence
+  // Publication match intelligence — hooks must be called before any early return
   const pubMatches = useMemo(() => 
-    matchArticleToPublications(item.title, item.summary, item.category, item.source, item.relevance_score),
-    [item.title, item.summary, item.category, item.source, item.relevance_score]
+    item ? matchArticleToPublications(item.title, item.summary, item.category, item.source, item.relevance_score) : [],
+    [item?.title, item?.summary, item?.category, item?.source, item?.relevance_score]
   );
+
+  if (!item) return null;
 
   const text = `${item.title} ${item.summary}`;
   const entities = extractEntities(text);
