@@ -64,7 +64,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const format = params.response_format ?? params.responseFormat;
   const wantsJson = format?.type === "json_object" || format?.type === "json_schema";
   const temperature = params.temperature ?? 0.7;
-  const model = params.model ?? "claude-sonnet-4-20250514";
+  const model = params.model ?? "claude-sonnet-4";
 
   // If model is explicitly OpenRouter or starts with a known OpenRouter pattern
   if (params.model?.includes("/") && ENV.openrouterApiKey) {
@@ -89,7 +89,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
           return await invokeOpenAI(params.messages, { maxTokens, format, temperature });
         }
         // For Google/DeepSeek models, still fall through to Anthropic as a general fallback
-        anthropicModel = "claude-sonnet-4-20250514";
+        anthropicModel = "claude-sonnet-4";
       }
       return await invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model: anthropicModel });
     } catch (err: any) {
@@ -109,7 +109,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // Fallback: OpenRouter (any model)
   if (ENV.openrouterApiKey) {
     try {
-      return await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: "anthropic/claude-sonnet-4-20250514" });
+      return await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: "anthropic/claude-sonnet-4" });
     } catch (err: any) {
       console.warn(`[LLM] OpenRouter last-resort failed: ${err?.message?.slice(0, 100)}`);
     }
@@ -336,7 +336,7 @@ export async function* streamLLM(params: InvokeParams): AsyncGenerator<string> {
   }
 
   const payload: Record<string, unknown> = {
-    model: params.model ?? "claude-sonnet-4-20250514",
+    model: params.model ?? "claude-sonnet-4",
     max_tokens: params.maxTokens ?? params.max_tokens ?? 4096,
     temperature: params.temperature ?? 0.7,
     messages: conversationMessages,

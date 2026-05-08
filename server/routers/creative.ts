@@ -37,7 +37,7 @@ async function enhancePromptViaOpenRouter(
 
   try {
     const result = await invokeLLM({
-      model: "google/gemini-2.0-flash-exp:free",
+      model: "google/gemini-2.5-flash",
       messages: [
         {
           role: "system",
@@ -122,7 +122,7 @@ export const creativeRouter = router({
     }))
     .mutation(async ({ input }) => {
       // Use OpenRouter for intelligent image suggestions
-      const modelToUse = ENV.openrouterApiKey ? "google/gemini-2.5-pro-preview-05-06" : undefined;
+      const modelToUse = ENV.openrouterApiKey ? "google/gemini-2.5-pro" : undefined;
 
       const result = await invokeLLM({
         model: modelToUse,
@@ -344,7 +344,7 @@ Return JSON:
       const colors = colorSchemes[input.colorScheme] || colorSchemes.dark;
 
       // Use OpenRouter for higher-quality infographic generation
-      const modelToUse = ENV.openrouterApiKey ? "anthropic/claude-sonnet-4-20250514" : undefined;
+      const modelToUse = ENV.openrouterApiKey ? "anthropic/claude-sonnet-4" : undefined;
 
       const result = await invokeLLM({
         model: modelToUse,
@@ -413,7 +413,7 @@ Return JSON:
       };
 
       // Use OpenRouter with Claude for best code generation
-      const modelToUse = ENV.openrouterApiKey ? "anthropic/claude-sonnet-4-20250514" : undefined;
+      const modelToUse = ENV.openrouterApiKey ? "anthropic/claude-sonnet-4" : undefined;
 
       const result = await invokeLLM({
         model: modelToUse,
@@ -474,7 +474,7 @@ Return JSON:
     }))
     .mutation(async ({ input }) => {
       const result = await invokeLLM({
-        model: ENV.openrouterApiKey ? "google/gemini-2.5-pro-preview-05-06" : undefined,
+        model: ENV.openrouterApiKey ? "google/gemini-2.5-pro" : undefined,
         messages: [
           {
             role: "system",
@@ -548,7 +548,7 @@ Return JSON:
 
       // Generate HTML card via OpenRouter
       const result = await invokeLLM({
-        model: ENV.openrouterApiKey ? "anthropic/claude-sonnet-4-20250514" : undefined,
+        model: ENV.openrouterApiKey ? "anthropic/claude-sonnet-4" : undefined,
         messages: [
           {
             role: "system",

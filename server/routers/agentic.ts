@@ -19,15 +19,15 @@ import { eq, and } from "drizzle-orm";
 // ─── OpenRouter Multi-Model Helper ───────────────────────
 
 const OPENROUTER_MODELS = {
-  "claude-sonnet": "anthropic/claude-sonnet-4-20250514",
-  "claude-opus": "anthropic/claude-opus-4-20250514",
+  "claude-sonnet": "anthropic/claude-sonnet-4",
+  "claude-opus": "anthropic/claude-opus-4",
   "gpt-4o": "openai/gpt-4o",
   "gpt-4o-mini": "openai/gpt-4o-mini",
-  "gemini-flash": "google/gemini-2.0-flash-exp:free",
-  "gemini-pro": "google/gemini-2.5-pro-preview-05-06",
-  "llama-70b": "meta-llama/llama-3.3-70b-instruct:free",
+  "gemini-flash": "google/gemini-2.5-flash",
+  "gemini-pro": "google/gemini-2.5-pro",
+  "llama-70b": "meta-llama/llama-3.3-70b-instruct",
   "deepseek-r1": "deepseek/deepseek-r1",
-  "qwen-72b": "qwen/qwen-2.5-72b-instruct:free",
+  "qwen-72b": "qwen/qwen-2.5-72b-instruct",
 } as const;
 
 type ModelAlias = keyof typeof OPENROUTER_MODELS;

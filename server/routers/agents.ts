@@ -51,13 +51,15 @@ const AGENT_PERSONAS: Record<string, { name: string; role: string; systemPrompt:
 };
 
 const OPENROUTER_MODELS: Record<string, string> = {
-  "claude-sonnet": "anthropic/claude-sonnet-4-20250514",
-  "claude-opus": "anthropic/claude-opus-4-20250514",
+  "claude-sonnet": "anthropic/claude-sonnet-4",
+  "claude-opus": "anthropic/claude-opus-4",
   "gpt-4o": "openai/gpt-4o",
   "gpt-4o-mini": "openai/gpt-4o-mini",
-  "gemini-flash": "google/gemini-2.0-flash-exp:free",
-  "gemini-pro": "google/gemini-2.5-pro-preview-05-06",
+  "gemini-flash": "google/gemini-2.5-flash",
+  "gemini-pro": "google/gemini-2.5-pro",
   "deepseek-r1": "deepseek/deepseek-r1",
+  "llama-70b": "meta-llama/llama-3.3-70b-instruct",
+  "qwen-72b": "qwen/qwen-2.5-72b-instruct",
 };
 
 // ─── Helper: Verify chat ownership ──────────────────────
@@ -493,7 +495,7 @@ ${contextBlock}`;
         }
 
         try {
-          const modelId = OPENROUTER_MODELS[persona.defaultModel] || "anthropic/claude-sonnet-4-20250514";
+          const modelId = OPENROUTER_MODELS[persona.defaultModel] || "anthropic/claude-sonnet-4";
           const result = await invokeLLM({
             model: modelId,
             messages: llmMessages,

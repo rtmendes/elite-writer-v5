@@ -20,13 +20,15 @@ import { syncArticleToPipeline } from "../lib/supabase-sync";
 // ─── OpenRouter Models (shared with agentic) ────────────
 
 const MODELS: Record<string, string> = {
-  "claude-sonnet": "anthropic/claude-sonnet-4-20250514",
+  "claude-sonnet": "anthropic/claude-sonnet-4",
+  "claude-opus": "anthropic/claude-opus-4",
   "gpt-4o": "openai/gpt-4o",
-  "gemini-pro": "google/gemini-2.5-pro-preview-05-06",
-  "gemini-flash": "google/gemini-2.0-flash-exp:free",
+  "gpt-4o-mini": "openai/gpt-4o-mini",
+  "gemini-pro": "google/gemini-2.5-pro",
+  "gemini-flash": "google/gemini-2.5-flash",
   "deepseek-r1": "deepseek/deepseek-r1",
-  "llama-70b": "meta-llama/llama-3.3-70b-instruct:free",
-  "qwen-72b": "qwen/qwen-2.5-72b-instruct:free",
+  "llama-70b": "meta-llama/llama-3.3-70b-instruct",
+  "qwen-72b": "qwen/qwen-2.5-72b-instruct",
 };
 
 async function callModel(model: string, messages: Array<{ role: string; content: string }>, opts: { maxTokens?: number; temp?: number; json?: boolean } = {}) {
