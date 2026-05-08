@@ -760,3 +760,19 @@ export const agentAssignments = mysqlTable("agent_assignments", {
 
 export type AgentAssignment = typeof agentAssignments.$inferSelect;
 export type InsertAgentAssignment = typeof agentAssignments.$inferInsert;
+
+// ─── Agent Memories (Persistent knowledge per agent per user) ──
+export const agentMemories = mysqlTable("agent_memories", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  agentId: varchar("agentId", { length: 50 }).notNull(),
+  fact: text("fact").notNull(), // extracted fact or learning
+  category: varchar("category", { length: 100 }), // preference, project, style, context
+  importance: int("importance").default(5), // 1-10 scale
+  sourceChatId: int("sourceChatId"), // which chat it was extracted from
+  expiresAt: timestamp("expiresAt"), // null = permanent
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AgentMemory = typeof agentMemories.$inferSelect;
+export type InsertAgentMemory = typeof agentMemories.$inferInsert;

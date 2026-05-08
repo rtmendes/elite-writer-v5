@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import {
   MessageSquare, Users, Send, Search, Clock, Zap, X, Check,
   Loader2, Sparkles, FileText, MoreHorizontal, Trash2, MessagesSquare,
+  Brain, Database, BookOpen, Lightbulb, Palette,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -74,6 +75,7 @@ export default function Agents() {
   );
   const assignMutation = trpc.agents.assign.useMutation();
   const deleteChatMutation = trpc.agents.deleteChat.useMutation();
+  const contextStatusQuery = trpc.agents.getContextStatus.useQuery();
 
   // Filter agents by search
   const filteredAgents = useMemo(() => {
@@ -214,6 +216,38 @@ export default function Agents() {
           </Button>
         </div>
       </div>
+
+      {/* Context Status Bar */}
+      {contextStatusQuery.data && (
+        <div className="flex items-center gap-4 px-4 py-2.5 rounded-lg border border-border bg-card/50">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Brain className="w-3.5 h-3.5 text-primary" />
+            <span className="font-medium text-foreground">Agent Intelligence:</span>
+          </div>
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="flex items-center gap-1 text-muted-foreground" title="Knowledge Base items available to all agents">
+              <Database className="w-3 h-3" />
+              {contextStatusQuery.data.kbItems} KB items
+            </span>
+            <span className="flex items-center gap-1 text-muted-foreground" title="Persistent memories across sessions">
+              <Sparkles className="w-3 h-3" />
+              {contextStatusQuery.data.memories} memories
+            </span>
+            <span className="flex items-center gap-1 text-muted-foreground" title="Articles agents can reference">
+              <FileText className="w-3 h-3" />
+              {contextStatusQuery.data.articles} articles
+            </span>
+            <span className="flex items-center gap-1 text-muted-foreground" title="Ideas agents can see">
+              <Lightbulb className="w-3 h-3" />
+              {contextStatusQuery.data.ideas} ideas
+            </span>
+            <span className="flex items-center gap-1 text-muted-foreground" title="Brands agents know about">
+              <Palette className="w-3 h-3" />
+              {contextStatusQuery.data.brands} brands
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative max-w-md">
@@ -598,6 +632,12 @@ function ChatInterface({ agentIds, messages, input, sending, onInputChange, onSe
                   ? `${agents.map(a => a.name.split(' ')[0]).join(', ')} are ready. They'll collaborate and build on each other's input.`
                   : agents[0]?.personality}
               </p>
+              <div className="flex items-center justify-center gap-3 mt-2 text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-0.5"><Database className="w-2.5 h-2.5" /> KB Access</span>
+                <span className="flex items-center gap-0.5"><Brain className="w-2.5 h-2.5" /> Memory</span>
+                <span className="flex items-center gap-0.5"><FileText className="w-2.5 h-2.5" /> Articles</span>
+                <span className="flex items-center gap-0.5"><Palette className="w-2.5 h-2.5" /> Brands</span>
+              </div>
               {/* Quick prompts */}
               <div className="flex flex-wrap justify-center gap-2 mt-4">
                 {!isGroup && agents[0] && getQuickPrompts(agents[0].id).map((prompt, i) => (
