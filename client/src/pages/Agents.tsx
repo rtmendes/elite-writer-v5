@@ -15,18 +15,27 @@ import {
 } from '@/components/ui/dialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuSeparator, DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
   MessageSquare, Users, Send, Search, Clock, Zap, X, Check,
   Loader2, Sparkles, FileText, MoreHorizontal, Trash2, MessagesSquare,
-  Brain, Database, BookOpen, Lightbulb, Palette,
+  Brain, Database, BookOpen, Lightbulb, Palette, LayoutGrid, List,
+  ArrowUpDown, ArrowUp, ArrowDown, Filter, CheckSquare, Square,
+  SlidersHorizontal, XCircle, ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ─── Types ───────────────────────────────────────────────
 
 type ChatMode = 'one_on_one' | 'group' | 'meeting';
+type ViewMode = 'gallery' | 'list';
+type SortField = 'name' | 'role' | 'articles' | 'response';
+type SortDirection = 'asc' | 'desc';
 
 interface ChatMessage {
   id?: number;
@@ -45,6 +54,12 @@ interface ChatSession {
   lastMessageAt: string | null;
 }
 
+// Extract unique roles from agent list
+const ALL_ROLES = Array.from(new Set(AGENT_LIST.map(a => a.role))).sort();
+const ALL_EXPERTISE = Array.from(
+  new Set(AGENT_LIST.flatMap(a => a.expertise))
+).sort();
+
 // ─── Main Component ──────────────────────────────────────
 
 export default function Agents() {
@@ -60,6 +75,15 @@ export default function Agents() {
   const [groupSelectOpen, setGroupSelectOpen] = useState(false);
   const [groupSelected, setGroupSelected] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // New state for view controls
+  const [viewMode, setViewMode] = useState<ViewMode>('gallery');
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [filterRole, setFilterRole] = useState<string>('all');
+  const [filterExpertise, setFilterExpertise] = useState<string>('all');
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [multiSelected, setMultiSelected] = useState<Set<string>>(new Set());
 
   // tRPC
   const chatsQuery = trpc.agents.listChats.useQuery();
@@ -77,16 +101,54 @@ export default function Agents() {
   const deleteChatMutation = trpc.agents.deleteChat.useMutation();
   const contextStatusQuery = trpc.agents.getContextStatus.useQuery();
 
-  // Filter agents by search
+  // Filter + sort agents
   const filteredAgents = useMemo(() => {
-    if (!searchQuery) return AGENT_LIST;
-    const q = searchQuery.toLowerCase();
-    return AGENT_LIST.filter(a =>
-      a.name.toLowerCase().includes(q) ||
-      a.role.toLowerCase().includes(q) ||
-      a.expertise.some(e => e.toLowerCase().includes(q))
-    );
-  }, [searchQuery]);
+    let list = [...AGENT_LIST];
+
+    // Text search
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(a =>
+        a.name.toLowerCase().includes(q) ||
+        a.role.toLowerCase().includes(q) ||
+        a.expertise.some(e => e.toLowerCase().includes(q))
+      );
+    }
+
+    // Role filter
+    if (filterRole !== 'all') {
+      list = list.filter(a => a.role === filterRole);
+    }
+
+    // Expertise filter
+    if (filterExpertise !== 'all') {
+      list = list.filter(a => a.expertise.some(e => e === filterExpertise));
+    }
+
+    // Sort
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'name':
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case 'role':
+          cmp = a.role.localeCompare(b.role);
+          break;
+        case 'articles':
+          cmp = a.stats.articlesProcessed - b.stats.articlesProcessed;
+          break;
+        case 'response':
+          cmp = parseInt(a.stats.avgResponseTime) - parseInt(b.stats.avgResponseTime);
+          break;
+      }
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+
+    return list;
+  }, [searchQuery, filterRole, filterExpertise, sortField, sortDirection]);
+
+  const hasActiveFilters = filterRole !== 'all' || filterExpertise !== 'all' || searchQuery.length > 0;
 
   // Load messages when chat changes
   useEffect(() => {
@@ -106,9 +168,34 @@ export default function Agents() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  // ─── Multi-select helpers ────────────────────────────
+
+  const toggleMultiSelect = (agentId: string) => {
+    const next = new Set(multiSelected);
+    if (next.has(agentId)) next.delete(agentId); else next.add(agentId);
+    setMultiSelected(next);
+  };
+
+  const selectAll = () => {
+    setMultiSelected(new Set(filteredAgents.map(a => a.id)));
+  };
+
+  const clearSelection = () => {
+    setMultiSelected(new Set());
+  };
+
+  const exitMultiSelect = () => {
+    setMultiSelectMode(false);
+    setMultiSelected(new Set());
+  };
+
   // ─── Handlers ────────────────────────────────────────
 
   const handleAgentClick = (agent: Agent) => {
+    if (multiSelectMode) {
+      toggleMultiSelect(agent.id);
+      return;
+    }
     setSelectedAgent(agent);
     setProfileOpen(true);
   };
@@ -178,6 +265,17 @@ export default function Agents() {
     setGroupSelected(new Set());
   };
 
+  const handleStartMultiSelectChat = () => {
+    if (multiSelected.size === 0) return;
+    const ids = Array.from(multiSelected);
+    if (ids.length === 1) {
+      handleStartChat(ids, 'one_on_one');
+    } else {
+      handleStartChat(ids, 'group');
+    }
+    exitMultiSelect();
+  };
+
   const handleDeleteChat = async (chatId: number) => {
     try {
       await deleteChatMutation.mutateAsync({ chatId });
@@ -192,28 +290,76 @@ export default function Agents() {
     }
   };
 
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setFilterRole('all');
+    setFilterExpertise('all');
+    setSortField('name');
+    setSortDirection('asc');
+  };
+
   // ─── Render ──────────────────────────────────────────
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">AI Editorial Team</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            18 specialized agents — click to interact, chat, or assign to projects
+            {filteredAgents.length} of {AGENT_LIST.length} agents
+            {multiSelectMode && multiSelected.size > 0 && (
+              <span className="text-primary font-medium"> · {multiSelected.size} selected</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setGroupSelectOpen(true)}
-          >
-            <Users className="w-3.5 h-3.5" />
-            Group Meeting
-          </Button>
+          {multiSelectMode ? (
+            <>
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={selectAll}>
+                <CheckSquare className="w-3.5 h-3.5" />
+                All
+              </Button>
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={clearSelection}>
+                <Square className="w-3.5 h-3.5" />
+                None
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1.5 text-xs"
+                disabled={multiSelected.size === 0}
+                onClick={handleStartMultiSelectChat}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                Chat ({multiSelected.size})
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={exitMultiSelect}>
+                <X className="w-3.5 h-3.5" />
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setMultiSelectMode(true)}
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                Select
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setGroupSelectOpen(true)}
+              >
+                <Users className="w-3.5 h-3.5" />
+                Group Meeting
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -249,28 +395,192 @@ export default function Agents() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search agents by name, role, or expertise..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          className="pl-9 h-9"
-        />
+      {/* ─── Toolbar: Search + Filter + Sort + View ─── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* Left: Search + Filters */}
+        <div className="flex items-center gap-2 flex-1 flex-wrap">
+          {/* Search */}
+          <div className="relative w-56">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search agents..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 h-8 text-xs"
+            />
+            {searchQuery && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setSearchQuery('')}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Role Filter */}
+          <Select value={filterRole} onValueChange={setFilterRole}>
+            <SelectTrigger className="w-44 h-8 text-xs">
+              <Filter className="w-3 h-3 mr-1.5 text-muted-foreground" />
+              <SelectValue placeholder="All Roles" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              {ALL_ROLES.map(role => (
+                <SelectItem key={role} value={role}>{role}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Expertise Filter */}
+          <Select value={filterExpertise} onValueChange={setFilterExpertise}>
+            <SelectTrigger className="w-48 h-8 text-xs">
+              <Sparkles className="w-3 h-3 mr-1.5 text-muted-foreground" />
+              <SelectValue placeholder="All Expertise" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Expertise</SelectItem>
+              {ALL_EXPERTISE.map(exp => (
+                <SelectItem key={exp} value={exp}>{exp}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Clear filters */}
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-muted-foreground hover:text-foreground" onClick={clearAllFilters}>
+              <XCircle className="w-3 h-3" />
+              Clear
+            </Button>
+          )}
+        </div>
+
+        {/* Right: Sort + View toggle */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Sort */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                <ArrowUpDown className="w-3 h-3" />
+                Sort
+                {sortField !== 'name' && (
+                  <Badge variant="secondary" className="text-[9px] h-4 px-1">{sortField}</Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground">Sort by</DropdownMenuLabel>
+              {[
+                { field: 'name' as SortField, label: 'Name' },
+                { field: 'role' as SortField, label: 'Role' },
+                { field: 'articles' as SortField, label: 'Articles Processed' },
+                { field: 'response' as SortField, label: 'Response Time' },
+              ].map(({ field, label }) => (
+                <DropdownMenuItem
+                  key={field}
+                  className="text-xs flex items-center justify-between"
+                  onClick={() => {
+                    if (sortField === field) {
+                      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortField(field);
+                      setSortDirection('asc');
+                    }
+                  }}
+                >
+                  <span>{label}</span>
+                  {sortField === field && (
+                    sortDirection === 'asc'
+                      ? <ArrowUp className="w-3 h-3 text-primary" />
+                      : <ArrowDown className="w-3 h-3 text-primary" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* View Toggle */}
+          <div className="flex items-center border border-border rounded-md overflow-hidden">
+            <button
+              className={cn(
+                "p-1.5 transition-colors",
+                viewMode === 'gallery'
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+              onClick={() => setViewMode('gallery')}
+              title="Gallery view"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+            <button
+              className={cn(
+                "p-1.5 transition-colors",
+                viewMode === 'list'
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+              onClick={() => setViewMode('list')}
+              title="List view"
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Agent Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        {filteredAgents.map(agent => (
-          <AgentCard
-            key={agent.id}
-            agent={agent}
-            onClick={() => handleAgentClick(agent)}
-            onChat={() => handleStartChat([agent.id])}
-          />
-        ))}
-      </div>
+      {/* ─── Agent Display ─── */}
+      {filteredAgents.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
+          <p className="text-sm font-medium">No agents match your filters</p>
+          <p className="text-xs mt-1">Try adjusting your search or filter criteria</p>
+          <Button variant="link" size="sm" className="mt-2 text-xs" onClick={clearAllFilters}>
+            Clear all filters
+          </Button>
+        </div>
+      ) : viewMode === 'gallery' ? (
+        /* Gallery Grid */
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {filteredAgents.map(agent => (
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              onClick={() => handleAgentClick(agent)}
+              onChat={() => handleStartChat([agent.id])}
+              multiSelectMode={multiSelectMode}
+              isSelected={multiSelected.has(agent.id)}
+              onToggleSelect={() => toggleMultiSelect(agent.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        /* List View */
+        <div className="rounded-lg border border-border overflow-hidden">
+          {/* List header */}
+          <div className="grid grid-cols-[auto_1fr_150px_100px_80px_80px_70px] gap-3 px-4 py-2.5 bg-muted/30 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider items-center">
+            {multiSelectMode && <div className="w-5" />}
+            <div className={multiSelectMode ? "" : "col-start-2"}>Agent</div>
+            <div>Role</div>
+            <div>Specialty</div>
+            <div className="text-center">Articles</div>
+            <div className="text-center">Response</div>
+            <div className="text-right">Actions</div>
+          </div>
+          {filteredAgents.map((agent, i) => (
+            <AgentListRow
+              key={agent.id}
+              agent={agent}
+              isEven={i % 2 === 0}
+              onClick={() => handleAgentClick(agent)}
+              onChat={() => handleStartChat([agent.id])}
+              multiSelectMode={multiSelectMode}
+              isSelected={multiSelected.has(agent.id)}
+              onToggleSelect={() => toggleMultiSelect(agent.id)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Recent Chats */}
       {chatsQuery.data && chatsQuery.data.length > 0 && (
@@ -420,18 +730,49 @@ export default function Agents() {
   );
 }
 
-// ─── Agent Card ──────────────────────────────────────────
+// ─── Agent Card (Gallery) ────────────────────────────────
 
-function AgentCard({ agent, onClick, onChat }: { agent: Agent; onClick: () => void; onChat: () => void }) {
+function AgentCard({ agent, onClick, onChat, multiSelectMode, isSelected, onToggleSelect }: {
+  agent: Agent;
+  onClick: () => void;
+  onChat: () => void;
+  multiSelectMode: boolean;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+}) {
   return (
     <Card
-      className="border-border hover:border-primary/40 transition-all cursor-pointer group hover:shadow-lg hover:shadow-primary/5"
+      className={cn(
+        "border-border hover:border-primary/40 transition-all cursor-pointer group hover:shadow-lg hover:shadow-primary/5",
+        multiSelectMode && isSelected && "border-primary ring-1 ring-primary bg-primary/5",
+      )}
       onClick={onClick}
     >
-      <CardContent className="p-3 flex flex-col items-center text-center">
+      <CardContent className="p-3 flex flex-col items-center text-center relative">
+        {/* Multi-select checkbox */}
+        {multiSelectMode && (
+          <button
+            className="absolute top-2 left-2 z-10"
+            onClick={e => { e.stopPropagation(); onToggleSelect(); }}
+          >
+            {isSelected ? (
+              <div className="w-5 h-5 bg-primary rounded flex items-center justify-center">
+                <Check className="w-3 h-3 text-primary-foreground" />
+              </div>
+            ) : (
+              <div className="w-5 h-5 border-2 border-muted-foreground/40 rounded hover:border-primary transition-colors" />
+            )}
+          </button>
+        )}
+
         {/* Avatar */}
         <div className="relative mb-2">
-          <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-border group-hover:ring-primary/50 transition-all">
+          <div className={cn(
+            "w-16 h-16 rounded-full overflow-hidden ring-2 transition-all",
+            multiSelectMode && isSelected
+              ? "ring-primary"
+              : "ring-border group-hover:ring-primary/50"
+          )}>
             <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
           </div>
           <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center ring-2 ring-background">
@@ -457,17 +798,108 @@ function AgentCard({ agent, onClick, onChat }: { agent: Agent; onClick: () => vo
         </div>
 
         {/* Quick chat button */}
+        {!multiSelectMode && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="mt-2 h-6 text-[10px] gap-1 w-full opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={e => { e.stopPropagation(); onChat(); }}
+          >
+            <MessageSquare className="w-3 h-3" />
+            Chat
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Agent List Row ──────────────────────────────────────
+
+function AgentListRow({ agent, isEven, onClick, onChat, multiSelectMode, isSelected, onToggleSelect }: {
+  agent: Agent;
+  isEven: boolean;
+  onClick: () => void;
+  onChat: () => void;
+  multiSelectMode: boolean;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "grid grid-cols-[auto_1fr_150px_100px_80px_80px_70px] gap-3 px-4 py-2.5 items-center cursor-pointer transition-colors group",
+        isEven ? "bg-background" : "bg-muted/20",
+        "hover:bg-primary/5",
+        multiSelectMode && isSelected && "bg-primary/10 hover:bg-primary/15",
+      )}
+      onClick={onClick}
+    >
+      {/* Checkbox */}
+      {multiSelectMode && (
+        <button
+          className="w-5 flex items-center justify-center"
+          onClick={e => { e.stopPropagation(); onToggleSelect(); }}
+        >
+          {isSelected ? (
+            <div className="w-4 h-4 bg-primary rounded flex items-center justify-center">
+              <Check className="w-2.5 h-2.5 text-primary-foreground" />
+            </div>
+          ) : (
+            <div className="w-4 h-4 border-2 border-muted-foreground/40 rounded hover:border-primary transition-colors" />
+          )}
+        </button>
+      )}
+
+      {/* Agent info */}
+      <div className={cn("flex items-center gap-3 min-w-0", !multiSelectMode && "col-start-2")}>
+        <div className="relative shrink-0">
+          <div className="w-9 h-9 rounded-full overflow-hidden ring-1 ring-border">
+            <img src={agent.avatar} alt={agent.name} className="w-full h-full object-cover" />
+          </div>
+          <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full flex items-center justify-center ring-1 ring-background">
+            <Zap className="w-2 h-2 text-white" />
+          </div>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">{agent.name}</p>
+          <p className="text-[10px] text-muted-foreground truncate">{agent.bio.slice(0, 60)}...</p>
+        </div>
+      </div>
+
+      {/* Role */}
+      <div>
+        <Badge variant="outline" className="text-[10px] font-normal">{agent.role}</Badge>
+      </div>
+
+      {/* Specialty */}
+      <div className="text-xs text-muted-foreground truncate" title={agent.stats.specialty}>
+        {agent.stats.specialty}
+      </div>
+
+      {/* Articles */}
+      <div className="text-center">
+        <span className="text-sm font-semibold">{agent.stats.articlesProcessed}</span>
+      </div>
+
+      {/* Response time */}
+      <div className="text-center">
+        <span className="text-xs text-muted-foreground">{agent.stats.avgResponseTime}</span>
+      </div>
+
+      {/* Actions */}
+      <div className="text-right">
         <Button
           size="sm"
           variant="ghost"
-          className="mt-2 h-6 text-[10px] gap-1 w-full opacity-0 group-hover:opacity-100 transition-opacity"
+          className="h-7 text-[10px] gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={e => { e.stopPropagation(); onChat(); }}
         >
           <MessageSquare className="w-3 h-3" />
           Chat
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 

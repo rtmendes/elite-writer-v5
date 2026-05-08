@@ -68,22 +68,51 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   // If model is explicitly OpenRouter or starts with a known OpenRouter pattern
   if (params.model?.includes("/") && ENV.openrouterApiKey) {
-    return invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: params.model });
+    try {
+      return await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: params.model });
+    } catch (err: any) {
+      console.warn(`[LLM] OpenRouter failed (${err?.message?.slice(0, 100)}), falling back...`);
+      // Fall through to try direct APIs
+    }
   }
 
-  // Try Anthropic first
+  // Try Anthropic direct (works for claude models)
   if (ENV.anthropicApiKey) {
-    return invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model });
+    try {
+      // Map OpenRouter model names back to Anthropic model names
+      let anthropicModel = model;
+      if (params.model?.startsWith("anthropic/")) {
+        anthropicModel = params.model.replace("anthropic/", "");
+      } else if (params.model?.startsWith("openai/") || params.model?.startsWith("google/") || params.model?.startsWith("deepseek/")) {
+        // Non-Anthropic model — try OpenAI or skip to next fallback
+        if (ENV.openaiApiKey && (params.model?.startsWith("openai/") || !ENV.anthropicApiKey)) {
+          return await invokeOpenAI(params.messages, { maxTokens, format, temperature });
+        }
+        // For Google/DeepSeek models, still fall through to Anthropic as a general fallback
+        anthropicModel = "claude-sonnet-4-20250514";
+      }
+      return await invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model: anthropicModel });
+    } catch (err: any) {
+      console.warn(`[LLM] Anthropic failed (${err?.message?.slice(0, 100)}), falling back...`);
+    }
   }
 
   // Fallback: OpenAI
   if (ENV.openaiApiKey) {
-    return invokeOpenAI(params.messages, { maxTokens, format, temperature });
+    try {
+      return await invokeOpenAI(params.messages, { maxTokens, format, temperature });
+    } catch (err: any) {
+      console.warn(`[LLM] OpenAI failed (${err?.message?.slice(0, 100)}), falling back...`);
+    }
   }
 
   // Fallback: OpenRouter (any model)
   if (ENV.openrouterApiKey) {
-    return invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: "anthropic/claude-sonnet-4-20250514" });
+    try {
+      return await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: "anthropic/claude-sonnet-4-20250514" });
+    } catch (err: any) {
+      console.warn(`[LLM] OpenRouter last-resort failed: ${err?.message?.slice(0, 100)}`);
+    }
   }
 
   // Legacy: Forge API
@@ -91,7 +120,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     return invokeForge(params);
   }
 
-  throw new Error("No LLM API key configured (ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, or BUILT_IN_FORGE_API_KEY)");
+  throw new Error("No LLM API key configured or all providers failed (ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, or BUILT_IN_FORGE_API_KEY)");
 }
 
 async function invokeAnthropic(
