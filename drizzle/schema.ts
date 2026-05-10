@@ -776,3 +776,60 @@ export const agentMemories = mysqlTable("agent_memories", {
 
 export type AgentMemory = typeof agentMemories.$inferSelect;
 export type InsertAgentMemory = typeof agentMemories.$inferInsert;
+
+// ─── Pulse Stories (Article Pulse → Elite Writer Pipeline) ──
+export const pulseStories = mysqlTable("pulse_stories", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId"),
+  // Story data from Article Pulse
+  externalId: int("externalId"), // original story ID from pulse briefing
+  headline: varchar("headline", { length: 500 }).notNull(),
+  source: varchar("source", { length: 1000 }),
+  sourceDisplay: varchar("sourceDisplay", { length: 200 }),
+  beat: varchar("beat", { length: 100 }).notNull(), // "AI & Enterprise Tech", "Women's Health", etc.
+  urgency: mysqlEnum("urgency", ["breaking", "this_week", "evergreen"]).default("this_week").notNull(),
+  urgencyEmoji: varchar("urgencyEmoji", { length: 10 }),
+  whyItMatters: text("whyItMatters"),
+  angle: text("angle"),
+  contentType: varchar("contentType", { length: 200 }),
+  priority: int("priority"),
+  // Pipeline status
+  status: mysqlEnum("pulseStatus", [
+    "new", "reviewing", "writing", "in_pipeline", "published", "skipped"
+  ]).default("new").notNull(),
+  // Audience & Publication matching (AI-enriched)
+  matchedBrands: json("matchedBrands").$type<{
+    brandName: string;
+    brandId?: number;
+    relevanceScore: number;
+    suggestedAngle: string;
+  }[]>(),
+  matchedPublications: json("matchedPublications").$type<{
+    publicationName: string;
+    publicationId?: number;
+    matchScore: number;
+    payRange: string;
+    whyItFits: string;
+  }[]>(),
+  // Data analysis metadata
+  analysisData: json("analysisData").$type<{
+    sentimentScore?: number;
+    viralPotential?: number;
+    competitiveGap?: number;
+    audienceSize?: string;
+    trendDirection?: "rising" | "stable" | "declining";
+    relatedStoryCount?: number;
+  }>(),
+  // Briefing grouping
+  briefingDate: varchar("briefingDate", { length: 10 }).notNull(), // YYYY-MM-DD
+  briefingRank: int("briefingRank"), // Viktor's top-5 rank if applicable
+  briefingReason: text("briefingReason"), // why Viktor ranked it
+  // Article pipeline link
+  articleId: int("articleId"), // linked article when promoted to pipeline
+  ideaId: int("ideaId"), // linked idea when converted
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PulseStory = typeof pulseStories.$inferSelect;
+export type InsertPulseStory = typeof pulseStories.$inferInsert;

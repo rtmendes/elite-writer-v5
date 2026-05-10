@@ -27,6 +27,7 @@ import { humanizerRouter } from "./routers/humanizer";
 import { strategyRouter } from "./routers/strategy";
 import { bridgesRouter } from "./routers/bridges";
 import { agentsRouter } from "./routers/agents";
+import { pulseRouter } from "./routers/pulse";
 
 export const appRouter = router({
   system: systemRouter,
@@ -79,6 +80,9 @@ export const appRouter = router({
 
   // Interactive AI agents — chat, assignments, profiles
   agents: agentsRouter,
+
+  // Article Pulse → Elite Writer pipeline
+  pulse: pulseRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, description: 'Overview & metrics' },
   { path: '/giststack', label: 'Intelligence', icon: Newspaper, description: 'Content curation & trends' },
+  { path: '/pulse', label: 'Pulse Pipeline', icon: Zap, description: 'AI stories → matched articles' },
   { path: '/ideas', label: 'Ideas', icon: Lightbulb, description: 'Article idea pipeline' },
   { path: '/research', label: 'Research', icon: Search, description: 'Data & source gathering' },
   { path: '/writer', label: 'Writer', icon: PenTool, description: 'AI-enhanced editor' },

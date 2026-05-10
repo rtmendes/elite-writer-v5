@@ -22,6 +22,7 @@ import Strategy from "./pages/Strategy";
 import Pipeline from "./pages/Pipeline";
 import Login from "./pages/Login";
 import Agents from "./pages/Agents";
+import PulsePipeline from "./pages/PulsePipeline";
 import NotFound from "@/pages/NotFound";
 function Router() {
   return (
@@ -46,6 +47,7 @@ function Router() {
             <Route path="/geo" component={Geo} />
             <Route path="/strategy" component={Strategy} />
             <Route path="/pipeline" component={Pipeline} />
+            <Route path="/pulse" component={PulsePipeline} />
             <Route path="/brands" component={Brands} />
             <Route path="/settings" component={Settings} />
             <Route path="/404" component={NotFound} />
