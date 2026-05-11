@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { contentStudioItems } from "../../drizzle/schema";
+import { contentStudioItems, brands } from "../../drizzle/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 
 export const studioRouter = router({
@@ -11,7 +11,7 @@ export const studioRouter = router({
       contentType: z.string().optional(),
       status: z.string().optional(),
       brandId: z.number().optional(),
-      limit: z.number().default(100),
+      limit: z.number().default(500),
     }).optional())
     .query(async ({ ctx, input }) => {
       const db = await getDb();
@@ -32,7 +32,7 @@ export const studioRouter = router({
       return db.select().from(contentStudioItems)
         .where(and(...conditions))
         .orderBy(desc(contentStudioItems.updatedAt))
-        .limit(input?.limit ?? 100);
+        .limit(input?.limit ?? 500);
     }),
 
   create: protectedProcedure
@@ -121,5 +121,26 @@ export const studioRouter = router({
         publishedAt: new Date(),
       } as any).where(and(eq(contentStudioItems.id, input.id), eq(contentStudioItems.userId, ctx.user.id)));
       return { success: true };
+    }),
+  // ─── List Brands ──────────────────────────────────────────
+  listBrands: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(brands)
+      .where(eq(brands.userId, ctx.user.id))
+      .orderBy(brands.name);
+  }),
+
+  // ─── AI Enrich — generate metadata for a content item ─────
+  enrich: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const [item] = await db.select().from(contentStudioItems)
+        .where(and(eq(contentStudioItems.id, input.id), eq(contentStudioItems.userId, ctx.user.id)));
+      if (!item) throw new Error("Item not found");
+      // Return the item for client-side enrichment display
+      return { success: true, item };
     }),
 });
