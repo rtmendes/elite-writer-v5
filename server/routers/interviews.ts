@@ -3,7 +3,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { aiInterviews } from "../../drizzle/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { v4 as uuid } from "uuid";
+import { randomUUID } from "crypto";
 
 const TOPIC_PACKS: Record<string, Array<{ question: string }>> = {
   brand_foundations: [
@@ -77,7 +77,7 @@ export const interviewsRouter = router({
 
       if (input.topicPack === "custom" && input.customQuestions?.length) {
         questions = input.customQuestions.map((q, i) => ({
-          id: uuid(),
+          id: randomUUID(),
           question: q,
           answer: null,
           order: i,
@@ -85,7 +85,7 @@ export const interviewsRouter = router({
       } else {
         const pack = TOPIC_PACKS[input.topicPack] || TOPIC_PACKS.brand_foundations;
         questions = pack.map((q, i) => ({
-          id: uuid(),
+          id: randomUUID(),
           question: q.question,
           answer: null,
           order: i,
