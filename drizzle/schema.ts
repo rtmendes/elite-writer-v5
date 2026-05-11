@@ -833,3 +833,129 @@ export const pulseStories = mysqlTable("pulse_stories", {
 
 export type PulseStory = typeof pulseStories.$inferSelect;
 export type InsertPulseStory = typeof pulseStories.$inferInsert;
+
+// ─── Content Command HQ: Trending Topics ──────────────────
+export const trendingTopics = mysqlTable("trending_topics", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  platform: mysqlEnum("platform", [
+    "linkedin", "twitter", "instagram", "facebook", "bluesky",
+    "tiktok", "youtube", "reddit", "general"
+  ]).default("general").notNull(),
+  category: varchar("category", { length: 100 }),
+  trendScore: int("trendScore").default(0),
+  velocity: mysqlEnum("velocity", ["rising", "stable", "declining"]).default("rising"),
+  suggestedAngles: json("suggestedAngles").$type<string[]>(),
+  sampleHeadlines: json("sampleHeadlines").$type<string[]>(),
+  relatedKeywords: json("relatedKeywords").$type<string[]>(),
+  sourceUrl: varchar("sourceUrl", { length: 1000 }),
+  brandId: int("brandId"),
+  status: mysqlEnum("trendStatus", ["active", "used", "archived"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type TrendingTopic = typeof trendingTopics.$inferSelect;
+export type InsertTrendingTopic = typeof trendingTopics.$inferInsert;
+
+// ─── Content Command HQ: Content Calendar ─────────────────
+export const contentCalendar = mysqlTable("content_calendar", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  scheduledDate: varchar("scheduledDate", { length: 10 }).notNull(), // YYYY-MM-DD
+  scheduledTime: varchar("scheduledTime", { length: 5 }), // HH:MM
+  platform: mysqlEnum("calPlatform", [
+    "linkedin", "twitter", "instagram", "facebook", "bluesky",
+    "blog", "newsletter", "threads", "press", "tiktok", "youtube"
+  ]).default("linkedin").notNull(),
+  contentType: mysqlEnum("calContentType", [
+    "post", "thread", "article", "carousel", "story", "reel",
+    "press_release", "newsletter", "video"
+  ]).default("post").notNull(),
+  status: mysqlEnum("calStatus", [
+    "planned", "drafting", "review", "approved", "scheduled", "published"
+  ]).default("planned").notNull(),
+  brandId: int("brandId"),
+  contentItemId: int("contentItemId"), // link to studio item
+  assignee: varchar("assignee", { length: 200 }),
+  color: varchar("color", { length: 20 }),
+  metadata: json("calMeta").$type<{
+    notes?: string;
+    tags?: string[];
+    campaignId?: string;
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ContentCalendarItem = typeof contentCalendar.$inferSelect;
+export type InsertContentCalendarItem = typeof contentCalendar.$inferInsert;
+
+// ─── Content Command HQ: AI Interviews ────────────────────
+export const aiInterviews = mysqlTable("ai_interviews", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  brandId: int("brandId"),
+  title: varchar("title", { length: 500 }).notNull(),
+  topic: varchar("topic", { length: 200 }),
+  topicPack: mysqlEnum("topicPack", [
+    "brand_foundations", "content_strategy", "audience_deep_dive", "custom"
+  ]).default("custom").notNull(),
+  questions: json("questions").$type<Array<{
+    id: string;
+    question: string;
+    answer: string | null;
+    order: number;
+  }>>(),
+  extractedInsights: json("extractedInsights").$type<string[]>(),
+  status: mysqlEnum("interviewStatus", [
+    "not_started", "in_progress", "completed", "archived"
+  ]).default("not_started").notNull(),
+  completeness: int("completeness").default(0), // 0-100
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AiInterview = typeof aiInterviews.$inferSelect;
+export type InsertAiInterview = typeof aiInterviews.$inferInsert;
+
+// ─── Content Command HQ: Content Studio Items ─────────────
+export const contentStudioItems = mysqlTable("content_studio_items", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  body: text("body"),
+  platform: mysqlEnum("studioPlatform", [
+    "linkedin", "twitter", "instagram", "facebook", "bluesky",
+    "blog", "newsletter", "threads", "press"
+  ]).default("linkedin").notNull(),
+  contentType: mysqlEnum("studioContentType", [
+    "post", "thread", "article", "carousel", "story", "reel",
+    "press_release", "newsletter"
+  ]).default("post").notNull(),
+  status: mysqlEnum("studioStatus", [
+    "draft", "review", "approved", "scheduled", "published", "archived"
+  ]).default("draft").notNull(),
+  charCount: int("charCount").default(0),
+  brandId: int("brandId"),
+  sourceInsightId: int("sourceInsightId"), // linked insight that inspired it
+  trendingTopicId: int("trendingTopicId"), // linked trending topic
+  imageUrl: varchar("studioImageUrl", { length: 1000 }),
+  publishUrl: varchar("publishUrl", { length: 1000 }),
+  publishedAt: timestamp("publishedAt"),
+  metadata: json("studioMeta").$type<{
+    hashtags?: string[];
+    mentions?: string[];
+    hooks?: string[];
+    cta?: string;
+    targetAudience?: string;
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ContentStudioItem = typeof contentStudioItems.$inferSelect;
+export type InsertContentStudioItem = typeof contentStudioItems.$inferInsert;

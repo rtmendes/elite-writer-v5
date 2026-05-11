@@ -28,6 +28,10 @@ import { strategyRouter } from "./routers/strategy";
 import { bridgesRouter } from "./routers/bridges";
 import { agentsRouter } from "./routers/agents";
 import { pulseRouter } from "./routers/pulse";
+import { trendingRouter } from "./routers/trending";
+import { calendarRouter } from "./routers/calendar";
+import { interviewsRouter } from "./routers/interviews";
+import { studioRouter } from "./routers/studio";
 
 export const appRouter = router({
   system: systemRouter,
@@ -83,6 +87,12 @@ export const appRouter = router({
 
   // Article Pulse → Elite Writer pipeline
   pulse: pulseRouter,
+
+  // Content Command HQ integration
+  trending: trendingRouter,
+  calendar: calendarRouter,
+  interviews: interviewsRouter,
+  studio: studioRouter,
 });
 
 export type AppRouter = typeof appRouter;

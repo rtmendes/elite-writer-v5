@@ -389,6 +389,12 @@ const intelligenceRouter = router({
     await db.delete(intelligenceItems).where(and(eq(intelligenceItems.id, input.id), eq(intelligenceItems.userId, ctx.user.id)));
     return { success: true };
   }),
+  save: protectedProcedure.input(z.object({ id: z.number(), saved: z.boolean() })).mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database unavailable");
+    await db.update(intelligenceItems).set({ saved: input.saved ? 1 : 0 }).where(and(eq(intelligenceItems.id, input.id), eq(intelligenceItems.userId, ctx.user.id)));
+    return { success: true };
+  }),
 });
 
 

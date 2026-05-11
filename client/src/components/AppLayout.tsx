@@ -8,6 +8,7 @@ import {
   BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
   Zap, Menu, Building2, Moon, Sun, Inbox, Loader2,
   MessageSquare, Library, Globe, Map, Users,
+  Flame, Calendar, Mic, Palette,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,12 @@ const NAV_ITEMS = [
   { path: '/publications', label: 'Publications', icon: BookOpen, description: '174+ publication database' },
   { path: '/pitches', label: 'Pitches', icon: Send, description: 'Pitch management' },
   { path: '/social', label: 'Social Engine', icon: MessageSquare, description: 'Multi-platform content' },
+  { path: '/trending', label: 'Trending', icon: Flame, description: 'Trending topics discovery' },
+  { path: '/content-studio', label: 'Content Studio', icon: PenTool, description: 'Multi-platform content creation' },
+  { path: '/content-calendar', label: 'Calendar', icon: Calendar, description: 'Content scheduling calendar' },
+  { path: '/content-insights', label: 'Insights', icon: Lightbulb, description: 'Smart content curation' },
+  { path: '/interviews', label: 'AI Interviews', icon: Mic, description: 'Guided Q&A expertise extraction' },
+  { path: '/brand-voice', label: 'Brand Voice', icon: Palette, description: 'Voice profile training' },
   { path: '/library', label: 'Library', icon: Library, description: 'Content & asset library' },
   { path: '/geo', label: 'GEO Suite', icon: Globe, description: 'AI visibility & humanizer' },
   { path: '/strategy', label: 'Strategy', icon: Map, description: 'Keywords & content strategy' },

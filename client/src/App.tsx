@@ -23,6 +23,12 @@ import Pipeline from "./pages/Pipeline";
 import Login from "./pages/Login";
 import Agents from "./pages/Agents";
 import PulsePipeline from "./pages/PulsePipeline";
+import Trending from "./pages/Trending";
+import ContentStudio from "./pages/ContentStudio";
+import ContentCalendar from "./pages/ContentCalendar";
+import ContentInsights from "./pages/ContentInsights";
+import Interviews from "./pages/Interviews";
+import BrandVoice from "./pages/BrandVoice";
 import NotFound from "@/pages/NotFound";
 function Router() {
   return (
@@ -48,6 +54,12 @@ function Router() {
             <Route path="/strategy" component={Strategy} />
             <Route path="/pipeline" component={Pipeline} />
             <Route path="/pulse" component={PulsePipeline} />
+            <Route path="/trending" component={Trending} />
+            <Route path="/content-studio" component={ContentStudio} />
+            <Route path="/content-calendar" component={ContentCalendar} />
+            <Route path="/content-insights" component={ContentInsights} />
+            <Route path="/interviews" component={Interviews} />
+            <Route path="/brand-voice" component={BrandVoice} />
             <Route path="/brands" component={Brands} />
             <Route path="/settings" component={Settings} />
             <Route path="/404" component={NotFound} />
