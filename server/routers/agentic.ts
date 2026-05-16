@@ -108,7 +108,7 @@ export const agenticRouter = router({
     .mutation(async ({ ctx, input }) => {
       const steps: Array<{ step: string; status: string; data?: any }> = [];
 
-      // Step 1: Research the topic
+      // Step 1: Research (Academic APIs + LLM in parallel)
       const researchPrompt = `You are an elite research analyst. Conduct comprehensive research on this topic and return actionable intelligence for a journalist.
 
 Topic: ${input.topic}
@@ -126,16 +126,31 @@ Return JSON:
   "suggestedSources": ["<source to interview or cite>"]
 }`;
 
-      const researchResult = await invokeWithModel(
-        input.depth === "deep" ? "claude-sonnet" : (input.model || "gemini-flash"),
-        [
-          { role: "system", content: "You are a senior research analyst at a Bloomberg-caliber newsroom. Return ONLY valid JSON." },
-          { role: "user", content: researchPrompt },
-        ],
-        { maxTokens: input.depth === "deep" ? 4096 : 2048, jsonMode: true }
-      );
+      // Run academic API search and LLM research in parallel
+      const [academicContext, researchResult] = await Promise.all([
+        (async () => {
+          try {
+            const { academicSearch, formatForLLM } = await import("../lib/academic-search");
+            const results = await academicSearch(input.topic, {
+              maxPerSource: input.depth === "deep" ? 8 : 5,
+            });
+            return formatForLLM(results, input.depth === "deep" ? 10 : 6);
+          } catch { return ""; }
+        })(),
+        invokeWithModel(
+          input.depth === "deep" ? "claude-sonnet" : (input.model || "gemini-flash"),
+          [
+            { role: "system", content: "You are a senior research analyst at a Bloomberg-caliber newsroom. Return ONLY valid JSON." },
+            { role: "user", content: researchPrompt },
+          ],
+          { maxTokens: input.depth === "deep" ? 4096 : 2048, jsonMode: true }
+        ),
+      ]);
 
       const research = parseJSON(researchResult) || { keyFacts: [], statistics: [], uniqueAngle: input.topic };
+      if (academicContext) {
+        research.academicSources = academicContext;
+      }
       steps.push({ step: "research", status: "complete", data: research });
 
       // Step 2: Create detailed outline
@@ -146,6 +161,7 @@ Research Findings:
 - Key Facts: ${(research.keyFacts || []).slice(0, 5).join("; ")}
 - Statistics: ${(research.statistics || []).map((s: any) => s.stat).slice(0, 5).join("; ")}
 - Unique Angle: ${research.uniqueAngle || input.topic}
+${research.academicSources ? `- Academic Papers Found:\n${research.academicSources.slice(0, 600)}` : ""}
 ${input.targetPublication ? `Target Publication: ${input.targetPublication}` : ""}
 ${input.template ? `Template Style: ${input.template}` : ""}
 Target Word Count: ${input.wordCount}
@@ -184,6 +200,9 @@ Statistics: ${(research.statistics || []).map((s: any) => `${s.stat} (${s.source
 Expert Voices: ${(research.expertQuotes || []).map((q: any) => `${q.name}, ${q.title}: "${q.quote}"`).join("; ")}
 Key Facts: ${(research.keyFacts || []).slice(0, 8).join("; ")}
 
+${research.academicSources ? `ACADEMIC SOURCES (cite these real papers where relevant):
+${research.academicSources}
+` : ""}
 ${input.brandVoice ? `BRAND VOICE: ${input.brandVoice}` : ""}
 ${input.targetPublication ? `TARGET PUBLICATION: ${input.targetPublication} — match their editorial style and standards.` : ""}
 

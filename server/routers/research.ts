@@ -1,12 +1,41 @@
 /**
- * Research & Utility Router — 4 endpoints ported from elite-writer-app
- * Covers: perplexity-research, scrape-url, youtube-search, status
+ * Research & Utility Router — 5 endpoints
+ * Covers: academic-search, perplexity-research, scrape-url, youtube-search, status
  */
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { ENV } from "../_core/env";
+import { academicSearch, formatForLLM, type AcademicResult } from "../lib/academic-search";
 
 export const researchRouter = router({
+
+  // ── Academic Multi-Source Search (OpenAlex + CrossRef + Semantic Scholar + PubMed) ──
+  // No API keys needed — free academic databases queried in parallel
+  academicSearch: protectedProcedure
+    .input(z.object({
+      query: z.string().min(1),
+      maxPerSource: z.number().min(1).max(20).default(5),
+      includePubMed: z.boolean().default(false),
+      sources: z.array(z.enum(["openalex", "crossref", "semantic_scholar", "pubmed"])).optional(),
+      format: z.enum(["json", "llm"]).default("json"),
+    }))
+    .mutation(async ({ input }) => {
+      const results = await academicSearch(input.query, {
+        maxPerSource: input.maxPerSource,
+        includePubMed: input.includePubMed,
+        sources: input.sources,
+      });
+
+      return {
+        success: true,
+        query: input.query,
+        totalResults: results.length,
+        results: input.format === "llm" ? undefined : results,
+        formatted: input.format === "llm" ? formatForLLM(results) : undefined,
+        sources: [...new Set(results.map(r => r.source))],
+      };
+    }),
+
   // Perplexity deep research
   perplexity: protectedProcedure
     .input(z.object({

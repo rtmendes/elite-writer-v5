@@ -929,22 +929,38 @@ Rules:
 
       steps.push({ step: "context", status: "complete", detail: `Brand: ${brandContext ? "loaded" : "none"}, Products: ${input.productIds?.length || 0}, Template: ${pubTemplate?.name || "none"}` });
 
-      // ─── Step 2: Research ───────────────────────────────
-      const researchResult = await invokeLLM({
-        messages: [
-          { role: "system", content: "Senior research analyst. Return ONLY valid JSON." },
-          {
-            role: "user",
-            content: `Research for publication-grade article:\n\nTopic: ${input.topic}\n${input.targetPublication ? `Target: ${pubTemplate?.name}` : ""}\n\nReturn JSON:\n{"keyFacts":["..."],"statistics":[{"stat":"...","source":"...","year":"..."}],"expertQuotes":[{"name":"...","title":"...","quote":"..."}],"uniqueAngle":"...","suggestedSources":["..."]}`,
-          },
-        ],
-        response_format: { type: "json_object" },
-        maxTokens: 3072,
-      });
+      // ─── Step 2: Research (Academic APIs + LLM) ──────────
+      // 2a: Query real academic databases in parallel with LLM research
+      const [academicResults, researchResult] = await Promise.all([
+        // Real academic search — OpenAlex + CrossRef + Semantic Scholar
+        (async () => {
+          try {
+            const { academicSearch, formatForLLM } = await import("../lib/academic-search");
+            const results = await academicSearch(input.topic, { maxPerSource: 5 });
+            return formatForLLM(results, 8);
+          } catch { return ""; }
+        })(),
+        // LLM-generated research context
+        invokeLLM({
+          messages: [
+            { role: "system", content: "Senior research analyst. Return ONLY valid JSON." },
+            {
+              role: "user",
+              content: `Research for publication-grade article:\n\nTopic: ${input.topic}\n${input.targetPublication ? `Target: ${pubTemplate?.name}` : ""}\n\nReturn JSON:\n{"keyFacts":["..."],"statistics":[{"stat":"...","source":"...","year":"..."}],"expertQuotes":[{"name":"...","title":"...","quote":"..."}],"uniqueAngle":"...","suggestedSources":["..."]}`,
+            },
+          ],
+          response_format: { type: "json_object" },
+          maxTokens: 3072,
+        }),
+      ]);
 
       let research: any = { keyFacts: [], statistics: [] };
       try { research = JSON.parse(researchResult.choices[0]?.message?.content || "{}"); } catch {}
-      steps.push({ step: "research", status: "complete" });
+      // Inject academic sources into research context
+      if (academicResults) {
+        research.academicSources = academicResults;
+      }
+      steps.push({ step: "research", status: "complete", detail: academicResults ? "with academic sources" : "LLM only" });
 
       // ─── Step 3: Draft with full context ────────────────
       const systemPrompt = `You are a senior journalist writing for ${pubTemplate?.name || "a top-tier publication"}.
@@ -958,7 +974,7 @@ No AI clichés. US English. Every sentence earns its place.`;
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `Write a complete article.\n\nTopic: ${input.topic}\n\nResearch:\n${JSON.stringify(research).slice(0, 3000)}\n\nTarget: ${input.wordCount} words. SEO+GEO optimized. Include FAQ section. Markdown with ## headings.`,
+            content: `Write a complete article.\n\nTopic: ${input.topic}\n\nResearch:\n${JSON.stringify({ keyFacts: research.keyFacts, statistics: research.statistics, expertQuotes: research.expertQuotes, uniqueAngle: research.uniqueAngle }).slice(0, 2500)}\n\n${research.academicSources ? `Academic Sources (cite these real papers where relevant):\n${research.academicSources}\n\n` : ""}Target: ${input.wordCount} words. SEO+GEO optimized. Include FAQ section. Markdown with ## headings. Reference real academic papers where appropriate.`,
           },
         ],
         maxTokens: Math.min(input.wordCount * 2, 8192),
