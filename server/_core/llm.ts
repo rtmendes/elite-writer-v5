@@ -342,28 +342,35 @@ export async function* streamLLM(params: InvokeParams): AsyncGenerator<string> {
       ],
     };
 
-    const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${ENV.openrouterApiKey}`,
-        "HTTP-Referer": ENV.appUrl || "https://elitewriter.insightprofit.live",
-        "X-Title": "Elite Writer V5",
-      },
-      body: JSON.stringify(orPayload),
-    });
+    let orResponse;
+    try {
+      orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${ENV.openrouterApiKey}`,
+          "HTTP-Referer": ENV.appUrl || "https://elitewriter.insightprofit.live",
+          "X-Title": "Elite Writer V5",
+        },
+        body: JSON.stringify(orPayload),
+      });
 
-    if (orResponse.ok) {
-      // OpenRouter uses OpenAI-compatible SSE: choices[0].delta.content
-      yield* parseSSEStream(orResponse, "openrouter");
-      return;
+      if (orResponse.ok) {
+        // OpenRouter uses OpenAI-compatible SSE: choices[0].delta.content
+        yield* parseSSEStream(orResponse, "openrouter");
+        return;
+      }
+    } catch (err: any) {
+      console.warn(`[streamLLM] OpenRouter network error (${err?.message}), falling back to Anthropic`);
     }
 
     // If OpenRouter fails and we have Anthropic, fall through
     if (!ENV.anthropicApiKey) {
-      throw new Error(`OpenRouter stream error: ${orResponse.status}`);
+      throw new Error(`OpenRouter stream error: ${orResponse?.status || 'Network error'}`);
     }
-    console.warn(`[streamLLM] OpenRouter streaming failed (${orResponse.status}), falling back to Anthropic`);
+    if (orResponse && !orResponse.ok) {
+      console.warn(`[streamLLM] OpenRouter streaming failed (${orResponse.status}), falling back to Anthropic`);
+    }
   }
 
   // Anthropic streaming fallback
