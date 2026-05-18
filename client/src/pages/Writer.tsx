@@ -8,11 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { useLocation, useRoute } from 'wouter';
 import { trpc } from '@/lib/trpc';
@@ -20,8 +20,9 @@ import {
   PenTool, Save, Send, BarChart3, BookOpen, Target,
   Sparkles, ChevronRight, FileText, Zap, Eye, Download, Building2, Loader2,
   Bot, Image, Package, PanelRightClose, PanelRightOpen, Search,
-  FileDown, FileType, FileCode, Globe, ChevronDown,
+  FileDown, FileType, FileCode, Globe,
   Microscope, FlaskConical, ShieldCheck, AlertTriangle, Ban, CheckCircle2, Info,
+  Timer, Focus, Check, X,
 } from 'lucide-react';
 import { PUBLICATIONS, matchPublications, type Publication } from '@/lib/publications-data';
 import { scoreArticleLocally, DIMENSION_LABELS, getScoreColor, getScoreBgColor, getTierFromScore } from '@/lib/scoring';
@@ -33,18 +34,18 @@ import { ProductPanel } from '@/components/writer/ProductPanel';
 import { DataVizPanel } from '@/components/writer/DataVizPanel';
 import { EnhancementPanel } from '@/components/writer/EnhancementPanel';
 import { SettingsModal, loadSettings, type WriterSettings } from '@/components/writer/SettingsModal';
-import { checkContentQuality, getGradeColor, getGradeBgColor, type QualityReport, type QualityIssue } from '@/lib/quality-checker';
+import { checkContentQuality, getGradeBgColor, type QualityReport, type QualityIssue } from '@/lib/quality-checker';
 import {
   WriterBlockNoteEditor,
   htmlToPlainText,
   htmlToMarkdown,
   parseContentToHtml,
 } from '@/components/writer/BlockNoteEditor';
+import { cn } from '@/lib/utils';
 
 // ─── Research Panel (Sidebar) ───────────────────────────────
-function ResearchPanel({ title, content, onInsertContent }: {
+function ResearchPanel({ title, onInsertContent }: {
   title: string;
-  content: string;
   onInsertContent: (text: string) => void;
 }) {
   const { state } = useApp();
@@ -230,6 +231,26 @@ function ResearchPanel({ title, content, onInsertContent }: {
   );
 }
 
+type InlineSuggestion = {
+  id: string;
+  message: string;
+  phrase: string;
+  replacement: string;
+  action: 'replace' | 'remove';
+};
+
+function getInlineReplacement(issue: QualityIssue): { replacement: string; action: 'replace' | 'remove' } {
+  if (issue.type === 'british') {
+    const match = issue.fix.match(/US English:\s*(.+)$/i);
+    return { replacement: match?.[1]?.trim() || '', action: 'replace' };
+  }
+  if (issue.fix.toLowerCase().includes('remove') || issue.fix.toLowerCase().includes('delete')) {
+    return { replacement: '', action: 'remove' };
+  }
+  const firstOption = issue.fix.split('/')[0]?.split('—')[0]?.trim() || '';
+  return { replacement: firstOption, action: firstOption ? 'replace' : 'remove' };
+}
+
 // ─── Main Writer Component ──────────────────────────────────
 export default function Writer() {
   const { state, addArticle, updateArticle } = useApp();
@@ -274,16 +295,21 @@ export default function Writer() {
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [writerSettings, setWriterSettings] = useState<WriterSettings>(loadSettings);
+  const [focusMode, setFocusMode] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState<string[]>([]);
+  const [suggestionFeedback, setSuggestionFeedback] = useState<Record<string, 'accepted' | 'rejected'>>({});
 
   const activeBrandObj = useMemo(() => state.brands.find(b => b.id === selectedBrandId), [state.brands, selectedBrandId]);
   const wordCount = useMemo(() => content.trim().split(/\s+/).filter(Boolean).length, [content]);
+  const readingTime = useMemo(() => Math.max(1, Math.round(wordCount / 220)), [wordCount]);
   const template = TEMPLATES.find(t => t.id === selectedTemplate);
 
   // Quality report state
   const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
 
   // Load article by route param /writer/:id
-  const articlesQuery = trpc.data.articles.useQuery(undefined, { enabled: !!matchRoute });
+  const articlesQuery = trpc.data.articles.list.useQuery(undefined, { enabled: !!matchRoute });
   useEffect(() => {
     if (!matchRoute || !routeParams?.id) return;
     const id = parseInt(routeParams.id, 10);
@@ -324,6 +350,60 @@ export default function Writer() {
     }, 800);
     return () => clearTimeout(timer);
   }, [content, wordCount]);
+
+  useEffect(() => {
+    if (focusMode) {
+      setSidebarOpen(false);
+    }
+  }, [focusMode]);
+
+  const inlineSuggestions = useMemo<InlineSuggestion[]>(() => {
+    if (!qualityReport) return [];
+    return qualityReport.issues
+      .filter(issue => issue.type === 'slop' || issue.type === 'british')
+      .slice(0, 4)
+      .map((issue, index) => {
+        const normalizedPhrase = issue.phrase.trim().toLowerCase().replace(/\s+/g, '-');
+        const id = `${issue.type}-${normalizedPhrase}-${index}`;
+        const { replacement, action } = getInlineReplacement(issue);
+        return {
+          id,
+          phrase: issue.phrase,
+          message: issue.message,
+          replacement,
+          action,
+        };
+      })
+      .filter(suggestion => !dismissedSuggestionIds.includes(suggestion.id));
+  }, [qualityReport, dismissedSuggestionIds]);
+
+  const applyInlineSuggestion = useCallback((suggestion: InlineSuggestion, accepted: boolean) => {
+    setSuggestionFeedback(prev => ({ ...prev, [suggestion.id]: accepted ? 'accepted' : 'rejected' }));
+
+    if (accepted) {
+      const escaped = suggestion.phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+      setContent(prev => {
+        if (!regex.test(prev)) return prev;
+        if (suggestion.action === 'remove') {
+          return prev.replace(regex, '').replace(/\s{2,}/g, ' ').trim();
+        }
+        return prev.replace(regex, suggestion.replacement);
+      });
+      toast.success('Suggestion applied');
+    } else {
+      toast('Suggestion dismissed');
+    }
+
+    window.setTimeout(() => {
+      setDismissedSuggestionIds(prev => [...prev, suggestion.id]);
+      setSuggestionFeedback(prev => {
+        const next = { ...prev };
+        delete next[suggestion.id];
+        return next;
+      });
+    }, 260);
+  }, [setContent]);
 
   // Publication search
   const pubResults = useMemo(() => {
@@ -449,7 +529,7 @@ export default function Writer() {
         targetPublication: selectedPub?.name,
         template: tmpl?.name,
         brandVoice: brand?.name,
-        model: writerSettings.ai?.model || 'claude-sonnet',
+        model: writerSettings.ai?.defaultModel || 'claude-sonnet',
         wordCount: template?.wordCountRange[1] || 2000,
         saveToDb: true,
       });
@@ -494,6 +574,7 @@ export default function Writer() {
     const md = htmlToMarkdown(editorHtml);
     downloadFile(new Blob([`# ${title}\n\n${md}`], { type: 'text/markdown' }), 'md');
     toast.success('Exported as Markdown');
+    setExportModalOpen(false);
   };
 
   const handleExportHtml = () => {
@@ -510,11 +591,13 @@ a{color:#1a73e8}code{background:#f5f5f5;padding:2px 6px;border-radius:3px;font-s
 ${editorHtml}</body></html>`;
     downloadFile(new Blob([html], { type: 'text/html' }), 'html');
     toast.success('Exported as HTML');
+    setExportModalOpen(false);
   };
 
   const handleExportTxt = () => {
     downloadFile(new Blob([`${title}\n${'='.repeat(title.length)}\n\n${content}`], { type: 'text/plain' }), 'txt');
     toast.success('Exported as Plain Text');
+    setExportModalOpen(false);
   };
 
   const handleExportPdf = () => {
@@ -536,6 +619,7 @@ ${editorHtml}
 <script>setTimeout(()=>{window.print();window.close();},500)</script></body></html>`);
     printWindow.document.close();
     toast.success('PDF print dialog opened');
+    setExportModalOpen(false);
   };
 
   const handleExportGoogleDoc = async () => {
@@ -548,6 +632,7 @@ ${editorHtml}
       if (result.success && result.docUrl) {
         window.open(result.docUrl, '_blank');
         toast.success('Google Doc created — opening in new tab');
+        setExportModalOpen(false);
       }
     } catch (err: any) {
       if (err.message?.includes('not connected') || err.message?.includes('not configured')) {
@@ -790,7 +875,6 @@ ${editorHtml}
           <TabsContent value="research" className="mt-0">
             <ResearchPanel
               title={title}
-              content={content}
               onInsertContent={(text) => insertRichContent(text)}
             />
           </TabsContent>
@@ -987,240 +1071,332 @@ ${editorHtml}
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
       {/* Main Editor */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Toolbar */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-background shrink-0 flex-wrap">
-          {/* Template */}
-          <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-            <SelectTrigger className="w-48 h-8 text-xs">
-              <SelectValue placeholder="Template" />
-            </SelectTrigger>
-            <SelectContent>
-              {TEMPLATES.filter(t => t.category === 'article').map(t => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-              ))}
-              <SelectItem value="---marketing" disabled>--- Marketing ---</SelectItem>
-              {TEMPLATES.filter(t => t.category === 'marketing').map(t => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-              ))}
-              <SelectItem value="---social" disabled>--- Social ---</SelectItem>
-              {TEMPLATES.filter(t => t.category === 'social').map(t => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className={cn(
+          "border-b border-border bg-background/95 backdrop-blur-sm shrink-0",
+          focusMode ? "px-5 py-3" : "px-4 py-2"
+        )}>
+          <div className="flex items-center gap-2 flex-wrap">
+            {!focusMode && (
+              <>
+                <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                  <SelectTrigger className="w-48 h-8 text-xs">
+                    <SelectValue placeholder="Template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATES.filter(t => t.category === 'article').map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                    <SelectItem value="---marketing" disabled>--- Marketing ---</SelectItem>
+                    {TEMPLATES.filter(t => t.category === 'marketing').map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                    <SelectItem value="---social" disabled>--- Social ---</SelectItem>
+                    {TEMPLATES.filter(t => t.category === 'social').map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-          {/* Writing Voice (renamed from Brand Voice) */}
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <Select value={selectedVoice} onValueChange={setSelectedVoice}>
-                    <SelectTrigger className="w-36 h-8 text-xs">
-                      <PenTool className="w-3 h-3 mr-1 shrink-0" />
-                      <SelectValue placeholder="Writing Voice" />
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+                          <SelectTrigger className="w-36 h-8 text-xs">
+                            <PenTool className="w-3 h-3 mr-1 shrink-0" />
+                            <SelectValue placeholder="Writing Voice" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <DropdownMenuLabel className="text-[10px] text-muted-foreground font-normal px-2 py-1">
+                              Writing style & tone preset
+                            </DropdownMenuLabel>
+                            {BRAND_VOICES.map(b => (
+                              <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Writing voice controls tone, style, and content filters</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                {state.brands.length > 0 && (
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <Select value={selectedBrandId} onValueChange={v => { setSelectedBrandId(v); setSelectedProductId(''); }}>
+                            <SelectTrigger className="w-40 h-8 text-xs">
+                              <Building2 className="w-3 h-3 mr-1 shrink-0" />
+                              <SelectValue placeholder="Brand" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <DropdownMenuLabel className="text-[10px] text-muted-foreground font-normal px-2 py-1">
+                                Business entity for monetization
+                              </DropdownMenuLabel>
+                              {state.brands.map(b => (
+                                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">Brand links articles to a business for product CTA tracking</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
+                {activeBrandObj && activeBrandObj.products.length > 0 && (
+                  <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                    <SelectTrigger className="w-40 h-8 text-xs">
+                      <SelectValue placeholder="Product CTA" />
                     </SelectTrigger>
                     <SelectContent>
-                      <DropdownMenuLabel className="text-[10px] text-muted-foreground font-normal px-2 py-1">
-                        Writing style & tone preset
-                      </DropdownMenuLabel>
-                      {BRAND_VOICES.map(b => (
-                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                      <SelectItem value="none">No product CTA</SelectItem>
+                      {activeBrandObj.products.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name} (${p.price})</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                )}
+
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={insertTemplate}>
+                  <FileText className="w-3 h-3" /> Insert Template
+                </Button>
+              </>
+            )}
+
+            <div className="flex-1" />
+
+            <div className="hidden xl:flex items-center gap-2">
+              <Badge variant="outline" className="font-mono text-xs">{wordCount.toLocaleString()} words</Badge>
+              <Badge variant="outline" className="font-mono text-xs"><Timer className="w-3 h-3 mr-1" /> {readingTime} min</Badge>
+              {qualityReport && (
+                <Badge className={cn("font-mono text-xs", getGradeBgColor(qualityReport.grade))}>
+                  Quality {qualityReport.grade}
+                </Badge>
+              )}
+            </div>
+
+            {!focusMode && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                  disabled={scoreMutation.isPending || wordCount < 50}
+                  onClick={handleAiScore}
+                >
+                  {scoreMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  {scoreMutation.isPending ? 'Scoring...' : 'AI Score'}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                  disabled={draftMutation.isPending || !title.trim()}
+                  onClick={handleAiDraft}
+                >
+                  {draftMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                  {draftMutation.isPending ? 'Writing...' : 'AI Draft'}
+                </Button>
+
+                <Button
+                  size="sm"
+                  className="h-8 text-xs gap-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
+                  disabled={pipelineRunning || fullPipelineMutation.isPending || !title.trim()}
+                  onClick={handleFullPipeline}
+                >
+                  {pipelineRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bot className="w-3 h-3" />}
+                  {pipelineRunning ? 'Pipeline...' : 'Full Pipeline'}
+                </Button>
+              </>
+            )}
+
+            <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                  <Download className="w-3 h-3" /> Export
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Export your draft</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground">
+                  Choose a destination format. Preview styles are optimized for editorial readability.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button type="button" className="rounded-xl border border-border p-3 text-left hover:border-primary/35 transition-colors" onClick={handleExportPdf}>
+                    <div className="flex items-center gap-2 text-sm font-medium"><FileDown className="w-4 h-4" /> PDF</div>
+                    <p className="text-xs text-muted-foreground mt-1">Print-ready layout with premium serif typography.</p>
+                  </button>
+                  <button type="button" className="rounded-xl border border-border p-3 text-left hover:border-primary/35 transition-colors" onClick={handleExportHtml}>
+                    <div className="flex items-center gap-2 text-sm font-medium"><FileCode className="w-4 h-4" /> HTML</div>
+                    <p className="text-xs text-muted-foreground mt-1">Formatted web article with headline and metadata.</p>
+                  </button>
+                  <button type="button" className="rounded-xl border border-border p-3 text-left hover:border-primary/35 transition-colors" onClick={handleExportMd}>
+                    <div className="flex items-center gap-2 text-sm font-medium"><FileText className="w-4 h-4" /> Markdown</div>
+                    <p className="text-xs text-muted-foreground mt-1">Clean markdown for CMS and version-controlled workflows.</p>
+                  </button>
+                  <button type="button" className="rounded-xl border border-border p-3 text-left hover:border-primary/35 transition-colors" onClick={handleExportTxt}>
+                    <div className="flex items-center gap-2 text-sm font-medium"><FileType className="w-4 h-4" /> Plain text</div>
+                    <p className="text-xs text-muted-foreground mt-1">Lightweight text export with title header.</p>
+                  </button>
                 </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">Writing voice controls tone, style, and content filters</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+                <Button variant="outline" className="w-full gap-2" onClick={handleExportGoogleDoc} disabled={googleCreateDoc.isPending}>
+                  <Globe className="w-4 h-4" />
+                  {googleCreateDoc.isPending ? 'Creating Google Doc...' : 'Export to Google Docs'}
+                </Button>
+              </DialogContent>
+            </Dialog>
 
-          {/* Brand Entity (only if brands exist) */}
-          {state.brands.length > 0 && (
-            <TooltipProvider delayDuration={300}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
-                    <Select value={selectedBrandId} onValueChange={v => { setSelectedBrandId(v); setSelectedProductId(''); }}>
-                      <SelectTrigger className="w-40 h-8 text-xs">
-                        <Building2 className="w-3 h-3 mr-1 shrink-0" />
-                        <SelectValue placeholder="Brand" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <DropdownMenuLabel className="text-[10px] text-muted-foreground font-normal px-2 py-1">
-                          Business entity for monetization
-                        </DropdownMenuLabel>
-                        {state.brands.map(b => (
-                          <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">Brand links articles to a business for product CTA tracking</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+            <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleSave}>
+              <Save className="w-3 h-3" /> Save
+            </Button>
 
-          {/* Product CTA */}
-          {activeBrandObj && activeBrandObj.products.length > 0 && (
-            <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-              <SelectTrigger className="w-40 h-8 text-xs">
-                <SelectValue placeholder="Product CTA" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No product CTA</SelectItem>
-                {activeBrandObj.products.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.name} (${p.price})</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={insertTemplate}>
-            <FileText className="w-3 h-3" /> Insert Template
-          </Button>
-
-          <div className="flex-1" />
-
-          <span className="text-xs text-muted-foreground font-mono">{wordCount} words</span>
-
-          {scores && (
-            <Badge
-              className={`font-mono text-xs cursor-pointer hover:opacity-80 ${getScoreBgColor(scores.overall)}`}
-              onClick={() => { setSidebarOpen(true); setSidebarTab('score'); }}
-            >
-              <Sparkles className="w-3 h-3 mr-1" />
-              {scores.overall}/10
-            </Badge>
-          )}
-
-          {qualityReport && (
-            <Badge
-              className={`font-mono text-xs cursor-pointer hover:opacity-80 ${getGradeBgColor(qualityReport.grade)}`}
-              onClick={() => { setSidebarOpen(true); setSidebarTab('score'); }}
-            >
-              <ShieldCheck className="w-3 h-3 mr-1" />
-              {qualityReport.grade}{qualityReport.stats.slopCount > 0 ? ` · ${qualityReport.stats.slopCount} slop` : ''}
-            </Badge>
-          )}
-
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
-            disabled={scoreMutation.isPending || wordCount < 50}
-            onClick={handleAiScore}>
-            {scoreMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-            {scoreMutation.isPending ? 'Scoring...' : 'AI Score'}
-          </Button>
-
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
-            disabled={draftMutation.isPending || !title.trim()}
-            onClick={handleAiDraft}>
-            {draftMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
-            {draftMutation.isPending ? 'Writing...' : 'AI Draft'}
-          </Button>
-
-          <Button size="sm" className="h-8 text-xs gap-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
-            disabled={pipelineRunning || fullPipelineMutation.isPending || !title.trim()}
-            onClick={handleFullPipeline}>
-            {pipelineRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bot className="w-3 h-3" />}
-            {pipelineRunning ? 'Pipeline...' : 'Full Pipeline'}
-          </Button>
-
-          {/* Export Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
-                <Download className="w-3 h-3" /> Export <ChevronDown className="w-3 h-3 ml-0.5" />
+            {!focusMode && (
+              <Button size="sm" className="h-8 text-xs gap-1" onClick={handleCreatePitch}>
+                <Send className="w-3 h-3" /> Create Pitch
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuLabel className="text-xs">Download</DropdownMenuLabel>
-              <DropdownMenuItem onClick={handleExportPdf} className="text-xs gap-2">
-                <FileDown className="w-3.5 h-3.5" /> PDF (Print)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportHtml} className="text-xs gap-2">
-                <FileCode className="w-3.5 h-3.5" /> HTML (Formatted)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportTxt} className="text-xs gap-2">
-                <FileType className="w-3.5 h-3.5" /> Plain Text (.txt)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportMd} className="text-xs gap-2">
-                <FileText className="w-3.5 h-3.5" /> Markdown (.md)
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-xs">Google Workspace</DropdownMenuLabel>
-              <DropdownMenuItem onClick={handleExportGoogleDoc} className="text-xs gap-2" disabled={googleCreateDoc.isPending}>
-                <Globe className="w-3.5 h-3.5" />
-                {googleCreateDoc.isPending ? 'Creating...' : 'Create Google Doc'}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
 
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleSave}>
-            <Save className="w-3 h-3" /> Save
-          </Button>
-          <Button size="sm" className="h-8 text-xs gap-1" onClick={handleCreatePitch}>
-            <Send className="w-3 h-3" /> Create Pitch
-          </Button>
+            <SettingsModal onSettingsChange={setWriterSettings} />
 
-          {/* Settings gear */}
-          <SettingsModal onSettingsChange={setWriterSettings} />
+            <Button
+              variant={focusMode ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setFocusMode(prev => !prev)}
+              title={focusMode ? 'Exit focus mode' : 'Enter focus mode'}
+            >
+              <Focus className="w-4 h-4" />
+            </Button>
 
-          {/* Sidebar toggle */}
-          <Button
-            variant="ghost" size="sm"
-            className="h-8 w-8 p-0 hidden lg:flex"
-            onClick={() => setSidebarOpen(prev => !prev)}
-            title={sidebarOpen ? 'Collapse sidebar' : 'Open sidebar'}
-          >
-            {sidebarOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
-          </Button>
-
-          {/* Mobile sidebar trigger (shows as Sheet/drawer on smaller screens) */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 lg:hidden">
-                <PanelRightOpen className="w-4 h-4" />
+            {!focusMode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 hidden lg:flex"
+                onClick={() => setSidebarOpen(prev => !prev)}
+                title={sidebarOpen ? 'Collapse sidebar' : 'Open sidebar'}
+              >
+                {sidebarOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
               </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-80 p-0 overflow-y-auto">
-              {sidebarContent}
-            </SheetContent>
-          </Sheet>
+            )}
+
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 lg:hidden" disabled={focusMode}>
+                  <PanelRightOpen className="w-4 h-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-80 p-0 overflow-y-auto">
+                {sidebarContent}
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+            <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.09em] text-muted-foreground">Word count</p>
+              <p className="text-sm font-semibold">{wordCount.toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.09em] text-muted-foreground">Reading time</p>
+              <p className="text-sm font-semibold">{readingTime} min</p>
+            </div>
+            <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.09em] text-muted-foreground">Quality score</p>
+              <p className="text-sm font-semibold">{qualityReport?.grade ?? '--'}</p>
+            </div>
+            <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.09em] text-muted-foreground">Editorial fit</p>
+              <p className="text-sm font-semibold">{scores ? `${scores.overall}/10` : '--'}</p>
+            </div>
+          </div>
         </div>
 
         {/* Title */}
-        <div className="px-6 pt-6 pb-2">
+        <div className={cn("px-6 pt-6 pb-2", focusMode && "pt-8")}>
           <input
             type="text"
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder="Article Title..."
-            className="w-full text-2xl font-bold bg-transparent border-none outline-none placeholder:text-muted-foreground/40"
-            style={{ fontFamily: "'Merriweather', serif" }}
+            className="writer-reading-surface w-full text-2xl md:text-3xl font-semibold bg-transparent border-none outline-none placeholder:text-muted-foreground/45"
           />
         </div>
 
+        {/* Inline AI suggestions */}
+        {inlineSuggestions.length > 0 && (
+          <div className="px-6 pb-3 space-y-2">
+            {inlineSuggestions.map(suggestion => {
+              const feedback = suggestionFeedback[suggestion.id];
+              return (
+                <div
+                  key={suggestion.id}
+                  className={cn(
+                    "flex items-start justify-between gap-3 rounded-xl border border-border/80 bg-card/70 px-3 py-2 transition-all duration-300",
+                    feedback === 'accepted' && "opacity-0 translate-x-4 scale-[0.98]",
+                    feedback === 'rejected' && "opacity-0 -translate-x-4 scale-[0.98]"
+                  )}
+                >
+                  <div>
+                    <p className="text-xs font-medium">AI suggestion</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{suggestion.message}</p>
+                    {suggestion.action === 'replace' && suggestion.replacement && (
+                      <p className="text-[11px] text-primary mt-1">Replace "{suggestion.phrase}" with "{suggestion.replacement}"</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px]" onClick={() => applyInlineSuggestion(suggestion, true)}>
+                      <Check className="w-3 h-3" /> Accept
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 gap-1 text-[11px]" onClick={() => applyInlineSuggestion(suggestion, false)}>
+                      <X className="w-3 h-3" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Rich Text Editor (BlockNote) */}
-        <div className="flex-1 overflow-hidden">
-          <WriterBlockNoteEditor
-            value={editorHtml}
-            onValueChange={setEditorHtml}
-            placeholder="Start writing your article... Type / for slash commands."
-          />
+        <div className={cn("flex-1 overflow-hidden", !focusMode && "px-4 pb-4")}>
+          <div className={cn(
+            "h-full overflow-hidden writer-reading-surface",
+            !focusMode && "rounded-2xl border border-border/80 bg-card/35 shadow-sm"
+          )}>
+            <WriterBlockNoteEditor
+              value={editorHtml}
+              onValueChange={setEditorHtml}
+              placeholder="Start writing your article... Type / for slash commands."
+            />
+          </div>
         </div>
       </div>
 
-      {/* Inline Sidebar — visible on lg+ when open */}
-      {sidebarOpen && (
-        <aside className="w-80 border-l border-border bg-card overflow-y-auto hidden lg:block shrink-0 transition-all">
+      {/* Inline Sidebar — visible on lg+ with animated collapse */}
+      <aside
+        className={cn(
+          "hidden lg:block shrink-0 bg-card/70 transition-all duration-300 border-l border-border overflow-hidden",
+          !focusMode && sidebarOpen ? "w-80 opacity-100" : "w-0 opacity-0 border-l-0 pointer-events-none"
+        )}
+      >
+        <div className={cn("h-full overflow-y-auto transition-opacity duration-200", !focusMode && sidebarOpen ? "opacity-100" : "opacity-0")}>
           {sidebarContent}
-        </aside>
-      )}
+        </div>
+      </aside>
     </div>
   );
 }

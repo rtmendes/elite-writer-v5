@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("rmreal@gmail.com");
+  const [password, setPassword] = useState("2001done");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [, navigate] = useLocation();
@@ -112,6 +112,9 @@ export default function Login() {
         </form>
 
         <p className="text-center text-gray-500 text-xs mt-8">
+          Demo credentials are pre-filled for faster access.
+        </p>
+        <p className="text-center text-gray-500 text-xs mt-1">
           Elite Writer v5 • Powered by AI Intelligence
         </p>
       </div>

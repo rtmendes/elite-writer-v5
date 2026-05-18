@@ -17,6 +17,7 @@ import '@blocknote/core/fonts/inter.css'
 import '@blocknote/mantine/style.css'
 import { MantineProvider, createTheme } from '@mantine/core'
 import '@mantine/core/styles.css'
+import { useTheme } from '@/contexts/ThemeContext'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -191,6 +192,7 @@ export function WriterBlockNoteEditor({
   placeholder = 'Start writing your article... Type / for slash commands.',
   readOnly = false,
 }: WriterBlockNoteEditorProps) {
+  const { theme } = useTheme()
   const [showSource, setShowSource] = useState(false)
   const [sourceHtml, setSourceHtml] = useState('')
   const onChangeRef = useRef(onValueChange)
@@ -204,7 +206,7 @@ export function WriterBlockNoteEditor({
     domAttributes: {
       editor: {
         class: 'writer-blocknote-editor',
-        'data-color-scheme': 'dark',
+        'data-color-scheme': theme,
       },
     },
   })
@@ -292,7 +294,7 @@ export function WriterBlockNoteEditor({
   }
 
   return (
-    <MantineProvider theme={mantineTheme} forceColorScheme="dark">
+    <MantineProvider theme={mantineTheme} forceColorScheme={theme}>
       <div className="writer-editor-wrapper h-full flex flex-col overflow-hidden">
         {/* Hint toolbar */}
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/50 shrink-0">
@@ -337,7 +339,7 @@ export function WriterBlockNoteEditor({
           <div className="writer-blocknote-container flex-1 overflow-y-auto">
             <BlockNoteView
               editor={editor}
-              theme="dark"
+              theme={theme}
               sideMenu={true}
               slashMenu={true}
               formattingToolbar={true}
