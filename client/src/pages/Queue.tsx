@@ -51,6 +51,7 @@ type QueueItem = {
   estimatedReadTime: number;
   aiModel: string;
   tags: string[];
+  previewSnippet: string;
 };
 
 const STATUS_CONFIG: Record<QueueStatus, { label: string; color: string; icon: any }> = {
@@ -72,7 +73,7 @@ export default function Queue() {
   const [pipelineStep, setPipelineStep] = useState('');
 
   // Fetch existing articles from the database
-  const articlesQuery = trpc.data.articles.useQuery(undefined, { staleTime: 30_000 });
+  const articlesQuery = trpc.data.articles.list.useQuery(undefined, { staleTime: 30_000 });
   const articles = articlesQuery.data ?? [];
 
   // Backend mutations
@@ -103,6 +104,7 @@ export default function Queue() {
         estimatedReadTime: Math.max(1, Math.round(wordCount / 250)),
         aiModel: 'claude-sonnet',
         tags: [article.brandVoice].filter(Boolean),
+        previewSnippet: getPreviewSnippet(content),
       };
     });
   }, [articles]);
@@ -331,9 +333,9 @@ export default function Queue() {
         </div>
 
         {/* ─── Article List ─── */}
-        <div className="space-y-2">
+        <div className="grid gap-3 md:grid-cols-2">
           {filteredItems.length === 0 ? (
-            <Card className="border-border">
+            <Card className="border-border md:col-span-2">
               <CardContent className="py-16 text-center">
                 <Inbox className="w-12 h-12 mx-auto text-muted-foreground opacity-30 mb-4" />
                 <h3 className="text-lg font-semibold">Queue is empty</h3>
@@ -397,9 +399,9 @@ function QueueCard({ item, onOpenInWriter, onDelete, onUpdateStatus }: {
   const StatusIcon = config.icon;
 
   return (
-    <Card className="border-border hover:border-primary/30 transition-colors group">
+    <Card className="border-border/80 bg-card/70 hover:border-primary/35 transition-colors group h-full">
       <CardContent className="p-4">
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-4 h-full">
           {/* Score circle with agent overlay */}
           <div className="relative shrink-0">
             <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${
@@ -416,7 +418,7 @@ function QueueCard({ item, onOpenInWriter, onDelete, onUpdateStatus }: {
           </div>
 
           {/* Main content */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 flex flex-col">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <h3 className="font-semibold text-sm leading-tight line-clamp-1 group-hover:text-primary transition-colors">
@@ -444,6 +446,10 @@ function QueueCard({ item, onOpenInWriter, onDelete, onUpdateStatus }: {
                 </div>
               </div>
 
+              <p className="mt-3 text-[12px] text-muted-foreground leading-relaxed line-clamp-3">
+                {item.previewSnippet}
+              </p>
+
               {/* Actions */}
               <div className="flex items-center gap-1 shrink-0">
                 {(item.status === 'queued' || item.status === 'review') && (
@@ -455,17 +461,6 @@ function QueueCard({ item, onOpenInWriter, onDelete, onUpdateStatus }: {
                   >
                     <Eye className="w-3 h-3" />
                     Review
-                  </Button>
-                )}
-                {item.status === 'draft' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs gap-1"
-                    onClick={() => onOpenInWriter(item.id)}
-                  >
-                    <PenTool className="w-3 h-3" />
-                    Edit
                   </Button>
                 )}
                 <DropdownMenu>
@@ -497,7 +492,7 @@ function QueueCard({ item, onOpenInWriter, onDelete, onUpdateStatus }: {
             </div>
 
             {/* Meta row */}
-            <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-[10px] text-muted-foreground">
               <span className="flex items-center gap-1">
                 <FileText className="w-2.5 h-2.5" /> {item.wordCount.toLocaleString()} words
               </span>
@@ -524,6 +519,17 @@ function QueueCard({ item, onOpenInWriter, onDelete, onUpdateStatus }: {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
+
+function getPreviewSnippet(content: string): string {
+  const plain = (content || '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|blockquote)>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!plain) return 'No draft content yet. Open in Writer to continue refining this piece.';
+  return plain.length > 180 ? `${plain.slice(0, 180)}...` : plain;
+}
 
 function mapArticleStatus(dbStatus: string): QueueStatus {
   switch (dbStatus) {

@@ -99,31 +99,69 @@ export default function Settings() {
     { id: 'data' as const, label: 'Data', icon: Database },
   ];
 
+  const tabDescriptions: Record<typeof tabs[number]['id'], { title: string; description: string }> = {
+    llm: {
+      title: 'Model routing and provider configuration',
+      description: 'Connect providers, choose preferred fallback behavior, and tune cost-vs-quality strategy.',
+    },
+    news: {
+      title: 'Live intelligence source setup',
+      description: 'Manage external news APIs powering the research and trending pipelines.',
+    },
+    writing: {
+      title: 'Editorial defaults',
+      description: 'Set baseline voice and daily output targets for all writing workflows.',
+    },
+    financial: {
+      title: 'Revenue planning',
+      description: 'Track target revenue and translate goals into article and pitch volume.',
+    },
+    usage: {
+      title: 'AI usage telemetry',
+      description: 'Monitor token usage, provider spend, and workload distribution.',
+    },
+    data: {
+      title: 'Data lifecycle controls',
+      description: 'Inspect system footprint, export snapshots, and manage local data state.',
+    },
+  };
+
   const configuredCount = Object.values(providerStatus).filter(p => p.configured).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <SettingsIcon className="w-7 h-7 text-violet-400" /> Settings
+          <h1 className="text-2xl font-semibold flex items-center gap-3">
+            <SettingsIcon className="w-7 h-7 text-primary" /> Settings
           </h1>
-          <p className="text-sm text-zinc-400 mt-1">{configuredCount} providers configured — Cost mode: {aiConfig.cost_mode}</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {configuredCount} providers configured · Cost mode: <span className="capitalize">{aiConfig.cost_mode}</span>
+          </p>
         </div>
-        <button onClick={saveAll} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors">
+        <button onClick={saveAll} className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors">
           <Save className="w-4 h-4" /> Save All
         </button>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 p-1 bg-zinc-900/50 rounded-lg border border-zinc-800 overflow-x-auto">
+      <div className="flex gap-1 p-1 bg-card rounded-lg border border-border overflow-x-auto">
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${activeTab === tab.id ? 'bg-violet-600/20 text-violet-300 border border-violet-500/30' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'}`}>
+            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+              activeTab === tab.id
+                ? 'bg-primary/15 text-primary border border-primary/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/70'
+            }`}>
             <tab.icon className="w-4 h-4" /> {tab.label}
           </button>
         ))}
+      </div>
+
+      <div className="rounded-xl border border-border bg-card/70 p-4">
+        <p className="text-sm font-medium">{tabDescriptions[activeTab].title}</p>
+        <p className="text-xs text-muted-foreground mt-1">{tabDescriptions[activeTab].description}</p>
       </div>
 
       {/* LLM Providers Tab */}
