@@ -1,0 +1,24 @@
+# Elite Writer v5 — Cursor Agent Rules
+
+## CRITICAL: This is the CANONICAL Elite Writer repo
+- The old `elite-writer-app` repo is ARCHIVED. Do not reference or deploy to it.
+- Live URL: elitewriter.insightprofit.live (Oracle VPS)
+
+## Never Delete
+- client/ directory or any page components
+- server/ directory or any routers
+- drizzle/ schema or migrations
+- shared/ types
+
+## Always
+- Work in feature branches
+- Run `bun run build` before committing
+- Preserve existing features when adding new ones
+- Follow Drizzle ORM patterns for database operations
+- Use existing Mantine/Radix/Tailwind component patterns
+
+## Code Style
+- TypeScript strict mode
+- Functional React components with hooks
+- Express routers follow existing patterns in server/
+- Database queries via Drizzle ORM (never raw SQL unless necessary)

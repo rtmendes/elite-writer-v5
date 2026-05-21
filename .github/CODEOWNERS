@@ -1,0 +1,6 @@
+# Elite Writer v5 — Code Owners
+# @rtmendes must approve changes to core directories
+client/    @rtmendes
+server/    @rtmendes
+drizzle/   @rtmendes
+shared/    @rtmendes
