@@ -46,6 +46,7 @@ async function generate({ file, prompt }) {
     body: JSON.stringify({
       model: MODEL,
       modalities: ["image", "text"],
+      max_tokens: 4000,
       messages: [{ role: "user", content: prompt }],
     }),
   });
