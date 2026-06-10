@@ -4,13 +4,27 @@
 // outlet data are injected server-side; results write back into the row's
 // fields and notes doc so every agent output is sortable and chartable.
 import { runTask } from "./agent";
-import { db, makeView, uid, updateDatabase, updateRow } from "./db";
+import { createRow, db, makeView, uid, updateDatabase, updateRow } from "./db";
 import { enqueue } from "./sync";
-import type { Database, Field, Row } from "./types";
+import { PUBLICATIONS } from "./publications-data";
+import type { Database, Field, Row, SelectOption } from "./types";
 
-// ── Idempotent seeding of the AI Ledger database ───────────────────────────
-export async function ensureIntelligence() {
-  if (await db.kv.get("seed:ledger")) return;
+const opt = (name: string, color: string): SelectOption => ({ id: uid(), name, color });
+
+// ── Idempotent seeding of the intelligence databases ───────────────────────
+// Single-flight: React StrictMode double-mounts the boot effect, which would
+// otherwise seed each database twice before the kv flag is written.
+let intelPromise: Promise<void> | null = null;
+export function ensureIntelligence(): Promise<void> {
+  if (!intelPromise) intelPromise = doEnsureIntelligence();
+  return intelPromise;
+}
+async function doEnsureIntelligence() {
+  await ensurePublications();
+  if (await db.kv.get("seed:ledger")) {
+    await ensureClaimLedger();
+    return;
+  }
   const exists = (await db.databases.toArray()).some((d) => d.name === "AI Ledger");
   if (!exists) {
     const now = Date.now();
@@ -40,6 +54,144 @@ export async function ensureIntelligence() {
   }
   await db.kv.put({ key: "seed:ledger", value: true });
   await ensureClaimLedger();
+}
+
+// ── Publications: rich, fully-editable outlet intelligence ─────────────────
+// Fields mirror the legacy database (category, traffic, pay, preferred topics,
+// best editors, submission info, application form, pitch difficulty, status,
+// notes). You can edit any cell, add fields, and add rows like any database.
+// The v2 migration UPGRADES an existing thin Publications table in place:
+// it adds missing fields, backfills empty cells, and inserts new outlets —
+// never overwriting anything you've already edited.
+const PUB_FIELD_DEFS: Array<{ key: string; name: string; type: Field["type"]; width: number }> = [
+  { key: "name", name: "Publication", type: "text", width: 220 },
+  { key: "logo", name: "Logo", type: "image", width: 90 },
+  { key: "category", name: "Category", type: "select", width: 150 },
+  { key: "website", name: "Website", type: "url", width: 180 },
+  { key: "traffic", name: "Monthly Traffic", type: "text", width: 150 },
+  { key: "pay", name: "Pay Range", type: "text", width: 170 },
+  { key: "payMax", name: "Pay Max ($)", type: "currency", width: 120 },
+  { key: "topics", name: "Preferred Topics", type: "longtext", width: 300 },
+  { key: "editors", name: "Best Editors to Pitch", type: "longtext", width: 300 },
+  { key: "submission", name: "Submission Info", type: "longtext", width: 300 },
+  { key: "applicationForm", name: "Application Form", type: "url", width: 200 },
+  { key: "difficulty", name: "Pitch Difficulty", type: "rating", width: 130 },
+  { key: "status", name: "Status", type: "select", width: 150 },
+  { key: "notes", name: "Notes", type: "longtext", width: 260 },
+];
+
+function buildPubFields(): { fields: Field[]; byKey: Map<string, Field> } {
+  const byKey = new Map<string, Field>();
+  const fields = PUB_FIELD_DEFS.map((def) => {
+    const f: Field = { id: uid(), name: def.name, type: def.type, width: def.width };
+    if (def.key === "category") {
+      const cats = [...new Set(PUBLICATIONS.map((p) => p.category).filter(Boolean))] as string[];
+      const colors = ["blue", "green", "purple", "orange", "teal", "pink", "red", "yellow", "gray"];
+      f.options = cats.slice(0, 30).map((c, i) => opt(c, colors[i % colors.length]));
+    }
+    if (def.key === "status") {
+      f.options = [opt("Not pitched", "gray"), opt("Researching", "purple"), opt("Pitched", "blue"), opt("Accepted", "green"), opt("Rejected", "red")];
+    }
+    byKey.set(def.key, f);
+    return f;
+  });
+  return { fields, byKey };
+}
+
+function pubRowValues(p: (typeof PUBLICATIONS)[number], byKey: Map<string, Field>): Record<string, unknown> {
+  const v: Record<string, unknown> = {};
+  for (const def of PUB_FIELD_DEFS) {
+    const field = byKey.get(def.key)!;
+    const raw = (p as unknown as Record<string, unknown>)[def.key];
+    if (def.key === "category" && raw) {
+      v[field.id] = field.options?.find((o) => o.name === raw)?.id ?? null;
+    } else if (def.key === "status") {
+      v[field.id] = field.options?.[0].id ?? null; // Not pitched
+    } else if (raw !== undefined && raw !== null && raw !== "") {
+      v[field.id] = raw;
+    }
+  }
+  return v;
+}
+
+async function ensurePublications() {
+  const existing = (await db.databases.toArray()).find((d) => d.name === "Publications");
+
+  // Fresh install: build the full rich database
+  if (!existing) {
+    if (await db.kv.get("seed:publications:v2")) return;
+    const now = Date.now();
+    const { fields, byKey } = buildPubFields();
+    const database: Database = {
+      id: uid(),
+      name: "Publications",
+      icon: "🏛️",
+      description: `${PUBLICATIONS.length} outlets that pay — category, traffic, pay range, preferred topics, best editors to pitch, submission info. Fully editable: change any cell, add fields, add outlets.`,
+      fields,
+      views: [
+        { ...makeView("table", "All Outlets"), sorts: [{ fieldId: byKey.get("payMax")!.id, dir: "desc" }] },
+        { ...makeView("kanban", "By Status"), groupBy: byKey.get("status")!.id },
+        { ...makeView("gallery", "Cards"), thumbnailField: byKey.get("logo")!.id },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.databases.add(database);
+    void enqueue("databases", database.id, "upsert");
+    let order = now;
+    for (const p of PUBLICATIONS) {
+      const row: Row = { id: uid(), dbId: database.id, values: pubRowValues(p, byKey), sortOrder: order++, createdAt: now, updatedAt: now };
+      await db.rows.add(row);
+      void enqueue("rows", row.id, "upsert");
+    }
+    await db.kv.put({ key: "seed:publications:v2", value: true });
+    return;
+  }
+
+  // Upgrade path: a thin Publications table already exists (the 4-field seed).
+  // Add missing fields, backfill empty cells, add new outlets — non-destructive.
+  if (await db.kv.get("seed:publications:v2")) return;
+  const fresh = (await db.databases.get(existing.id))!;
+  const fieldByName = new Map(fresh.fields.map((f) => [f.name.toLowerCase(), f]));
+  const addedFields: Field[] = [];
+  const keyToField = new Map<string, Field>();
+  for (const def of PUB_FIELD_DEFS) {
+    let field = fieldByName.get(def.name.toLowerCase());
+    if (!field) {
+      const fb = buildPubFields().byKey.get(def.key)!;
+      field = { ...fb, id: uid() };
+      addedFields.push(field);
+    }
+    keyToField.set(def.key, field);
+  }
+  if (addedFields.length > 0) {
+    await updateDatabase(fresh.id, { fields: [...fresh.fields, ...addedFields] });
+  }
+
+  const rows = await db.rows.where("dbId").equals(fresh.id).toArray();
+  const titleFieldId = fresh.fields[0].id;
+  const byNameRow = new Map(rows.map((r) => [String(r.values[titleFieldId] ?? "").trim().toLowerCase(), r]));
+  let order = Date.now();
+  for (const p of PUBLICATIONS) {
+    const match = byNameRow.get(p.name.toLowerCase());
+    const richValues = pubRowValues(p, keyToField);
+    if (match) {
+      // backfill empty cells only — preserve any edits
+      const merged = { ...match.values };
+      let changed = false;
+      for (const [fid, val] of Object.entries(richValues)) {
+        if (merged[fid] === undefined || merged[fid] === null || merged[fid] === "") {
+          merged[fid] = val;
+          changed = true;
+        }
+      }
+      if (changed) await updateRow(match.id, { values: merged });
+    } else {
+      await createRow(fresh.id, richValues);
+      order++;
+    }
+  }
+  await db.kv.put({ key: "seed:publications:v2", value: true });
 }
 
 async function ensureClaimLedger() {

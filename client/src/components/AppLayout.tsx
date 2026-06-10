@@ -8,7 +8,7 @@ import {
   BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
   Zap, Menu, Building2, Moon, Sun, Inbox, Loader2,
   MessageSquare, Library, Globe, Map, Users,
-  Flame, Calendar, Mic, Palette,
+  Flame, Calendar, Mic, Palette, ChevronDown,
   LayoutGrid,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -69,6 +69,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem("ew_nav_sections") ?? "{}"); } catch { return {}; }
+  });
   const { theme, toggleTheme, switchable } = useTheme();
   const { loading: authLoading, isAuthenticated } = useAuth({ redirectOnUnauthenticated: true });
 
@@ -126,14 +129,24 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3">
-            {NAV_SECTIONS.map(section => (
+            {NAV_SECTIONS.map(section => {
+              const sectionOpen = collapsed || openSections[section.title] !== false;
+              return (
               <div key={section.title} className="space-y-1.5">
                 {!collapsed && (
-                  <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">
-                    {section.title}
-                  </p>
+                  <button
+                    onClick={() => {
+                      const next = { ...openSections, [section.title]: openSections[section.title] === false };
+                      setOpenSections(next);
+                      try { localStorage.setItem("ew_nav_sections", JSON.stringify(next)); } catch { /* ignore */ }
+                    }}
+                    className="w-full flex items-center justify-between px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors"
+                  >
+                    <span>{section.title}</span>
+                    <ChevronDown className={cn("w-3 h-3 transition-transform duration-200", !sectionOpen && "-rotate-90")} />
+                  </button>
                 )}
-                {section.items.map((item) => {
+                {sectionOpen && section.items.map((item) => {
                   const isActive = item.path === '/' ? location === '/' : location.startsWith(item.path);
                   return (
                     <Link
@@ -161,7 +174,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   );
                 })}
               </div>
-            ))}
+              );
+            })}
           </nav>
 
           {/* Collapse toggle */}

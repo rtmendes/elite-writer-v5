@@ -228,11 +228,13 @@ export default function WorkspaceShell() {
 
   useEffect(() => {
     (async () => {
-      await pullAll();
+      // Render from local cache immediately; never block boot on the network.
       await seedIfEmpty();
       await ensureIntelligence();
-      startSync();
       setReady(true);
+      // Reconcile with MySQL in the background.
+      void pullAll();
+      startSync();
     })();
     const off = onSyncStatus(setSyncStatus);
     const onHash = () => setHash(window.location.hash);
