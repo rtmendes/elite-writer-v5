@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { like } from "drizzle-orm";
 import { publicProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
+import { getDb } from "../db";
+import { publications } from "../../drizzle/schema";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GAP #2 + #3: Publication SOP data for server-side AI scoring & drafting
@@ -86,14 +89,48 @@ export const aiRouter = router({
         content: z.string(),
         targetPublication: z.string().optional(),
         brandVoice: z.string().optional(),
+        audienceAvatar: z.string().optional(),
+        editorPreferences: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
+      // Reader avatar + editor preferences: explicit input wins, then the
+      // publications table, then the static SOP audience entry, then inference.
+      let audienceAvatar = input.audienceAvatar || "";
+      let editorPreferences = input.editorPreferences || "";
+      if (input.targetPublication && (!audienceAvatar || !editorPreferences)) {
+        try {
+          const db = await getDb();
+          if (!db) throw new Error("no db");
+          const rows = await db
+            .select()
+            .from(publications)
+            .where(like(publications.name, `%${input.targetPublication}%`))
+            .limit(1);
+          const pub = rows[0];
+          if (pub) {
+            if (!audienceAvatar && pub.audienceAvatar) audienceAvatar = pub.audienceAvatar;
+            if (!editorPreferences && pub.editorPreferences) editorPreferences = pub.editorPreferences;
+          }
+        } catch {
+          /* publications lookup is best-effort */
+        }
+        if (!audienceAvatar) {
+          const sop = PUBLICATION_INSTRUCTIONS[input.targetPublication.toLowerCase()];
+          if (sop?.audience) audienceAvatar = sop.audience;
+        }
+      }
+      const readerBlock = audienceAvatar
+        ? `\n\nTHE READER (avatar — judge reader_resonance against THIS person):\n${audienceAvatar}`
+        : "\n\nTHE READER: no avatar provided — infer the publication's typical reader and judge reader_resonance against that profile.";
+      const editorBlock = editorPreferences
+        ? `\n\nTHE EDITOR (the gatekeeper's documented preferences — judge editor_alignment against these):\n${editorPreferences}`
+        : "\n\nTHE EDITOR: no preferences provided — infer what this publication's editors consistently accept and reject.";
       const result = await invokeLLM({
         messages: [
           {
             role: "system",
-            content: `You are a Bloomberg-caliber editorial scoring engine. Score articles on 11 dimensions used by top-tier publications. Apply publication-specific standards when a target publication is specified. Return ONLY valid JSON with no markdown formatting.${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ''}`,
+            content: `You are a Bloomberg-caliber editorial scoring engine. Score articles on 13 dimensions used by top-tier publications. Apply publication-specific standards when a target publication is specified. Return ONLY valid JSON with no markdown formatting.${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ''}${readerBlock}${editorBlock}`,
           },
           {
             role: "user",
@@ -120,7 +157,9 @@ Return JSON with this exact structure:
     "seo": { "score": <0-100>, "feedback": "<specific feedback>" },
     "actionability": { "score": <0-100>, "feedback": "<specific feedback>" },
     "timeliness": { "score": <0-100>, "feedback": "<specific feedback>" },
-    "authority": { "score": <0-100>, "feedback": "<specific feedback>" }
+    "authority": { "score": <0-100>, "feedback": "<specific feedback>" },
+    "reader_resonance": { "score": <0-100>, "feedback": "<does it speak to THE READER's role, pains, vocabulary, sophistication>" },
+    "editor_alignment": { "score": <0-100>, "feedback": "<does it match THE EDITOR's documented preferences and avoid their pet peeves>" }
   },
   "summary": "<2-3 sentence editorial assessment>",
   "improvements": ["<improvement 1>", "<improvement 2>", "<improvement 3>"],
