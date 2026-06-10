@@ -2,7 +2,46 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { FilePlus2, DatabaseZap } from "lucide-react";
 import React from "react";
 import { createDatabase, createPage, db } from "../db";
+import { computeRevenue, getRevenueGoal, setRevenueGoal } from "../finance";
 import { formatCurrency } from "../ui";
+import { useState } from "react";
+
+function RevenueTracker({ navigate }: { navigate: (hash: string) => void }) {
+  const databases = useLiveQuery(() => db.databases.toArray(), []) ?? [];
+  const rows = useLiveQuery(() => db.rows.toArray(), []) ?? [];
+  const [goal, setGoalState] = useState(getRevenueGoal());
+  const r = computeRevenue(databases, rows, goal);
+  if (!r) return null;
+  const month = new Date().toLocaleDateString("en-US", { month: "long" });
+  return (
+    <>
+      <div className="dash-section-title">Revenue — {month} goal</div>
+      <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow)", padding: "16px 18px", marginBottom: 26 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, color: "var(--text-soft)" }}>Monthly goal $</span>
+          <input className="input" type="number" style={{ width: 110 }} value={goal}
+            onChange={(e) => { const v = Number(e.target.value) || 0; setGoalState(v); setRevenueGoal(v); }} />
+          <div style={{ flex: 1, minWidth: 160, height: 12, borderRadius: 99, background: "var(--bg-active)", overflow: "hidden", position: "relative" }}>
+            <div style={{ width: `${r.pct}%`, height: "100%", background: "var(--accent)" }} />
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 600, minWidth: 90, textAlign: "right" }}>{Math.round(r.pct)}% of goal</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+          <div><div className="stat-value" style={{ fontSize: 22, color: "var(--tag-green-fg)" }}>{formatCurrency(r.earned) || "$0"}</div><div className="stat-label">Earned (published)</div></div>
+          <div><div className="stat-value" style={{ fontSize: 22 }}>{formatCurrency(r.inflight) || "$0"}</div><div className="stat-label">In flight ({r.liveCount} live)</div></div>
+          <div><div className="stat-value" style={{ fontSize: 22 }}>{formatCurrency(r.projected) || "$0"}</div><div className="stat-label">Total projected</div></div>
+          <div><div className="stat-value" style={{ fontSize: 22, color: r.earned >= r.goal ? "var(--tag-green-fg)" : "var(--text)" }}>{formatCurrency(Math.max(0, r.goal - r.earned)) || "$0"}</div><div className="stat-label">Gap to goal</div></div>
+        </div>
+        {r.needToHitGoal > 0 && r.avgFee > 0 && (
+          <div style={{ fontSize: 12.5, color: "var(--text-soft)", marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+            To close the gap: <b style={{ color: "var(--text)" }}>~{r.needToHitGoal} more article{r.needToHitGoal === 1 ? "" : "s"}</b> at your average fee of {formatCurrency(r.avgFee)}.
+            <span style={{ cursor: "pointer", color: "var(--accent)", marginLeft: 8 }} onClick={() => { const p = databases.find((d) => d.name === "Article Pipeline"); if (p) navigate(`#/db/${p.id}`); }}>open pipeline →</span>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
 
 function AgentActivity({ navigate }: { navigate: (hash: string) => void }) {
   const databases = useLiveQuery(() => db.databases.toArray(), []) ?? [];
@@ -117,6 +156,7 @@ export function Dashboard({ navigate }: { navigate: (hash: string) => void }) {
           </button>
         </div>
 
+        <RevenueTracker navigate={navigate} />
         <AgentActivity navigate={navigate} />
 
         <div className="dash-section-title">Jump back in</div>

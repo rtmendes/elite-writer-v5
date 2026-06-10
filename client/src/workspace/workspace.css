@@ -286,7 +286,7 @@ tr:hover .row-open-btn, .gallery-card:hover .row-open-btn, .list-row:hover .row-
 .list-meta { display: flex; gap: 6px; align-items: center; color: var(--text-soft); font-size: 12.5px; flex-wrap: wrap; }
 
 /* ── Page editor ── */
-.page-canvas { max-width: 860px; margin: 0 auto; padding: 36px 48px 200px; }
+.page-canvas { max-width: 1100px; margin: 0 auto; padding: 36px 64px 200px; }
 .page-icon-btn { font-size: 56px; background: none; border: none; cursor: pointer; padding: 0; line-height: 1; border-radius: 8px; }
 .page-icon-btn:hover { background: var(--bg-hover); }
 .page-title-input {

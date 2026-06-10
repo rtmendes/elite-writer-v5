@@ -3,13 +3,141 @@ import "@blocknote/mantine/style.css";
 import { BlockNoteView } from "@blocknote/mantine";
 import { useCreateBlockNote } from "@blocknote/react";
 import React, { useMemo, useRef, useState } from "react";
-import { Loader2, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Loader2, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { deleteRow, setRowValue, updateRow } from "../db";
-import { createOffer, matchPublications, researchBrief, scoreIdea, tournamentDraft, verifyFacts } from "../intel";
+import {
+  buildOutline, createOffer, getOutlineSuggestions, matchPublications, researchBrief,
+  scoreIdea, tournamentDraft, verifyFacts, writeFullArticle,
+} from "../intel";
 import type { Database, Row } from "../types";
 import { Modal } from "../ui";
 import { Cell } from "./cells";
 import { rowTitle } from "./query";
+
+const STAGES = ["Idea", "Research", "Outline", "Draft", "Edit", "Submit"] as const;
+
+function currentStage(database: Database, row: Row): string {
+  const sf = database.fields.find((f) => f.name.toLowerCase() === "status" && f.type === "select");
+  const name = sf ? sf.options?.find((o) => o.id === row.values[sf.id])?.name ?? "" : "";
+  const hit = STAGES.find((s) => name.toLowerCase().includes(s.toLowerCase()));
+  return hit ?? "Idea";
+}
+
+// ── The article assembly line: drives Status stage-by-stage ─────────────────
+function WorkflowBar({ database, row, onDone }: { database: Database; row: Row; onDone: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Array<{ area: string; suggestion: string }> | null>(null);
+  const [accepted, setAccepted] = useState<Record<number, boolean>>({});
+  const stage = currentStage(database, row);
+
+  const run = async (label: string, fn: () => Promise<unknown>) => {
+    setBusy(label);
+    setError(null);
+    try {
+      await fn();
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const step = async (st: string) => {
+    if (st === "Idea") await scoreIdea(database, row);
+    else if (st === "Research") await researchBrief(database, row);
+    else if (st === "Outline") await buildOutline(database, row);
+  };
+
+  // Single step (stops at Outline for approval) or auto-chain Idea→Research→Outline.
+  const runStage = (auto = false) =>
+    run(auto ? "auto" : "stage", async () => {
+      if (!auto) {
+        await step(stage);
+        if (stage === "Outline") setSuggestions(await getOutlineSuggestions(database, row));
+        return;
+      }
+      const startIdx = STAGES.indexOf(stage as never);
+      for (const target of ["Idea", "Research", "Outline"]) {
+        if (startIdx <= STAGES.indexOf(target as never)) await step(target);
+      }
+      setSuggestions(await getOutlineSuggestions(database, row));
+    });
+
+  const writeDraft = (withSuggestions: boolean) =>
+    run("draft", async () => {
+      const picks = withSuggestions && suggestions ? suggestions.filter((_, i) => accepted[i]).map((x) => x.suggestion) : [];
+      await writeFullArticle(database, row, picks);
+      setSuggestions(null);
+    });
+
+  return (
+    <div style={{ gridColumn: "1 / -1", border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg-raised)", padding: "10px 12px", marginBottom: 8 }}>
+      {/* stepper */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
+        {STAGES.map((s, i) => {
+          const active = s === stage;
+          const done = STAGES.indexOf(stage as never) > i;
+          return (
+            <React.Fragment key={s}>
+              <span style={{
+                fontSize: 11.5, fontWeight: active ? 700 : 500, padding: "2px 8px", borderRadius: 99,
+                background: active ? "var(--accent-soft)" : done ? "var(--bg-active)" : "transparent",
+                color: active ? "var(--accent)" : done ? "var(--text)" : "var(--text-faint)",
+              }}>{done && <Check size={10} style={{ verticalAlign: -1, marginRight: 2 }} />}{s}</span>
+              {i < STAGES.length - 1 && <ArrowRight size={11} style={{ color: "var(--text-faint)" }} />}
+            </React.Fragment>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <button className="btn primary sm" disabled={busy !== null} onClick={() => runStage(false)}>
+          {busy === "stage" ? <Loader2 size={13} className="spin" /> : <ArrowRight size={13} />}
+          Run {stage} stage
+        </button>
+        <button className="btn sm" disabled={busy !== null} onClick={() => runStage(true)} title="Score → Research → Outline, then pause for your approval">
+          {busy === "auto" ? <Loader2 size={13} className="spin" /> : <Wand2 size={13} />}
+          Auto-run to outline
+        </button>
+        {stage === "Draft" && (
+          <button className="btn sm" disabled={busy !== null} onClick={() => writeDraft(false)}>
+            {busy === "draft" ? <Loader2 size={13} className="spin" /> : <Wand2 size={13} />}
+            Write full draft
+          </button>
+        )}
+        <span style={{ fontSize: 11.5, color: "var(--text-faint)", marginLeft: "auto" }}>
+          agent does the heavy lifting · you edit the draft
+        </span>
+      </div>
+      {error && <div style={{ color: "#c0392b", fontSize: 12.5, marginTop: 8 }}>{error}</div>}
+
+      {/* interactive outline approval */}
+      {suggestions && (
+        <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>Outline ready — sharpen it before drafting?</div>
+          <div style={{ fontSize: 12, color: "var(--text-soft)", marginBottom: 8 }}>Check the upgrades to fold in, then write the full draft — or proceed as-is.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10 }}>
+            {suggestions.map((s, i) => (
+              <label key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, cursor: "pointer" }}>
+                <input type="checkbox" className="checkbox-dot" checked={!!accepted[i]} onChange={(e) => setAccepted({ ...accepted, [i]: e.target.checked })} style={{ marginTop: 2 }} />
+                <span><b style={{ textTransform: "uppercase", fontSize: 10.5, color: "var(--accent)", marginRight: 6 }}>{s.area}</b>{s.suggestion}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button className="btn primary sm" disabled={busy !== null} onClick={() => writeDraft(true)}>
+              {busy === "draft" ? <Loader2 size={13} className="spin" /> : <Wand2 size={13} />}
+              Write full draft with picks
+            </button>
+            <button className="btn sm" disabled={busy !== null} onClick={() => writeDraft(false)}>Proceed as-is</button>
+            <button className="btn ghost sm" onClick={() => setSuggestions(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const AGENT_ACTIONS = [
   { id: "score", label: "Score idea", run: scoreIdea },
@@ -122,6 +250,7 @@ export function RowModal({
   return (
     <Modal wide onClose={onClose} title={<span style={{ fontFamily: "var(--font-serif)", fontSize: 20 }}>{database.icon} {rowTitle(database, row)}</span>}>
       <div style={{ display: "grid", gridTemplateColumns: "230px 1fr", gap: 24, alignItems: "start" }}>
+        <WorkflowBar database={database} row={row} onDone={() => setNotesVersion((v) => v + 1)} />
         <AgentBar database={database} row={row} onDone={() => setNotesVersion((v) => v + 1)} />
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {database.fields.map((f) => (
