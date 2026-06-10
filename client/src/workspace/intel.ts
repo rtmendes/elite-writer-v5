@@ -73,6 +73,10 @@ const PUB_FIELD_DEFS: Array<{ key: string; name: string; type: Field["type"]; wi
   { key: "payMax", name: "Pay Max ($)", type: "currency", width: 120 },
   { key: "topics", name: "Preferred Topics", type: "longtext", width: 300 },
   { key: "editors", name: "Best Editors to Pitch", type: "longtext", width: 300 },
+  { key: "writingStyle", name: "Writing Style", type: "longtext", width: 320 },
+  { key: "editorStyle", name: "Editor's Style", type: "longtext", width: 320 },
+  { key: "editorLikes", name: "What Editor Likes", type: "longtext", width: 320 },
+  { key: "targetAudience", name: "Target Audience", type: "longtext", width: 280 },
   { key: "submission", name: "Submission Info", type: "longtext", width: 300 },
   { key: "applicationForm", name: "Application Form", type: "url", width: 200 },
   { key: "difficulty", name: "Pitch Difficulty", type: "rating", width: 130 },
@@ -119,7 +123,7 @@ async function ensurePublications() {
 
   // Fresh install: build the full rich database
   if (!existing) {
-    if (await db.kv.get("seed:publications:v2")) return;
+    if (await db.kv.get("seed:publications:v3")) return;
     const now = Date.now();
     const { fields, byKey } = buildPubFields();
     const database: Database = {
@@ -144,13 +148,13 @@ async function ensurePublications() {
       await db.rows.add(row);
       void enqueue("rows", row.id, "upsert");
     }
-    await db.kv.put({ key: "seed:publications:v2", value: true });
+    await db.kv.put({ key: "seed:publications:v3", value: true });
     return;
   }
 
   // Upgrade path: a thin Publications table already exists (the 4-field seed).
   // Add missing fields, backfill empty cells, add new outlets — non-destructive.
-  if (await db.kv.get("seed:publications:v2")) return;
+  if (await db.kv.get("seed:publications:v3")) return;
   const fresh = (await db.databases.get(existing.id))!;
   const fieldByName = new Map(fresh.fields.map((f) => [f.name.toLowerCase(), f]));
   const addedFields: Field[] = [];
@@ -191,7 +195,7 @@ async function ensurePublications() {
       order++;
     }
   }
-  await db.kv.put({ key: "seed:publications:v2", value: true });
+  await db.kv.put({ key: "seed:publications:v3", value: true });
 }
 
 async function ensureClaimLedger() {
@@ -496,9 +500,33 @@ async function setStatus(database: Database, row: Row, stageName: string) {
   }
 }
 
+
+/** Look up the target publication's style + editor preferences from the
+ *  Publications database, so drafts match its voice WITHOUT re-researching. */
+async function publicationStyleBrief(pubName: string): Promise<string> {
+  if (!pubName) return "";
+  const pubsDb = (await db.databases.toArray()).find((d) => d.name === "Publications");
+  if (!pubsDb) return "";
+  const nameField = pubsDb.fields[0];
+  const rows = await db.rows.where("dbId").equals(pubsDb.id).toArray();
+  const match = rows.find((r) => String(r.values[nameField.id] ?? "").trim().toLowerCase() === pubName.trim().toLowerCase());
+  if (!match) return "";
+  const get = (fname: string) => {
+    const f = pubsDb.fields.find((x) => x.name.toLowerCase() === fname.toLowerCase());
+    return f ? String(match.values[f.id] ?? "").trim() : "";
+  };
+  const parts: string[] = [];
+  const ws = get("Writing Style"); if (ws) parts.push(`WRITING STYLE: ${ws}`);
+  const es = get("Editor's Style"); if (es) parts.push(`EDITOR'S STYLE: ${es}`);
+  const el = get("What Editor Likes"); if (el) parts.push(`WHAT THIS EDITOR LIKES: ${el}`);
+  const ta = get("Target Audience"); if (ta) parts.push(`TARGET AUDIENCE: ${ta}`);
+  return parts.length ? `\n\nMATCH THIS PUBLICATION'S HOUSE STYLE (do not re-research — use this):\n${parts.join("\n")}` : "";
+}
+
 export async function buildOutline(database: Database, row: Row): Promise<string> {
   const fresh = (await db.rows.get(row.id))!;
-  const brief = rowSummary(database, fresh) + "\n\nRESEARCH:\n" + notesText(fresh).slice(0, 8000);
+  const styleBrief = await publicationStyleBrief(targetPublication(database, fresh));
+  const brief = rowSummary(database, fresh) + "\n\nRESEARCH:\n" + notesText(fresh).slice(0, 8000) + styleBrief;
   const { wsTrpc } = await import("./trpcClient");
   const res = await wsTrpc.workspace.buildOutline.mutate({ brief: brief.slice(0, 38000), publication: targetPublication(database, fresh), context: String(fresh.values[database.fields[0].id] ?? "") });
   await appendToNotes(fresh, "Outline", res.text);
@@ -519,7 +547,8 @@ export async function writeFullArticle(database: Database, row: Row, accepted: s
   const fresh = (await db.rows.get(row.id))!;
   const outline = sectionText(fresh, /outline/i);
   if (!outline) throw new Error("Build and approve an outline first.");
-  const research = sectionText(fresh, /research brief/i) || notesText(fresh).slice(0, 8000);
+  const styleBrief = await publicationStyleBrief(targetPublication(database, fresh));
+  const research = (sectionText(fresh, /research brief/i) || notesText(fresh).slice(0, 8000)) + styleBrief;
   const { wsTrpc } = await import("./trpcClient");
   const res = await wsTrpc.workspace.writeFullDraft.mutate({
     outline, research: research.slice(0, 38000), publication: targetPublication(database, fresh), accepted, context: String(fresh.values[database.fields[0].id] ?? ""),
