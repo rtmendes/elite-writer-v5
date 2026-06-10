@@ -84,6 +84,7 @@ export interface Page {
   parentId: ID | null;
   title: string;
   icon: string;
+  cover?: string; // cover banner image (data URL)
   doc?: unknown[]; // BlockNote document
   sortOrder: number;
   createdAt: number;

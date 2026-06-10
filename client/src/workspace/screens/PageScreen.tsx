@@ -1,5 +1,5 @@
 import { useLiveQuery } from "dexie-react-hooks";
-import { Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Image, Loader2, Sparkles, Trash2 } from "lucide-react";
 import React, { useRef, useState } from "react";
 import { runAI, type AIAction } from "../ai";
 import { db, deletePageTree, updatePage } from "../db";
@@ -74,7 +74,26 @@ export function PageScreen({ pageId, dark, onDeleted }: { pageId: string; dark: 
 
   return (
     <div className="content-scroll">
-      <div className="page-canvas">
+      {page.cover && (
+        <div style={{ position: "relative", height: 200, background: "var(--bg-active)", overflow: "hidden" }}>
+          <img src={page.cover} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <button className="btn sm" style={{ position: "absolute", right: 16, bottom: 12, opacity: 0.92 }} onClick={() => updatePage(page.id, { cover: undefined })}>
+            Remove cover
+          </button>
+        </div>
+      )}
+      <div className="page-canvas" style={page.cover ? { paddingTop: 18 } : undefined}>
+        {!page.cover && (
+          <label className="btn ghost sm" style={{ marginBottom: 8, cursor: "pointer", width: "fit-content" }}>
+            <Image size={13} /> Add cover
+            <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => {
+              const file = e.target.files?.[0]; if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => updatePage(page.id, { cover: reader.result as string });
+              reader.readAsDataURL(file);
+            }} />
+          </label>
+        )}
         <button className="page-icon-btn" onClick={(e) => setIconAnchor(e.currentTarget)}>
           {page.icon}
         </button>

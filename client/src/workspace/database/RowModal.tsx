@@ -7,7 +7,7 @@ import { ArrowRight, Check, Loader2, Sparkles, Trash2, Wand2 } from "lucide-reac
 import { deleteRow, setRowValue, updateRow } from "../db";
 import {
   buildOutline, createOffer, getOutlineSuggestions, matchPublications, researchBrief,
-  scoreIdea, tournamentDraft, verifyFacts, writeFullArticle,
+  generateCover, scoreIdea, tournamentDraft, verifyFacts, writeFullArticle,
 } from "../intel";
 import type { Database, Row } from "../types";
 import { Modal } from "../ui";
@@ -145,6 +145,7 @@ const AGENT_ACTIONS = [
   { id: "match", label: "Match publications", run: matchPublications },
   { id: "draft", label: "Tournament draft", run: tournamentDraft },
   { id: "facts", label: "Verify facts", run: verifyFacts },
+  { id: "cover", label: "Cover image", run: generateCover },
   { id: "offer", label: "Create offer", run: createOffer },
 ] as const;
 
