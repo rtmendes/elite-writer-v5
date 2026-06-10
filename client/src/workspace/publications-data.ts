@@ -1,9 +1,13 @@
-// Auto-merged: 4 CSVs + Google Sheet 'Writing Styles by Publication' — 135 outlets.
+// Master swipe file: 4 CSVs + Google Sheet styles + Notion 'Publication Targets' DB — 184 outlets.
 export interface PubSeed {
   name: string; category?: string; traffic?: string; pay?: string; payMax?: number;
   topics?: string; editors?: string; submission?: string; applicationForm?: string;
   website?: string; logo?: string;
   writingStyle?: string; targetAudience?: string; editorStyle?: string; editorLikes?: string;
+  payArticle?: string; payAV?: string; projection?: string; wordCount?: string;
+  editorName?: string; editorEmail?: string; writingInstruction?: string; styleGuide?: string;
+  suggestedTypes?: string; doNotWrite?: string; columnIdea?: string; classification?: string;
+  tier?: string; frequency?: string; niche?: string; formToSubmit?: string;
 }
 export const PUBLICATIONS: PubSeed[] = [
  {
@@ -52,7 +56,16 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write bold, sex-positive content for young women that celebrates confidence, pleasure, and self-expression with unapologetic energy. Use a fun, empowering tone that treats readers as fearless friends navigating relationships, careers, and identity with humor and honesty. Focus on sex, relationships, career, and culture with progressive values and millennial/Gen Z sensibility.",
   "targetAudience": "Women under 35 in the US — millennial and Gen Z readers interested in culture, identity, relationships, and empowerment",
   "editorStyle": "Cyclingnews",
-  "editorLikes": "Dedicated cyclists — from enthusiasts to pros — who follow racing, gear, training, and cycling culture"
+  "editorLikes": "Dedicated cyclists — from enthusiasts to pros — who follow racing, gear, training, and cycling culture",
+  "payArticle": "$1.50 - $2 / word $4,500 to $10,000 per article",
+  "projection": "6000",
+  "wordCount": "3000",
+  "editorName": "Nicole Pasulka, Senior Features Editor",
+  "editorEmail": "nicole.pasulka@hearst.com",
+  "styleGuide": "AI Content Writer Prompt: Write a bold, engaging, and conversational article that blends informality with journalistic integrity, fitting seamlessly into Cosmopolitan’s signature tone. The article should appeal to a millennial and Gen Z audience with a mix of humor, personal anecdotes, and social commentary. Keep the voice empathetic, relatable, and assertive while covering contemporary issues like culture, identity, and relationships. Style Guidelines: • Conversational Tone: Use second-person (\"you\") to make the reader feel directly engaged, almost like talking to a close friend. • Cultural Relevance: Incorporate pop culture references, current events, and modern slang to create familiarity. Ensure the content feels fresh and in-the-moment. • Emotional Resonance: Share personal stories and humanize the subject to evoke empathy, while maintaining a tone that feels empowering. • Humor and Wit: Inject moments of sarcasm or humor, without overpowering the article. Ensure it’s clever, not snarky. • Structured Narrative: Organize the article into short, easily digestible sections or paragraphs that are highly scannable. Use subheadings, lists, and bullets for clarity. • Use of Real Quotes: When applicable, include quotes from interviews or social media posts to support the narrative and add authenticity. • Tackle Serious Topics with Sensitivity: Balance serious, often challenging subjects with a tone of hope, resilience, and insight, leaving the reader feeling informed but also empowered. Editing Feedback Instructions: 1. Optimize for Empathy: Rewrite sentences that feel too formal. Use contractions, active voice, and personal pronouns to strengthen emotional connection. 2. Cultural Accuracy: Ensure references are current and relevant. Fact-check all pop culture and social trends to avoid outdated phrases. 3. Tone Calibration: Balance light-hearted humor with seriousness based on the subject matter. Avoid making jokes that may seem tone-deaf in sensitive contexts. 4. Flow and Engagement: Ensure that each paragraph builds onto the next seamlessly, with cliffhangers at the end of sections to keep the reader interested. 5. Empowering Messaging: Ensure the final tone leaves readers feeling knowledgeable, motivated, or inspired to take action, especially in articles related to self-care, relationships, or personal growth.",
+  "doNotWrite": "[\"Op-Ed\",\"Personal Essays\",\"Trend Stories\"]",
+  "columnIdea": "https://chatgpt.com/share/676f719a-ae90-800a-a55f-0657897c3735",
+  "niche": "[\"Women\"]"
  },
  {
   "name": "Harper's Bazaar",
@@ -150,7 +163,13 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to women.",
   "editors": "Abigail Greene (Contributors): agreene@hearst.com",
   "submission": "No official submissions page.",
-  "payMax": 20000
+  "payMax": 20000,
+  "payArticle": "$2,000",
+  "payAV": "$4,000",
+  "editorName": "Abigail Greene",
+  "suggestedTypes": "Leadership development, managing energy for success",
+  "targetAudience": "Personal growth seekers, business professionals",
+  "website": "https://www.oprahdaily.com"
  },
  {
   "name": "US Weekly",
@@ -209,7 +228,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "category": "Men's Topics",
   "applicationForm": "Form: https://docs.google.com/forms/d/17D4HEE6X10gcpp76zyngbCIOrPS4nAFVdrCC_t4b8c4/viewform?edit_requested=true",
   "payMax": 15000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com",
+  "editorName": "Chris Hatler",
+  "formToSubmit": "https://docs.google.com/forms/d/17D4HEE6X10gcpp76zyngbCIOrPS4nAFVdrCC_t4b8c4/viewform?edit_requested=true"
  },
  {
   "name": "Good Housekeeping",
@@ -239,7 +260,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write research-backed management insights for senior executives and business leaders, using rigorous analysis and evidence-based frameworks. Employ an authoritative, academic tone that synthesizes research findings into actionable strategies, always supporting arguments with data and case studies. Focus on leadership, strategy, and organizational effectiveness with intellectual depth that shapes business thinking.",
   "targetAudience": "Senior executives, management consultants, MBA students, corporate strategists",
   "editorStyle": "Health Magazine",
-  "editorLikes": "Health-conscious readers seeking reliable, science-backed wellness, fitness, and nutrition information"
+  "editorLikes": "Health-conscious readers seeking reliable, science-backed wellness, fitness, and nutrition information",
+  "tier": "[\"Tier 1: Open Applications\"]"
  },
  {
   "name": "Men's Health",
@@ -287,7 +309,14 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "No official submissions page.",
   "website": "https://thedailybeast.com",
   "payMax": 15000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thedailybeast.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thedailybeast.com",
+  "payArticle": "$500 to $1,500 per article, 900 to 2,000 words.",
+  "payAV": "1000",
+  "projection": "2000",
+  "editorName": "Allegra Frank, Senior Lifestyle Editor",
+  "editorEmail": "allegra.frank@thedailybeast.dot.com",
+  "editorStyle": "She’s responsive and covers the lifestyle and entertainment verticals, to which all of your art, culture, and entertainment topics would fit.",
+  "columnIdea": "Four pitch ideas that are one each of your topics. The pitch ideas should be one personal story, two that are topic-based, and one news-based pitch on one of your topics. The Daily Beast is flexible with contributor articles – you can do as many or as few as you’d like but need to pitch each story."
  },
  {
   "name": "Alantic (The)",
@@ -331,7 +360,15 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write authoritative business journalism for C-suite executives and decision-makers, focusing on corporate strategy, leadership, and market-moving trends. Use sophisticated, data-driven analysis with insider access to top executives, always connecting individual company stories to broader economic forces. Maintain a serious, professional tone that respects readers' business acumen while providing intelligence they can't get elsewhere.",
   "targetAudience": "Business leaders, entrepreneurs, senior executives, corporate decision-makers",
   "editorStyle": "Fuller Project",
-  "editorLikes": "Readers interested in global women's issues, gender justice, and investigative journalism centering women's stories worldwide"
+  "editorLikes": "Readers interested in global women's issues, gender justice, and investigative journalism centering women's stories worldwide",
+  "payArticle": "$800 per article; 700 to 900 words.",
+  "payAV": "$1,600 (do two articles per month)",
+  "projection": "1600",
+  "editorName": "Ruth Umoh",
+  "editorEmail": "matt.heimer@fortune.com",
+  "suggestedTypes": "Effective sales strategies, business growth case studies",
+  "columnIdea": "Three pitch ideas that cover a personal business win, a topic-based piece on AI, and a how-to piece on content. Fortune is flexible on contributor articles – you can do as many or as few as you’d like, but need to pitch each story.",
+  "frequency": "2x per month"
  },
  {
   "name": "HuffPost",
@@ -454,7 +491,13 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write significant, newsworthy journalism that captures defining moments and influential people shaping the world with historical perspective. Use clear, authoritative prose that explains why stories matter and what they reveal about our times, always emphasizing impact and significance. Focus on leaders, innovators, and events that shape history with Time's distinctive blend of news and analysis.",
   "targetAudience": "Informed general readers, industry professionals, people who want expert perspectives on business, leadership, and innovation",
   "editorStyle": "Travel & Leisure",
-  "editorLikes": "Affluent travelers seeking beautiful, inspiring travel content that blends luxury with authentic experiences"
+  "editorLikes": "Affluent travelers seeking beautiful, inspiring travel content that blends luxury with authentic experiences",
+  "editorName": "Emma Barker Bonomo",
+  "editorEmail": "emma.barker@time.com",
+  "columnIdea": "Pitches and tips to emma.barker@time.com",
+  "classification": "Freelance - Pay Per Article",
+  "tier": "[\"Tier 4: Pitching Publications That Assign Articles\"]",
+  "niche": "[\"Leadership\",\"Innovation\",\"Business\",\"Entrepreneur\",\"News\",\"Parenting\"]"
  },
  {
   "name": "Travel & Leisure",
@@ -514,6 +557,20 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorLikes": "Health-conscious women seeking fitness, nutrition, mental health, and wellness content backed by experts"
  },
  {
+  "name": "Wired Business",
+  "payMax": 10000,
+  "payArticle": "$1 per word, and rates start at $2,500. There’s no limit on word count. This could be $5,000 to $10,000 per article",
+  "payAV": "2500",
+  "editorName": "Tom Simonite",
+  "editorEmail": "natasha_bernal@wired.com",
+  "editorStyle": "Very easy tips to create a successful story for WIRED At WIRED, we love intelligent, original freelance pitches that will help us to cover the biggest stories in business. But often it’s difficult to know what to pitch and when to pitch it. We are looking for authoritative, interesting work that will capture the imagination of our readers and provide a fresh insight into the big businesses that are affecting our lives. tech, business, AI, leadership, and travel articles that relate back to tech. It can be how-to, topic, stories, reported, and investigative articles. So if you want to pitch a WIRED business story, great! Here are some things that will help to make your idea more successful: Timely: A new and different take on the big news stories of the day — has to be something that either moves the story along, or a deep-dive that provides unparalleled level of insight into an issue or topic. Exclusive: A news story about a relevant business that is so big that we can lead the way on it — this has to be major news that will impact an entire market or sector. Original: A take on something that is going on in the world and affecting our lives — and that people may not be aware of. Innovative projects to save the world, ridiculously large aircrafts or ships, new and emerging economies… the wilder, the better. So… here are the businesses we care about Big tech: FAANG + innovative big companies FINTECH: B2B and B2C WeWork, Uber, Palantir, Deliveroo, Tesla, Amazon, and any business that is impacting the world as we know it Big traditional companies that are trying to reform/be cool: Whether it’s cultural (launching a product to rival smaller players, investing in robots) or big household brands that are bucking the trend. Things ABOUT businesses that we care about Big structural upheaval BIG INNOVATION Cultural differences Major strategy changes Branding/product fails Harassment issues Worker rights issues Every pitch has to answer the following: Will our audience care about this? Our audience is the general public: someone who likes gadgets, reads the news, and is interested in businesses that are going to affect his/her life directly. They already read the nationals/watch the news. What we bring is something different: analysis that gives them unparalleled insight into the big tech news of the year, or exposés that show them something they didn’t know what going on. Our audience is also predominantly US based — this has to be relevant to them. Why are we doing this now? What is the hook, or the reason for us to write this piece? Why not in a month’s time etc? What are basic guidelines for longform feature pitches? The vast majority of the features we publish are narratives. For best results, pitch us a tale you're going to tell, not a topic you want to explore. What central chronology are you going to reconstruct? Who are your main characters? What scenes are we going to be able to see? You don't have to know the full narrative arc of your story when you pitch, but you should be able to give some indication that it's going to be a satisfying one. Also, be able to convey your tale's larger implication or importance. WIRED does occasionally publish feature-length essays, but there, too, we're looking for a focused through line, not just an exploration of a topic. What argument are you making, and what evidence will you muster for it? What's the core example (or two, or three) that will animate the idea you're hoping to get across? For any feature pitch, give us a sentence or two about the sort of work you've done, and please include links to other stories, especially long-form narrative pieces. How long should my pitch be? A pitch needs to have enough detail to intrigue us, but not TMI. For a feature, 500 to 700 words is a good range. How much do you pay for freelance pieces? We offer set project fees depending on the factors described above-story length, time involved, and intensity of the reporting and writing involved. These story fees start at about $2,500 and rise from there. Read our stories to get ideas for yours: https://www.wired.com/category/business/",
+  "writingInstruction": "# Wired.com Article Writing Template ## Article Structure ### 1. Headline Requirements - Must be attention-grabbing and specific - Should contain a clear hook or unique angle - Typically includes a dash (-) to separate main title from subtitle ### 2. Opening Elements - Strong lead paragraph that immediately engages reader - Clear subject introduction within first two paragraphs - Scene-setting details when applicable ### 3. Content Style - Long-form journalism (2000-5000 words) - Mix of narrative and analytical writing - Include relevant technical details while maintaining accessibility - Break up text with descriptive subheadings - Use short paragraphs for readability ### 4. Essential Elements - Expert quotes and interviews - Current events context - Historical background when relevant - Statistical data and research citations - Real-world examples and case studies ### 5. Visual Elements - High-quality photographs with detailed captions - Relevant diagrams or infographics when applicable - Clear photo credits and attributions ### 6. Writing Style Guidelines - Authoritative but accessible tone - Technical accuracy balanced with engaging narrative - Active voice - Present tense for immediacy - Clear explanations of complex concepts ### 7. Article Components Your article should include: - Main headline and subheading - Author byline - Introduction (hook + context) - Body (with clear section breaks) - Expert perspectives - Analysis and implications - Conclusion ### 8. Best Practices - Focus on emerging trends and cutting-edge developments - Connect technical subjects to broader societal implications - Maintain journalistic objectivity while providing insight - Include diverse perspectives and voices - End with forward-looking implications or future impacts ### 9. Topics of Interest - Technology and innovation - Science and research - Digital culture and society - Climate and environment - Artificial intelligence and robotics - Cybersecurity and privacy - Future trends and predictions ### 10. Submission Requirements - Original, unpublished content - Fact-checked and verified information - Proper attribution for all sources - High-resolution images with rights clearance - Author bio and credentials",
+  "suggestedTypes": "AI advancements in business, digital marketing trends",
+  "targetAudience": "Tech enthusiasts, business professionals",
+  "topics": "AI, emerging technologies, the economy, growing business, digital marketing, chatbots, marketing software (Go High Level, ClickFunnels), webinars, podcasting",
+  "website": "https://www.wired.com/tag/business"
+ },
+ {
   "name": "Women's Health",
   "category": "Women's Topics",
   "traffic": "14.8 million monthly",
@@ -536,6 +593,28 @@ export const PUBLICATIONS: PubSeed[] = [
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=worth.com"
  },
  {
+  "name": "Forbes",
+  "traffic": "110 million monthly",
+  "pay": "$10 for each New Paid Subscription Conversion on one of your posts or profile page | $15 for each New Paid Subscription Conversion if you convert five (5) or more subscribers in a given month | $1 for each New Registered Reader Conversion through the \"follow,\" \"comment\" or \"save\" options on one of your posts or profile page.",
+  "editors": "DeArbea Walker: dwalker@forbes.com (SportsMoney, Food & Drink, Venture Capital, Creator Economy and Entrepreneurs) | Jair Hilburn: jhilburn@forbes.com (CMO, Media, Hollywood & Entertainment, Social Media, ForbesBLK and Games) | Sarah Chandler Perez: schandler@forbes.com (Forbes Women) | Jeff Marcus: jmarcus@forbes.com (Main editor in charge of the entire contributor program) | Leigh Cuen lcuen@forbes.com (Leadership Strategy) | Helen Popki hpopkin@forbes.com (Careers)",
+  "submission": "No official submissions page.",
+  "website": "https://forbes.com",
+  "payMax": 8000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=forbes.com",
+  "writingStyle": "Write authoritative business journalism for entrepreneurs, executives, and investors, focusing on wealth creation, leadership, and market trends. Use a sophisticated, success-focused tone that celebrates achievement while providing strategic insights and market intelligence. Focus on billionaires, successful companies, and investment opportunities with Forbes' distinctive emphasis on wealth and power.",
+  "targetAudience": "Business owners, C-suite executives, investors, financial professionals",
+  "editorStyle": "Foreign Policy",
+  "editorLikes": "Foreign policy professionals, diplomats, political scientists, and internationally minded readers who shape or follow global affairs",
+  "payAV": "pay per view",
+  "projection": "8000",
+  "editorName": "Advisor: https://www.forbes.com/advisor/ Health: https://www.forbes.com/health/ Vetted (products): https://www.forbes.com/vetted/",
+  "editorEmail": "dwalker@forbes.com",
+  "columnIdea": "Closing the Wealth Gap Through Community Economic Development and Black Generational Wealth The idea is a column on how to create meaningful financial progress in the Black community through proactive financial education that is not reactive to our current situation. This column will cover generational wealth and community economic development strategies and black individuals and companies that contribute to this goal.",
+  "classification": "Columnist",
+  "frequency": "6x / month",
+  "topics": "CEO"
+ },
+ {
   "name": "Narratively",
   "traffic": "475,000 monthly",
   "pay": "$1,500 to $8,000 per article.",
@@ -549,6 +628,26 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorLikes": "Culinary professionals, chefs, culinary students, and food industry leaders seeking industry news and professional development"
  },
  {
+  "name": "National Geographic",
+  "category": "All Topics",
+  "traffic": "8.6 million monthly",
+  "pay": "$1 to $2 per word.",
+  "topics": "Any type of article as long as it relates to nature, science, and travel.",
+  "editors": "Starlight Williams (Contrubutors): starlight.williams@natgeo.com",
+  "submission": "No official submissions page.",
+  "website": "https://nationalgeographic.com",
+  "applicationForm": "Kids stories form: https://ttj51ygan9g.typeform.com/to/vtdwJSXl?typeform",
+  "payMax": 7500,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=nationalgeographic.com",
+  "writingStyle": "Write immersive, visually stunning journalism that explores science, nature, culture, and history with narrative power and photographic excellence. Use evocative, literary prose that transports readers to distant places and times while maintaining scientific accuracy and cultural sensitivity. Focus on stories that reveal the wonder and complexity of our world, always emphasizing conservation and cross-cultural understanding.",
+  "targetAudience": "Curious, educated general readers fascinated by science, nature, culture, history, and the world's wonders",
+  "editorStyle": "National Wildlife",
+  "editorLikes": "Nature lovers, wildlife advocates, and conservation-minded readers supporting the National Wildlife Federation",
+  "payArticle": "$1 a word, and there is no limit on word count. This could be $2,500 to $7,500 per article",
+  "editorEmail": "starlight.williams@natgeo.com",
+  "columnIdea": "Seeking conversation starters. Timely culture, history, health/wellness, and trend explainers/stories. Lover of all mythology, supernatural, strange history, fitness trend stories. Can intersect with travel. ~$1/w"
+ },
+ {
   "name": "AFAR",
   "category": "Travel",
   "traffic": "1 million monthly",
@@ -558,7 +657,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.afar.com/about/pitch-guidelines",
   "website": "https://afar.com",
   "payMax": 5000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=afar.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=afar.com",
+  "editorName": "https://x.com/kjlagrave/status/1851327309808112056"
  },
  {
   "name": "Business Insider",
@@ -595,7 +695,12 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write empowering content for Black women that celebrates Black culture, beauty, and achievement while addressing community concerns and systemic issues. Use an affirming, culturally grounded tone that speaks directly to Black women's experiences, always centering Black voices and perspectives. Focus on beauty, fashion, relationships, career, and social justice with cultural authenticity and community connection.",
   "targetAudience": "People of color, Black entrepreneurs, Black professionals and community leaders",
   "editorStyle": "Fast Company",
-  "editorLikes": "Business leaders, innovators, creative professionals, people shaping the future of work"
+  "editorLikes": "Business leaders, innovators, creative professionals, people shaping the future of work",
+  "payArticle": "$1,000",
+  "payAV": "$2,000",
+  "editorName": "Dawn Baskerville",
+  "suggestedTypes": "Success stories of entrepreneurs of color, business growth strategies",
+  "website": "https://www.essence.com"
  },
  {
   "name": "Fodor's Travel",
@@ -654,7 +759,11 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write practical personal finance journalism that helps readers make smart money decisions about investing, saving, and spending. Use a clear, authoritative tone that explains financial concepts accessibly while providing specific recommendations and strategies. Focus on actionable financial advice, market analysis, and money management for readers building wealth and financial security.",
   "targetAudience": "Finance enthusiasts, entrepreneurs, professionals managing personal and business finances",
   "editorStyle": "More to Her Story",
-  "editorLikes": "Readers interested in women's stories that have been overlooked, underreported, or erased from history and current media"
+  "editorLikes": "Readers interested in women's stories that have been overlooked, underreported, or erased from history and current media",
+  "payArticle": "$1,500",
+  "payAV": "$4,000",
+  "editorName": "Brad Tuttle",
+  "suggestedTypes": "Strategic financial planning, innovative money management"
  },
  {
   "name": "Newsweek",
@@ -731,7 +840,13 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "Features, compelling stories, analysis and news pitches: https://www.linkedin.com/feed/update/urn:li:activity:7420849163992449025/",
   "website": "https://linkedin.com",
   "payMax": 5000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com",
+  "payArticle": "$2,000",
+  "payAV": "$5,000",
+  "editorName": "Hilary Milnes",
+  "suggestedTypes": "SEO strategies for businesses, branding for growth",
+  "targetAudience": "Business owners, entrepreneurs",
+  "topics": "SEO, podcasting, business growth strategy, sales, lead generation, branding, entrepreneurial mindset, business owner assistance"
  },
  {
   "name": "Conde Nast Traveler",
@@ -756,6 +871,41 @@ export const PUBLICATIONS: PubSeed[] = [
   "website": "https://health.com",
   "payMax": 3000,
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=health.com"
+ },
+ {
+  "name": "People Magazine",
+  "payMax": 3000,
+  "writingStyle": "Write accessible, human-interest stories about celebrities and entrepreneurs with warmth and relatability, focusing on personal journeys and emotional resonance. Use conversational, upbeat prose that makes famous people feel approachable while celebrating their achievements, always emphasizing universal themes of family, perseverance, and triumph. Structure stories around compelling personal details and quotes that reveal character.",
+  "targetAudience": "General interest readers, aspiring entrepreneurs, mainstream American audience across all demographics",
+  "editorStyle": "Playboy",
+  "editorLikes": "Culturally literate adults interested in politics, culture, sex, art, and long-form journalism",
+  "payArticle": "$3,000",
+  "payAV": "$4,000",
+  "editorName": "Alex Apatoff",
+  "suggestedTypes": "Starting a successful side hustle, business growth stories",
+  "topics": "Personal finance, Entrepreneurial success stories, Starting and growing a business, Side hustles, Making money online",
+  "website": "https://people.com"
+ },
+ {
+  "name": "Business Insider 2024 Business Insider Freelance Lifestyle Pitchs",
+  "payMax": 2500,
+  "payArticle": "$1/word",
+  "payAV": "$3,000",
+  "projection": "2500",
+  "editorName": "Edith Honan",
+  "editorEmail": "lhaas@businessinsider.com",
+  "editorStyle": "Hot take — I've worked with 1,000+ freelancers, but I don't care where you've been published. I've had writers with prestigious credentials send me awful copy and ones with no clips send incredible work. Clips are nice, but you never know if a writer just had a GREAT editor. Middle of the Road equal Balanced Readers. Expert take away & Insights",
+  "editorLikes": "https://docs.google.com/document/d/1zmcUVb0aE2ZFYhR-AsoFcIoGalvANmIVM7ViF_u11XQ/edit?tab=t.0#heading=h.2tjws4ar0x8o",
+  "writingInstruction": "https://drive.google.com/drive/folders/1ce0DMLPU8qO-d1pD73rSbrouLQ8H93Vr this has the best practices",
+  "styleGuide": "short to the point story. All headlines look like a sentence",
+  "suggestedTypes": "Unique business models, current business news analysis",
+  "columnIdea": "I couldnt find this thing I needed so I created it",
+  "classification": "Freelance - Pay Per Article",
+  "tier": "[\"Tier 1: Open Applications\"]",
+  "niche": "[\"Business\"]",
+  "targetAudience": "Business professionals, entrepreneurs",
+  "topics": "https://docs.google.com/document/d/1JhK6-UCAjNSrup6iGCagUc4WpAoynewCv96qlGlkl1w/edit?tab=t.0 Ideas for stories freelancers to source: Big Ideas/Personal Essay topics: People sharing their salary journeys Lottery winners or people who come in big sums of money suddenly People who invested their way out of the 9-to-5 Parenting and workaholics — how long hours impacts relationships and kids Comparision stories: I worked at TK Big Tech companies, TK consulting firms, VC firms, I lived in Tk big cities/countries here’s how they compare As told to 600-800 words, please send potential sources/interviewees for these ideas to kfields@insider.com Sources should be comfortable presenting their stories in the “as-told-to” format. Top Priority: I worked for Cascade Investments, Bill Gates’ investment firm. Here’s what it was like I worked in recruitment in NYC. It was a crazy, party machine. I gave up my pension to move abroad it was/wasn’t worth it. I bought a house, and it’s quickly losing value/has been destroyed by climate-change-fueled natural disasters. I’m the breadwinner of my family. Here’s how it impacts my relationship with my partner. I worked with Bob Iger/ at Disney during the Iger/Chapak rivalry. This is what it was like. I’m a Gen Z/millennial and my parents still do TK things for me (pay bills, pay rent, buy big ticket items). It’s a big help/makes me feel like an adult kid. People who have built their dream house cheaply aboard (Thailand, the Philippines, Mexico) Someone who works at a data center or lives near one about the industry impacts their lives/community Wealth advisors or consultants with ultrawealthy clients (Golden visa advisors, property advisors) who can give insights into the money habits of their clients Someone who was offered a promotion at a corporate job and turned it down because they were happy with their role and didn't want to work more/be a manager A millennial who bought a business from its boomer owners to run themselves Someone who has successfully retired early or tried to retire early and struggled/failed A Gen Z running a successful Airbnb business I work on a luxury yacht/exclusive hotel/spa. Here’s what my job is like. Business success stories, business topics in the news, interesting business models, making money online",
+  "website": "https://www.businessinsider.com"
  },
  {
   "name": "American Forests",
@@ -783,6 +933,20 @@ export const PUBLICATIONS: PubSeed[] = [
   "targetAudience": "Expecting and new parents building their baby registries and navigating the overwhelming world of baby products",
   "editorStyle": "BBC",
   "editorLikes": "Global, educated, news-conscious readers across all demographics"
+ },
+ {
+  "name": "CNN",
+  "payMax": 2000,
+  "writingStyle": "Write breaking news and analysis with journalistic authority and global perspective, using clear, objective language that serves diverse audiences. Focus on significant national and international stories with context and expert sourcing, always explaining why events matter and what comes next. Maintain CNN's brand of serious, trustworthy journalism while making complex stories accessible.",
+  "targetAudience": "General audience, business professionals, news-conscious readers",
+  "editorStyle": "Conde Nast Traveler",
+  "editorLikes": "Affluent, discerning travelers seeking curated, high-end travel experiences worldwide",
+  "payArticle": "$2,000",
+  "payAV": "$4,000",
+  "editorName": "David Goldman",
+  "suggestedTypes": "Virtual team success stories, high performance strategies",
+  "topics": "Energy management High performance Personal development Inspiring stories Virtual teams Finance Wealth creation Online marketing Making money online",
+  "website": "https://www.cnn.com"
  },
  {
   "name": "Longreads",
@@ -850,7 +1014,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "applicationForm": "Form: https://docs.google.com/forms/d/e/1FAIpQLSccX7myfNo1XTbMfEIbboQ-BNr2z12L0d0p5HKfttALAKZOxQ/viewform",
   "website": "https://docs.google.com",
   "payMax": 1500,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com",
+  "tier": "[\"Tier 1: Open Applications\"]"
  },
  {
   "name": "The Sick Times",
@@ -867,6 +1032,19 @@ export const PUBLICATIONS: PubSeed[] = [
   "targetAudience": "People living with chronic illness, disability advocates, and healthcare professionals who want honest perspectives on life with illness",
   "editorStyle": "The Telegraph",
   "editorLikes": "UK-based, center-right readers who value traditional journalism, business coverage, and British lifestyle content"
+ },
+ {
+  "name": "Digiday.com",
+  "payMax": 1200,
+  "payArticle": "$1 per word; articles are 1,000 to 1,200 words.",
+  "projection": "4000",
+  "editorName": "Kristina Monllos, Senior Marketing Editor",
+  "editorEmail": "kristina@digiday.com",
+  "editorStyle": "She’s responsive and loves getting pitches.",
+  "columnIdea": "Three pitch ideas that cover the types of marketing and content pieces. The pitches should be a personal story around content, a reported story about how to use AI in content or marketing, and a how-to article on anything related to business, content, and marketing. Digiday is flexible on contributor articles – you can do as many or as few as you’d like but need to pitch each story.",
+  "frequency": "do two articles per month. aim for 4",
+  "topics": "CMO Chief Marketing Office",
+  "website": "https://digiday.com"
  },
  {
   "name": "Intrepid Times",
@@ -894,6 +1072,20 @@ export const PUBLICATIONS: PubSeed[] = [
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=romper.com"
  },
  {
+  "name": "Workforce Magazine",
+  "payMax": 1000,
+  "writingStyle": "Write practical career content for professionals navigating full-time work, focusing on workplace challenges, career advancement, and work-life balance. Use a relatable, supportive tone that speaks to employees (not entrepreneurs) seeking guidance on navigating corporate life and building careers. Focus on workplace dynamics, career development, and professional growth with actionable advice for career professionals.",
+  "targetAudience": "Career professionals, job seekers, people balancing full-time work with side hustles",
+  "editorStyle": "Worth Magazine",
+  "editorLikes": "High-net-worth individuals, family offices, and impact investors interested in wealth, purpose, and philanthropy",
+  "payArticle": "$1,000",
+  "payAV": "$1,000",
+  "editorName": "Paul Temple",
+  "suggestedTypes": "Finding a new job, balancing side hustles with full-time work",
+  "topics": "Increasing salary, finding a new job, entrepreneurial mindset, side hustles while working a job",
+  "website": "https://workforce.com"
+ },
+ {
   "name": "Yahoo News",
   "category": "All Topics",
   "traffic": "3.2 billion monthly",
@@ -917,6 +1109,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "website": "https://bsky.app",
   "payMax": 800,
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=bsky.app"
+ },
+ {
+  "name": "SUCCESS Magazine",
+  "payMax": 750,
+  "payArticle": "$750",
+  "payAV": "$3,000",
+  "editorName": "Tess Lopez",
+  "editorStyle": "https://drive.google.com/drive/folders/1xZc4pLSpk6rhjGETY4q0SMlEuODbjTJy Thisis the Drive Once someone is accepted",
+  "suggestedTypes": "How to achieve financial independence, success stories",
+  "targetAudience": "Aspiring entrepreneurs, personal growth seekers",
+  "topics": "Personal development, Inspiring stories, Financial literacy, Wealth creation, Marketing, Making money online, Side hustle, Online software (Go High Level, ClickFunnels)",
+  "website": "https://www.success.com"
  },
  {
   "name": "Motley Bloom",
@@ -958,7 +1162,14 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://fastcompany.zendesk.com/hc/en-us/articles/360000291906-How-can-I-submit-an-editorial-contribution-",
   "website": "https://fastcompany.com",
   "payMax": 400,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=fastcompany.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=fastcompany.com",
+  "editorName": "Julia Herbst",
+  "editorEmail": "jherbst@fastcompany.com",
+  "editorStyle": "Fast Company is the only media brand dedicated to chronicling the future of business. We cover the leaders, ideas, and companies defining where business is headed, from agile startups to multinationals transforming themselves from within. Technology, design, impact, and creativity—these are the pillars of Fast Company’s coverage, and the keys to winning in the innovation economy.”—Brendan Vaughan, Editor-in-Chief, Fast Company",
+  "suggestedTypes": "\"Lessons learned\" style framing for buzzy/major companies - a feeling of an insider look at a well-known company and how things work there. Examples of past FC stories like this: - What Airbnb learned after a year of letting employees work from anywhere - How Shopify's anti-meeting, anti-mandatory-office experiment is going - What Zoom learned from bringing employees back to the office Deeply reported workplace trend pieces Examples of past FC stories: - The Slack generation can't communicate with the email generation. Why more platforms are dividing the workplace - The mass exodus of tech's DEI leaders is now underway - Gen Z workers are changing what it means to network Freelancers: Do you have ideas about workplace culture, leadership and hiring trends, careers, or equity and inclusion efforts? Pitch me! I'm always looking for new writers fo @FastCoWorkLife. Rates start at $400+ for reported articles. jherbst@fastcompany.com.",
+  "columnIdea": "Leadership Stories and funnel to my coaching leadership business",
+  "classification": "Freelance - Pay Per Article",
+  "niche": "[\"Business\",\"Entrepreneur\",\"Finance\"]"
  },
  {
   "name": "Matador Network",
@@ -1000,6 +1211,25 @@ export const PUBLICATIONS: PubSeed[] = [
   "website": "https://nwf.org",
   "payMax": 250,
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=nwf.org"
+ },
+ {
+  "name": "Business Insider Lifestyle & EntertainmentDeep sea",
+  "payMax": 150,
+  "payArticle": "$130, minimum. For stories that require new, original photos rates start at $150",
+  "projection": "2500",
+  "editorName": "Kiera Fields",
+  "editorEmail": "pdifiore@insider.com",
+  "editorStyle": "https://advertising.businessinsider.com/create",
+  "editorLikes": "https://docs.google.com/document/d/1zmcUVb0aE2ZFYhR-AsoFcIoGalvANmIVM7ViF_u11XQ/edit?tab=t.0#heading=h.2tjws4ar0x8o",
+  "styleGuide": "short to the point story. All headlines look like a sentence",
+  "suggestedTypes": "We cover entertainment and lifestyle, which encompasses a lot of things (travel, pets, tattoos, movies, shows, food, fashion, beauty, style, books, casual fitness, van life, etc). Any pitches that are super health-, business-, or science-focused are not for me and I’ll probably pass on them unless they have some great lifestyle or entertainment peg. Kiera’s Twitter thread",
+  "columnIdea": "feel good stories",
+  "classification": "Freelance - Pay Per Article",
+  "tier": "[\"Tier 1: Open Applications\"]",
+  "frequency": "weekly",
+  "targetAudience": "Business professionals, entrepreneurs",
+  "topics": "https://docs.google.com/document/d/1JhK6-UCAjNSrup6iGCagUc4WpAoynewCv96qlGlkl1w/edit?tab=t.0 Sample Ideas for stories freelancers to source: Big Ideas/Personal Essay topics: People sharing their salary journeys Lottery winners or people who come in big sums of money suddenly People who invested their way out of the 9-to-5 Parenting and workaholics — how long hours impacts relationships and kids Comparision stories: I worked at TK Big Tech companies, TK consulting firms, VC firms, I lived in Tk big cities/countries here’s how they compare As told to 600-800 words, please send potential sources/interviewees for these ideas to kfields@insider.com Sources should be comfortable presenting their stories in the “as-told-to” format. Top Priority: I worked for Cascade Investments, Bill Gates’ investment firm. Here’s what it was like I worked in recruitment in NYC. It was a crazy, party machine. I gave up my pension to move abroad it was/wasn’t worth it. I bought a house, and it’s quickly losing value/has been destroyed by climate-change-fueled natural disasters. I’m the breadwinner of my family. Here’s how it impacts my relationship with my partner. I worked with Bob Iger/ at Disney during the Iger/Chapak rivalry. This is what it was like. I’m a Gen Z/millennial and my parents still do TK things for me (pay bills, pay rent, buy big ticket items). It’s a big help/makes me feel like an adult kid. People who have built their dream house cheaply aboard (Thailand, the Philippines, Mexico) Someone who works at a data center or lives near one about the industry impacts their lives/community Wealth advisors or consultants with ultrawealthy clients (Golden visa advisors, property advisors) who can give insights into the money habits of their clients Someone who was offered a promotion at a corporate job and turned it down because they were happy with their role and didn't want to work more/be a manager A millennial who bought a business from its boomer owners to run themselves Someone who has successfully retired early or tried to retire early and struggled/failed A Gen Z running a successful Airbnb business I work on a luxury yacht/exclusive hotel/spa. Here’s what my job is like. Business success stories, business topics in the news, interesting business models, making money online",
+  "website": "https://www.businessinsider.com"
  },
  {
   "name": "East End Taste",
@@ -1051,18 +1281,15 @@ export const PUBLICATIONS: PubSeed[] = [
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
-  "name": "Forbes",
-  "traffic": "110 million monthly",
-  "pay": "$10 for each New Paid Subscription Conversion on one of your posts or profile page | $15 for each New Paid Subscription Conversion if you convert five (5) or more subscribers in a given month | $1 for each New Registered Reader Conversion through the \"follow,\" \"comment\" or \"save\" options on one of your posts or profile page.",
-  "editors": "DeArbea Walker: dwalker@forbes.com (SportsMoney, Food & Drink, Venture Capital, Creator Economy and Entrepreneurs) | Jair Hilburn: jhilburn@forbes.com (CMO, Media, Hollywood & Entertainment, Social Media, ForbesBLK and Games) | Sarah Chandler Perez: schandler@forbes.com (Forbes Women) | Jeff Marcus: jmarcus@forbes.com (Main editor in charge of the entire contributor program) | Leigh Cuen lcuen@forbes.com (Leadership Strategy) | Helen Popki hpopkin@forbes.com (Careers)",
-  "submission": "No official submissions page.",
-  "website": "https://forbes.com",
-  "payMax": 15,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=forbes.com",
-  "writingStyle": "Write authoritative business journalism for entrepreneurs, executives, and investors, focusing on wealth creation, leadership, and market trends. Use a sophisticated, success-focused tone that celebrates achievement while providing strategic insights and market intelligence. Focus on billionaires, successful companies, and investment opportunities with Forbes' distinctive emphasis on wealth and power.",
-  "targetAudience": "Business owners, C-suite executives, investors, financial professionals",
-  "editorStyle": "Foreign Policy",
-  "editorLikes": "Foreign policy professionals, diplomats, political scientists, and internationally minded readers who shape or follow global affairs"
+  "name": "Noema",
+  "payMax": 50,
+  "payArticle": "$1.50 per word",
+  "projection": "4500",
+  "wordCount": "3000",
+  "editorName": "Frances Wade",
+  "editorEmail": "francis@noemamag.com",
+  "columnIdea": "I'm now commissioning longform essays and reported stories for @noemamag.com. If you have have ideas for pieces on climate & the natural world, nations, democracy, AI & tech, or anything else the magazine covers, drop me a DM/email: francis@noemamag.com.",
+  "classification": "Freelance - Pay Per Article"
  },
  {
   "name": "USA Today",
@@ -1099,7 +1326,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.technologyreview.com/how-to-pitch-mit-technology-review/",
   "website": "https://technologyreview.com",
   "payMax": 3,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=technologyreview.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=technologyreview.com",
+  "editorStyle": "How to pitch MIT Technology Review MIT Technology Review welcomes pitches from freelance writers across a broad range of topics. We encourage writers of all skill levels, and from all backgrounds, to pitch us. We are especially interested in hearing from writers with backgrounds that are traditionally under-represented in technology and science journalism, and from outside the United States. This guide will give you a brief overview of the kinds of stories we run, what we’re looking for in a pitch, and who to contact when you have an idea. Most of the stories that MIT Technology Review commissions come from pitches, but we do reach out to writers with assignments. We also issue a bi-monthly call for pitches for the print magazine. If you’d like to be considered for assignments and be informed of calls for pitches, you can fill out this form to be added to our database of freelance journalists. What is an MIT Technology Review story? MIT Technology Review publishes a wide range of stories, from breaking news to long-term investigations. We want stories about technology itself, but we’re particularly excited about those areas where technology and humans collide—where technology meets the real world. Our stories should feel like must-reads for people who want to stay up to date with how technology is changing our world. In general, we commission news stories (generally 800-1,000 words), analysis pieces (800-1,000 words), and features (2,500-4,000 words) from freelancers for the website. The print magazine offers other potential formats for stories in addition to news and features, including infographics and data spreads, essays, short profiles, and book reviews. If you are an expert interested in writing an op-ed for the magazine, you can find more information on the op-ed pitching and writing process here. What makes a good MIT Technology Review pitch? A pitch does not need to be long, but it should contain enough information to give the commissioning editor a good sense of what the end product would look like. A good pitch will tell us why our readers should care about your idea and why they should be reading about it now. It should also show how you (the writer) will make the story an enjoyable read. In general, there has to be a sense of urgency and a clear top line. Pitching to write about a topic isn’t enough: What is the story you’re going to tell us? What kind of take-away should readers have? One way to do this is to think about what the headline might be. You can look at our site to get a sense of how we write our headlines (for example, we generally avoid formulating headlines as questions). Please check to see if we have published similar stories recently. If it is an idea that hasn’t been covered by us but has been covered well by other outlets, explain how your story would stand apart. And if you have not written for MIT Technology Review before, be sure to introduce yourself and include links to a few relevant clips if you have them. News and analysis stories If you’re pitching a news story about a scientific or technological development, be sure to make clear why this advance (if it is an advance) is important and not just incremental. It can’t be significant only to researchers in the field: it has to be important to people in general. They should be able to read the story and instantly get a sense as to why it’s a big deal. In addition to straight news stories, we sometimes commission analysis pieces from freelance writers (examples here, here and here) that look at the news of the day through a new lens, adding context, insight, or new information to take the story forward. We’d want a quick pitch (and a quick turnaround) for such analysis pieces. Summing up what is already out there isn’t enough; you need to tell us what the new thing is you’re bringing to the story. What do people not know? What are the consequences of the event that many of our readers will be unaware of—but would be fascinated to learn about? Features and essays Features can take a wide range of possible approaches, including profiles, narrative features, and deep investigations. Ultimately, readers should enjoy reading them. So your pitch should not only explain what the story is and why it is important but show how you’d tell it in a compelling way. Feature pitches should have a specific story to tell—it is not enough to pitch an interesting topic. You must explain what kind of approach you’d take, what kind of ride you’ll take readers on. Who are the main characters? What obstacles or challenges will they meet on the way? How might your story resolve? What is the nut graf? We don’t expect you to have everything worked out in advance of reporting and writing the story, but the pitch should be able to give a sense of where the story will go. Similarly, pitches for essays need a clear argument. Explain what you want to say about the topic in hand, why you're qualified to write about it, what take-aways you hope to give readers, and the evidence you will marshal to make your case. Pitching for print MIT Technology Review publishes a bi-monthly print magazine. We run short news stories and profiles (500-800 words), op-eds, and data spreads in the front of the book and essays and book reviews in the back of the book (usually around 2000 words). The feature well of the magazine is devoted to narrative features, investigations, big profiles, and reported essays (generally between 2500-4000 words). Our features in each issue are centered around a theme. Here are the upcoming themes for 2025. Please note that specific pitch deadlines will be announced over e-mail. You can add yourself to the freelance database through the form linked at the top of this page to get the official call for pitches for each issue: • Jan/Feb: Breakthroughs [includes our annual round-up of high-impact innovations, pitches due late July/early August 2024] • March/April: Relationships [pitches due mid Sept 2024] • May/June: Creativity [pitches due mid-to-late November 2024] • July/August: Power [pitches due mid-to-late Jan 2025] • Sept/Oct: Security [pitches due mid-to-late March 2025] • Nov/Dec: The Body [pitches due mid-to-late May 2025] How much does MIT Technology Review pay? Rates range from $1 to $2 per word, depending on the experience level of the writer, the story, and the publication route. Deeply reported features pay more than shorter news pieces. Who do I pitch to? If you have any questions or if you are ready to send a pitch, please reach out to commissioning editor Rachel Courtland (rachel.courtland@technologyreview.com). Please be sure to include “PITCH” in the subject line of your email. We prefer pitches to be within the body of an e-mail instead of as an attachment."
  },
  {
   "name": "Strategy & Business Magazine",
@@ -1170,23 +1398,6 @@ export const PUBLICATIONS: PubSeed[] = [
   "website": "https://gizmodo.com",
   "payMax": 2,
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=gizmodo.com"
- },
- {
-  "name": "National Geographic",
-  "category": "All Topics",
-  "traffic": "8.6 million monthly",
-  "pay": "$1 to $2 per word.",
-  "topics": "Any type of article as long as it relates to nature, science, and travel.",
-  "editors": "Starlight Williams (Contrubutors): starlight.williams@natgeo.com",
-  "submission": "No official submissions page.",
-  "website": "https://nationalgeographic.com",
-  "applicationForm": "Kids stories form: https://ttj51ygan9g.typeform.com/to/vtdwJSXl?typeform",
-  "payMax": 2,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=nationalgeographic.com",
-  "writingStyle": "Write immersive, visually stunning journalism that explores science, nature, culture, and history with narrative power and photographic excellence. Use evocative, literary prose that transports readers to distant places and times while maintaining scientific accuracy and cultural sensitivity. Focus on stories that reveal the wonder and complexity of our world, always emphasizing conservation and cross-cultural understanding.",
-  "targetAudience": "Curious, educated general readers fascinated by science, nature, culture, history, and the world's wonders",
-  "editorStyle": "National Wildlife",
-  "editorLikes": "Nature lovers, wildlife advocates, and conservation-minded readers supporting the National Wildlife Federation"
  },
  {
   "name": "New Scientist",
@@ -1519,7 +1730,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://docs.google.com/document/d/1tx9NV87x6KpOTrSInGSpdHDlG7_jpMWQb2E4hWb5_H0/edit?tab=t.0",
   "website": "https://docs.google.com",
   "payMax": 1,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com",
+  "classification": "NOT WRITING FOR THEM",
+  "tier": "[\"Tier 1: Open Applications\"]"
  },
  {
   "name": "The Nation",
@@ -1543,6 +1756,21 @@ export const PUBLICATIONS: PubSeed[] = [
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com"
  },
  {
+  "name": "AARP.com",
+  "payMax": 0,
+  "payArticle": "$2/word",
+  "payAV": "$2,000",
+  "editorName": "Robert Love",
+  "suggestedTypes": "Retirement planning, wellness in business for seniors",
+  "targetAudience": "Retirees, senior citizens",
+  "topics": "Finances, retirement, wellness in business, mental wellness, spiritual topics, living a good life",
+  "website": "https://www.aarp.org"
+ },
+ {
+  "name": "BankRate",
+  "payMax": 0
+ },
+ {
   "name": "BDG (Bustle Digital Group)",
   "payMax": 0,
   "writingStyle": "Write relatable, identity-focused content for young women navigating modern life, using a conversational tone that feels like talking to a smart friend. Focus on relationships, career, culture, and self-discovery with honesty and humor, always centering millennial and Gen Z women's experiences and perspectives. Use personal narrative, expert quotes, and cultural analysis that validates readers' lives and challenges.",
@@ -1563,12 +1791,33 @@ export const PUBLICATIONS: PubSeed[] = [
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=blackenterprise.com"
  },
  {
-  "name": "CNN",
+  "name": "CEO World",
   "payMax": 0,
-  "writingStyle": "Write breaking news and analysis with journalistic authority and global perspective, using clear, objective language that serves diverse audiences. Focus on significant national and international stories with context and expert sourcing, always explaining why events matter and what comes next. Maintain CNN's brand of serious, trustworthy journalism while making complex stories accessible.",
-  "targetAudience": "General audience, business professionals, news-conscious readers",
-  "editorStyle": "Conde Nast Traveler",
-  "editorLikes": "Affluent, discerning travelers seeking curated, high-end travel experiences worldwide"
+  "website": "https://ceoworld.biz"
+ },
+ {
+  "name": "CNBC",
+  "payMax": 0,
+  "editorName": "https://www.cnbc.com/select/"
+ },
+ {
+  "name": "CNET (Voices)",
+  "payMax": 0,
+  "payArticle": "can pay $2-$3k for written articles and video articles",
+  "payAV": "$3k for video Articles $4k for branded video articles",
+  "editorName": "Nick Woly",
+  "editorEmail": "https://www.linkedin.com/posts/nickwolny_this-week-we-launched-a-new-franchise-at-activity-7204580305444167681-DlHi/?fbclid=IwY2xjawGIh5JleHRuA2FlbQIxMAABHTcpzytS1PETr8uD9NzM5rAPbEHCozRn4xkHHmCmX4EA48B53Lid9pIpAg_aem_q7xgqNUp8pOCg_k5ncMXAg",
+  "editorLikes": "write for career professionals and not businesses",
+  "suggestedTypes": "https://www.cnet.com/paid-content/news/the-walmart-deals-event-starts-today-10-items-to-consider-for-every-budget/",
+  "columnIdea": "talk about the intersection of a topic and Tech for regular career professionals NOT business or entrepreneurs",
+  "niche": "[\"Tech\",\"Health\"]",
+  "targetAudience": "career employees NOT ENTREPRENEURS OR BUSINESS",
+  "website": "https://www.cnet.com cnet.com/cnet-voices/"
+ },
+ {
+  "name": "Conde Naste Travel",
+  "payMax": 0,
+  "editorEmail": "megan_spurrell@condenast.com"
  },
  {
   "name": "Digiday",
@@ -1577,6 +1826,14 @@ export const PUBLICATIONS: PubSeed[] = [
   "targetAudience": "Marketing professionals, CMOs, content strategists, ad industry insiders",
   "editorStyle": "DiningOut Magazine",
   "editorLikes": "Foodies, restaurant-goers, and hospitality professionals interested in restaurant culture, dining trends, and chef stories"
+ },
+ {
+  "name": "Digital Frontier",
+  "payMax": 0,
+  "editorName": "Rohan Banerjee",
+  "editorEmail": "rohan@digitalfrontier.com",
+  "topics": "Would love to hear some culture-tech stories! Looking for freelance pitches on subjects where tech (not just AI) is changing the way we engage with arts, politics, sport and society. Hit me up on rohan@digitalfrontier.com",
+  "website": "https://digitalfrontier.com/about"
  },
  {
   "name": "EDTECH Magazine",
@@ -1592,7 +1849,26 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write actionable business content for startup founders and small business owners, focusing on practical strategies, growth tactics, and entrepreneurial mindset. Use an energetic, motivational tone that balances inspiration with concrete advice, always emphasizing execution and results over theory. Focus on real entrepreneur stories, proven frameworks, and tactical guidance that readers can apply to their businesses.",
   "targetAudience": "Entrepreneurs, startup founders, small business owners, aspiring business builders",
   "editorStyle": "Esquire",
-  "editorLikes": "Educated, culturally engaged men interested in style, politics, culture, and ideas"
+  "editorLikes": "Educated, culturally engaged men interested in style, politics, culture, and ideas",
+  "payAV": "$0.50/ word",
+  "website": "https://www.entrepreneur.com"
+ },
+ {
+  "name": "FenderBender",
+  "payMax": 0,
+  "niche": "[\"Cars\"]"
+ },
+ {
+  "name": "Fodors (travel)",
+  "payMax": 0
+ },
+ {
+  "name": "FORBES Advisor",
+  "payMax": 0
+ },
+ {
+  "name": "FoxBusiness",
+  "payMax": 0
  },
  {
   "name": "GameSpot",
@@ -1611,6 +1887,47 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorLikes": "Millennials and Gen Z adults seeking approachable, stigma-free health and wellness content (dermatology, mental health, sexual health)"
  },
  {
+  "name": "http://motley-bloom.com/",
+  "payMax": 0
+ },
+ {
+  "name": "https://thehustle.co/news?hubs_content=thehustle.co%2F&hubs_content-cta=null",
+  "payMax": 0
+ },
+ {
+  "name": "https://www.fastcompany.com/section/modern-ceo",
+  "payMax": 0
+ },
+ {
+  "name": "Hubspot",
+  "payMax": 0,
+  "editorName": "https://form.asana.com/?k=fhiUwpizv-utSbUlUqsBJw&d=8587152060687"
+ },
+ {
+  "name": "Huffington Parenting & Relationships",
+  "payMax": 0,
+  "editorName": "Noah Michelson - very responsive either way y/n to pitches",
+  "suggestedTypes": "huffpost.com/static/how-to-pitch-huffpost",
+  "columnIdea": "Family & Relationships",
+  "classification": "Freelance - Pay Per Article",
+  "tier": "[\"Tier 1: Open Applications\"]",
+  "niche": "[\"Parenting\",\"News\",\"Relationships\"]",
+  "website": "https://www.huffpost.com"
+ },
+ {
+  "name": "Huffington Post General",
+  "payMax": 0,
+  "editorName": "Noah wants a lot of the lessons learned",
+  "writingInstruction": "they want to see a draft of the article before the editor accepts",
+  "suggestedTypes": "huffpost.com/static/how-to-pitch-huffpost",
+  "columnIdea": "family and relationship and go deep. EOL app can be the scenario to build on",
+  "tier": "[\"Tier 1: Open Applications\"]",
+  "niche": "[\"Parenting\",\"News\",\"Relationships\"]",
+  "topics": "family and relationhsip and go deep. EOL app can be the scenario to build on",
+  "formToSubmit": "https://docs.google.com/forms/d/e/1FAIpQLSdVVTTGdo9CfZN4FUujM5hODF1RVsfTRvnguCB9QiXYnod8jw/viewform?fbzx=4427941639059578228",
+  "website": "https://www.huffpost.com"
+ },
+ {
   "name": "Inc.com",
   "traffic": "15 million monthly",
   "editors": "contributors@inc.com (general) | Rebecca Deczynski (Senior Editor): rdeczynski@inc.com | Stephanie Taylor (Senior Editor): staylor@inc.com |They aslo have a submission form: https://airtable.com/appP8Vuy2BX3x1Blp/shrddwSfmMZG7y0Fb",
@@ -1619,15 +1936,61 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write growth-focused business content for venture-backed startups and scaling companies, using data-driven insights and founder stories. Focus exclusively on serious tech startups and high-growth companies (not lifestyle businesses or online marketing), always emphasizing scalable strategies and VC-backed growth. Use an authoritative, startup-fluent tone that speaks to founders building companies, not side hustles.",
   "targetAudience": "Startup founders, venture-backed companies, tech business leaders — NOT internet marketers or online business hustlers",
   "editorStyle": "International Living",
-  "editorLikes": "Americans (especially retirees and pre-retirees) considering living, retiring, or investing abroad"
+  "editorLikes": "Americans (especially retirees and pre-retirees) considering living, retiring, or investing abroad",
+  "editorName": "inc.com/inc-columnist-proposal-pitch-form.html",
+  "editorEmail": "2000",
+  "styleGuide": "https://airtable.com/appP8Vuy2BX3x1Blp/shrddwSfmMZG7y0Fb",
+  "suggestedTypes": "400 to 800 words max first person style and unique",
+  "columnIdea": "Analytical Publication. They don’t want opinion. They want something reported",
+  "classification": "Columnist",
+  "tier": "[\"Tier 1: Open Applications\"]",
+  "niche": "[\"Business\",\"Leadership\"]",
+  "website": "https://www.inc.com"
  },
  {
-  "name": "People Magazine",
+  "name": "Life Hacker",
   "payMax": 0,
-  "writingStyle": "Write accessible, human-interest stories about celebrities and entrepreneurs with warmth and relatability, focusing on personal journeys and emotional resonance. Use conversational, upbeat prose that makes famous people feel approachable while celebrating their achievements, always emphasizing universal themes of family, perseverance, and triumph. Structure stories around compelling personal details and quotes that reveal character.",
-  "targetAudience": "General interest readers, aspiring entrepreneurs, mainstream American audience across all demographics",
-  "editorStyle": "Playboy",
-  "editorLikes": "Culturally literate adults interested in politics, culture, sex, art, and long-form journalism"
+  "editorName": "Kristen",
+  "columnIdea": "Gadget Reviews. Product pitches"
+ },
+ {
+  "name": "LinkedIn",
+  "payMax": 0
+ },
+ {
+  "name": "Mashable",
+  "payMax": 0,
+  "classification": "Freelance - Pay Per Article"
+ },
+ {
+  "name": "McClatchy",
+  "payMax": 0,
+  "editorName": "Abby Kass",
+  "editorEmail": "akass@mcclatchy.com",
+  "editorStyle": "Commerce and Content Editor",
+  "topics": "We're looking to add some #freelance writers to our commerce team at McClatchy. Right now, we're looking for writers with expertise in the following categories/beats: - Babies/Kids - Pets - Beauty If this is something you're interested in and think you'd be a good fit for any (or all!) of these categories, send me a DM or email me at akass@mcclatchy.com, and we can talk. #freelancing #freelancewriting #freelanceopportunity #commerce #shopping #writers"
+ },
+ {
+  "name": "Mens Health",
+  "payMax": 0
+ },
+ {
+  "name": "New Science",
+  "payMax": 0
+ },
+ {
+  "name": "New York Times",
+  "payMax": 0
+ },
+ {
+  "name": "Parenting Magazine",
+  "payMax": 0,
+  "topics": "Heres what you need to know. not HOW TO. just give the data and facts",
+  "website": "https://www.parents.com"
+ },
+ {
+  "name": "Parents.com",
+  "payMax": 0
  },
  {
   "name": "Road",
@@ -1646,6 +2009,23 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorLikes": "Scientifically literate general readers, researchers, science enthusiasts, and policy makers"
  },
  {
+  "name": "Slate.com",
+  "payMax": 0
+ },
+ {
+  "name": "Southern Living",
+  "payMax": 0
+ },
+ {
+  "name": "Spiceworks",
+  "payMax": 0
+ },
+ {
+  "name": "Success Print",
+  "payMax": 0,
+  "editorStyle": "success.com/wp-content/uploads/2024/11/2025_MEDIAKIT_V2.pdf"
+ },
+ {
   "name": "Success.com",
   "traffic": "550,000 monthly",
   "editors": "Tyler Clayton (Content Director) tyler.clayton@success.com",
@@ -1653,11 +2033,74 @@ export const PUBLICATIONS: PubSeed[] = [
   "payMax": 0
  },
  {
-  "name": "Workforce Magazine",
+  "name": "The Good Men Project",
   "payMax": 0,
-  "writingStyle": "Write practical career content for professionals navigating full-time work, focusing on workplace challenges, career advancement, and work-life balance. Use a relatable, supportive tone that speaks to employees (not entrepreneurs) seeking guidance on navigating corporate life and building careers. Focus on workplace dynamics, career development, and professional growth with actionable advice for career professionals.",
-  "targetAudience": "Career professionals, job seekers, people balancing full-time work with side hustles",
-  "editorStyle": "Worth Magazine",
-  "editorLikes": "High-net-worth individuals, family offices, and impact investors interested in wealth, purpose, and philanthropy"
+  "formToSubmit": "http://www.medill.northwestern.edu"
+ },
+ {
+  "name": "The Muse",
+  "payMax": 0
+ },
+ {
+  "name": "The New Yorker",
+  "payMax": 0,
+  "payArticle": "$1-$3/word",
+  "payAV": "$4,000",
+  "editorName": "Michael Luo",
+  "suggestedTypes": "AI impact on society, leadership lessons from unique perspectives",
+  "niche": "[\"Lifestyle\",\"Food\",\"Parenting\",\"Personality\"]",
+  "targetAudience": "Intellectuals, culture enthusiasts",
+  "topics": "AI, interesting stories, success lessons, leadership, personal finance, spirituality in business topics",
+  "website": "https://www.newyorker.com"
+ },
+ {
+  "name": "ThrillList.com",
+  "payMax": 0,
+  "editorName": "Joe Erbentraut",
+  "editorStyle": "Travel and other topics: https://x.com/robojojo/status/1775999343134126417",
+  "niche": "[\"Travel\"]",
+  "topics": "pop culture"
+ },
+ {
+  "name": "Today Show",
+  "payMax": 0
+ },
+ {
+  "name": "Today.com",
+  "payMax": 0,
+  "editorName": "Rheana Murray"
+ },
+ {
+  "name": "Travel + Leisure",
+  "payMax": 0
+ },
+ {
+  "name": "USA Today (Branded Content Studio)http://advertising.usatoday.com/partners/get-creative/http://advertising.usatoday.com/partners/get-creative/",
+  "payMax": 0
+ },
+ {
+  "name": "Wall Street Journal wsj.com",
+  "payMax": 0,
+  "columnIdea": "https://www.wsj.com/buyside",
+  "classification": "Freelance - Pay Per Article"
+ },
+ {
+  "name": "Women’s Health",
+  "payMax": 0
+ },
+ {
+  "name": "Yale",
+  "payMax": 0,
+  "editorEmail": "theyalereview@yale.edu"
+ },
+ {
+  "name": "Yoga Journal",
+  "payMax": 0,
+  "tier": "[\"Tier 1: Open Applications\"]",
+  "website": "yogajournal.com"
+ },
+ {
+  "name": "ZDNet",
+  "payMax": 0
  }
 ];

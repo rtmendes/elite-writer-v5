@@ -77,6 +77,18 @@ const PUB_FIELD_DEFS: Array<{ key: string; name: string; type: Field["type"]; wi
   { key: "editorStyle", name: "Editor's Style", type: "longtext", width: 320 },
   { key: "editorLikes", name: "What Editor Likes", type: "longtext", width: 320 },
   { key: "targetAudience", name: "Target Audience", type: "longtext", width: 280 },
+  { key: "payArticle", name: "Pay Rate (Article)", type: "text", width: 150 },
+  { key: "projection", name: "Projection $", type: "currency", width: 120 },
+  { key: "wordCount", name: "Word Count", type: "number", width: 110 },
+  { key: "editorName", name: "Editor Name", type: "text", width: 180 },
+  { key: "editorEmail", name: "Editor Email", type: "text", width: 200 },
+  { key: "writingInstruction", name: "Writing Instruction", type: "longtext", width: 320 },
+  { key: "styleGuide", name: "Style Guide", type: "longtext", width: 240 },
+  { key: "suggestedTypes", name: "Suggested Article Types", type: "longtext", width: 260 },
+  { key: "doNotWrite", name: "Do NOT Write", type: "longtext", width: 240 },
+  { key: "columnIdea", name: "Column Idea", type: "longtext", width: 260 },
+  { key: "classification", name: "Classification", type: "text", width: 150 },
+  { key: "tier", name: "Tier", type: "text", width: 200 },
   { key: "submission", name: "Submission Info", type: "longtext", width: 300 },
   { key: "applicationForm", name: "Application Form", type: "url", width: 200 },
   { key: "difficulty", name: "Pitch Difficulty", type: "rating", width: 130 },
@@ -123,7 +135,7 @@ async function ensurePublications() {
 
   // Fresh install: build the full rich database
   if (!existing) {
-    if (await db.kv.get("seed:publications:v3")) return;
+    if (await db.kv.get("seed:publications:v4")) return;
     const now = Date.now();
     const { fields, byKey } = buildPubFields();
     const database: Database = {
@@ -148,13 +160,13 @@ async function ensurePublications() {
       await db.rows.add(row);
       void enqueue("rows", row.id, "upsert");
     }
-    await db.kv.put({ key: "seed:publications:v3", value: true });
+    await db.kv.put({ key: "seed:publications:v4", value: true });
     return;
   }
 
   // Upgrade path: a thin Publications table already exists (the 4-field seed).
   // Add missing fields, backfill empty cells, add new outlets — non-destructive.
-  if (await db.kv.get("seed:publications:v3")) return;
+  if (await db.kv.get("seed:publications:v4")) return;
   const fresh = (await db.databases.get(existing.id))!;
   const fieldByName = new Map(fresh.fields.map((f) => [f.name.toLowerCase(), f]));
   const addedFields: Field[] = [];
@@ -195,7 +207,7 @@ async function ensurePublications() {
       order++;
     }
   }
-  await db.kv.put({ key: "seed:publications:v3", value: true });
+  await db.kv.put({ key: "seed:publications:v4", value: true });
 }
 
 async function ensureClaimLedger() {
@@ -520,6 +532,10 @@ async function publicationStyleBrief(pubName: string): Promise<string> {
   const es = get("Editor's Style"); if (es) parts.push(`EDITOR'S STYLE: ${es}`);
   const el = get("What Editor Likes"); if (el) parts.push(`WHAT THIS EDITOR LIKES: ${el}`);
   const ta = get("Target Audience"); if (ta) parts.push(`TARGET AUDIENCE: ${ta}`);
+  const wi = get("Writing Instruction"); if (wi) parts.push(`WRITING INSTRUCTION: ${wi}`);
+  const sg = get("Style Guide"); if (sg) parts.push(`STYLE GUIDE: ${sg}`);
+  const sat = get("Suggested Article Types"); if (sat) parts.push(`PREFERRED ARTICLE TYPES: ${sat}`);
+  const dnw = get("Do NOT Write"); if (dnw) parts.push(`DO NOT WRITE: ${dnw}`);
   return parts.length ? `\n\nMATCH THIS PUBLICATION'S HOUSE STYLE (do not re-research — use this):\n${parts.join("\n")}` : "";
 }
 
