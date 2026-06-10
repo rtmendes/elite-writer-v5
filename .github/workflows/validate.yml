@@ -1,8 +1,8 @@
 name: Lint & Build Validation
 
+# PR-only — runs once per pull request, not again on the merge push, to keep
+# GitHub Actions minutes low. Deploys happen on the VPS via cron (no Actions).
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -30,6 +30,9 @@ jobs:
 
       - name: Lint report
         run: pnpm eslint . --max-warnings 600 || echo "⚠️ Lint issues found — see above. Non-blocking until tech debt is resolved."
+
+      - name: Tests
+        run: pnpm vitest run
 
       - name: Build check
         run: pnpm build
