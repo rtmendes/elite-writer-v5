@@ -1,11 +1,62 @@
+import { useLiveQuery } from "dexie-react-hooks";
 import React, { useEffect, useRef, useState } from "react";
-import { Check, ExternalLink, ImagePlus } from "lucide-react";
-import type { Field } from "../types";
+import { Check, ExternalLink, ImagePlus, Link2, Search, X } from "lucide-react";
+import { db } from "../db";
+import type { Database, Field, Row } from "../types";
 import { Menu, Stars, Tag, formatCurrency, formatDate } from "../ui";
 
+function rowTitleOf(database: Database | undefined, row: Row | undefined): string {
+  if (!database || !row) return "";
+  const v = row.values[database.fields[0]?.id];
+  return v ? String(v) : "Untitled";
+}
+
+/** Renders linked record titles for a relation field. */
+function RelationChip({ field, value }: { field: Field; value: unknown }) {
+  const ids = Array.isArray(value) ? (value as string[]) : value ? [String(value)] : [];
+  const target = useLiveQuery(() => (field.relationDbId ? db.databases.get(field.relationDbId) : undefined), [field.relationDbId]);
+  const rows = useLiveQuery(
+    async () => (field.relationDbId ? await db.rows.where("dbId").equals(field.relationDbId).toArray() : []),
+    [field.relationDbId],
+  ) ?? [];
+  if (ids.length === 0) return null;
+  return (
+    <>
+      {ids.map((id) => {
+        const row = rows.find((r) => r.id === id);
+        return (
+          <Tag key={id} color="blue">
+            <Link2 size={10} style={{ marginRight: 2, verticalAlign: -1 }} />
+            {rowTitleOf(target, row) || "—"}
+          </Tag>
+        );
+      })}
+    </>
+  );
+}
+
+/** Resolves a lookup field: reads a field on the first linked record. */
+function LookupChip({ field, row, database }: { field: Field; row?: Row; database?: Database }) {
+  const relField = database?.fields.find((f) => f.id === field.lookupRelationId);
+  const linkedIds = relField && row ? (Array.isArray(row.values[relField.id]) ? (row.values[relField.id] as string[]) : []) : [];
+  const targetDb = useLiveQuery(() => (relField?.relationDbId ? db.databases.get(relField.relationDbId) : undefined), [relField?.relationDbId]);
+  const linkedRow = useLiveQuery(
+    async () => (linkedIds[0] ? await db.rows.get(linkedIds[0]) : undefined),
+    [linkedIds[0]],
+  );
+  if (!relField || !targetDb || !linkedRow) return null;
+  const lf = targetDb.fields.find((f) => f.id === field.lookupFieldId);
+  if (!lf) return null;
+  return <ValueChip field={lf} value={linkedRow.values[lf.id]} />;
+}
+
 /** Read-only presentation of a value (used by board/gallery/list cards too). */
-export function ValueChip({ field, value }: { field: Field; value: unknown }) {
+export function ValueChip({ field, value, row, database }: { field: Field; value: unknown; row?: Row; database?: Database }) {
   switch (field.type) {
+    case "relation":
+      return <RelationChip field={field} value={value} />;
+    case "lookup":
+      return <LookupChip field={field} row={row} database={database} />;
     case "select": {
       const o = field.options?.find((o) => o.id === value);
       return o ? <Tag color={o.color}>{o.name}</Tag> : null;
@@ -42,15 +93,60 @@ export function ValueChip({ field, value }: { field: Field; value: unknown }) {
   }
 }
 
+/** Searchable picker for relation (linked-record) fields. */
+function RelationPicker({ field, value, anchor, onChange, onClose }: {
+  field: Field; value: unknown; anchor: HTMLElement; onChange: (v: unknown) => void; onClose: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const target = useLiveQuery(() => (field.relationDbId ? db.databases.get(field.relationDbId) : undefined), [field.relationDbId]);
+  const rows = useLiveQuery(
+    async () => (field.relationDbId ? await db.rows.where("dbId").equals(field.relationDbId).toArray() : []),
+    [field.relationDbId],
+  ) ?? [];
+  const ids = Array.isArray(value) ? (value as string[]) : value ? [String(value)] : [];
+  const titleId = target?.fields[0]?.id;
+  const filtered = rows
+    .filter((r) => !q || String(r.values[titleId ?? ""] ?? "").toLowerCase().includes(q.toLowerCase()))
+    .slice(0, 40);
+  return (
+    <Menu anchor={anchor} onClose={onClose} width={260}>
+      <div style={{ padding: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, border: "1px solid var(--border)", borderRadius: 6, padding: "3px 7px", marginBottom: 4 }}>
+          <Search size={12} style={{ color: "var(--text-faint)" }} />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${target?.name ?? "records"}…`}
+            style={{ border: "none", outline: "none", background: "transparent", color: "var(--text)", fontSize: 13, width: "100%" }} />
+        </div>
+        {filtered.map((r) => {
+          const selected = ids.includes(r.id);
+          return (
+            <button key={r.id} className="menu-item" onClick={() => {
+              onChange(selected ? ids.filter((i) => i !== r.id) : [...ids, r.id]);
+            }}>
+              <Link2 size={12} style={{ color: "var(--text-faint)" }} />
+              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>{String(r.values[titleId ?? ""] ?? "Untitled")}</span>
+              {selected && <Check size={13} />}
+            </button>
+          );
+        })}
+        {filtered.length === 0 && <div className="menu-label">No matching records</div>}
+      </div>
+    </Menu>
+  );
+}
+
 /** Editable table cell. */
 export function Cell({
   field,
   value,
   onChange,
+  row,
+  database,
 }: {
   field: Field;
   value: unknown;
   onChange: (v: unknown) => void;
+  row?: Row;
+  database?: Database;
 }) {
   const [editing, setEditing] = useState(false);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -60,6 +156,25 @@ export function Cell({
   useEffect(() => {
     if (editing) inputRef.current?.focus();
   }, [editing]);
+
+  // lookup = read-only computed value
+  if (field.type === "lookup") {
+    return <div className="cell"><LookupChip field={field} row={row} database={database} /></div>;
+  }
+
+  // relation = searchable linked-record picker
+  if (field.type === "relation") {
+    return (
+      <>
+        <div className="cell editable" onClick={(e) => setAnchor(e.currentTarget)}>
+          <RelationChip field={field} value={value} />
+        </div>
+        {anchor && (
+          <RelationPicker field={field} value={value} anchor={anchor} onChange={onChange} onClose={() => setAnchor(null)} />
+        )}
+      </>
+    );
+  }
 
   // checkbox + rating edit inline without popover
   if (field.type === "checkbox") {

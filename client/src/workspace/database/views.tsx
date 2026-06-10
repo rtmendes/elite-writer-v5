@@ -70,14 +70,14 @@ export function TableView(p: ViewProps) {
                   {i === 0 ? (
                     <div style={{ display: "flex", alignItems: "center" }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <Cell field={f} value={row.values[f.id]} onChange={(v) => setRowValue(row.id, f.id, v)} />
+                        <Cell field={f} value={row.values[f.id]} onChange={(v) => setRowValue(row.id, f.id, v)} row={row} database={p.database} />
                       </div>
                       <button className="row-open-btn" style={{ marginRight: 8 }} onClick={() => p.onOpenRow(row)}>
                         OPEN
                       </button>
                     </div>
                   ) : (
-                    <Cell field={f} value={row.values[f.id]} onChange={(v) => setRowValue(row.id, f.id, v)} />
+                    <Cell field={f} value={row.values[f.id]} onChange={(v) => setRowValue(row.id, f.id, v)} row={row} database={p.database} />
                   )}
                 </td>
               ))}
@@ -176,7 +176,7 @@ export function KanbanView(p: ViewProps) {
                     <div className="kcard-title">{rowTitle(p.database, row)}</div>
                     <div className="kcard-meta">
                       {cardFields.map((f) => (
-                        <ValueChip key={f.id} field={f} value={row.values[f.id]} />
+                        <ValueChip key={f.id} field={f} value={row.values[f.id]} row={row} database={p.database} />
                       ))}
                     </div>
                   </div>
@@ -212,7 +212,7 @@ export function GalleryView(p: ViewProps) {
               <div className="gallery-title">{rowTitle(p.database, row)}</div>
               <div className="kcard-meta">
                 {metaFields.map((f) => (
-                  <ValueChip key={f.id} field={f} value={row.values[f.id]} />
+                  <ValueChip key={f.id} field={f} value={row.values[f.id]} row={row} database={p.database} />
                 ))}
               </div>
             </div>
@@ -244,7 +244,7 @@ export function ListView(p: ViewProps) {
             {metaFields.map((f) => {
               if (f.type === "currency") return <span key={f.id}>{formatCurrency(row.values[f.id])}</span>;
               if (f.type === "date") return <span key={f.id}>{formatDate(row.values[f.id])}</span>;
-              return <ValueChip key={f.id} field={f} value={row.values[f.id]} />;
+              return <ValueChip key={f.id} field={f} value={row.values[f.id]} row={row} database={p.database} />;
             })}
           </div>
         </div>
