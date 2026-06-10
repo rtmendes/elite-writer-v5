@@ -6,6 +6,7 @@
 import { runTask } from "./agent";
 import { createRow, db, makeView, uid, updateDatabase, updateRow } from "./db";
 import { enqueue } from "./sync";
+import { autoFillFeeFromPublication } from "./finance";
 import { PUBLICATIONS } from "./publications-data";
 import type { Database, Field, Row, SelectOption } from "./types";
 
@@ -363,6 +364,7 @@ ${summary}`,
     }
   }
   await appendToNotes(row, "Publication matches", out);
+  await autoFillFeeFromPublication(database, row); // pull pay rate → Fee
   return out;
 }
 
