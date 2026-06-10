@@ -959,3 +959,27 @@ export const contentStudioItems = mysqlTable("content_studio_items", {
 
 export type ContentStudioItem = typeof contentStudioItems.$inferSelect;
 export type InsertContentStudioItem = typeof contentStudioItems.$inferInsert;
+
+// ─── Workspace Module (Notion/Airtable-style pages + databases) ───────────
+// Generic JSON documents with last-write-wins sync; client keeps a Dexie
+// cache and pushes/pulls through the workspace tRPC router.
+export const wsPages = mysqlTable("wsPages", {
+  id: varchar("id", { length: 32 }).primaryKey(),
+  data: json("data").notNull(),
+  updatedAt: bigint("updatedAt", { mode: "number" }).notNull().default(0),
+  deleted: boolean("deleted").notNull().default(false),
+});
+
+export const wsDatabases = mysqlTable("wsDatabases", {
+  id: varchar("id", { length: 32 }).primaryKey(),
+  data: json("data").notNull(),
+  updatedAt: bigint("updatedAt", { mode: "number" }).notNull().default(0),
+  deleted: boolean("deleted").notNull().default(false),
+});
+
+export const wsRows = mysqlTable("wsRows", {
+  id: varchar("id", { length: 32 }).primaryKey(),
+  data: json("data").notNull(),
+  updatedAt: bigint("updatedAt", { mode: "number" }).notNull().default(0),
+  deleted: boolean("deleted").notNull().default(false),
+});
