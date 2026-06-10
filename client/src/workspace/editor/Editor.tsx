@@ -24,7 +24,7 @@ import { db } from "../db";
 import type { Database } from "../types";
 import { DatabaseScreen } from "../database/DatabaseScreen";
 
-const CHART_COLORS = ["#c2410c", "#1b5e93", "#1d6f42", "#7d5c0e", "#5b3b8c", "#9c2f63", "#14605c", "#a13226", "#944d10"];
+const CHART_COLORS = ["#9a7b4f", "#3a6ea5", "#2e8b6f", "#8a5a9c", "#b06a8f", "#5a7d3a", "#a35a4a", "#4a6b8a", "#8a7d4a"];
 
 // ── Chart block (live infographic bound to a database) ─────────────────────
 function ChartRenderer({

@@ -3,20 +3,21 @@
   --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-serif: "Lora", Georgia, serif;
 
-  --bg: #fdfdfc;
+  /* Quiet-luxury light: cool paper white, slate ink, muted antique-gold accent */
+  --bg: #fbfbfc;
   --bg-raised: #ffffff;
-  --bg-sidebar: #f7f6f3;
-  --bg-hover: rgba(0, 0, 0, 0.045);
-  --bg-active: rgba(0, 0, 0, 0.08);
-  --text: #1f1e1b;
-  --text-soft: #6f6d66;
-  --text-faint: #a3a09a;
-  --border: #e8e6e1;
-  --border-strong: #d6d3cc;
-  --accent: #c2410c;
-  --accent-soft: rgba(194, 65, 12, 0.1);
-  --shadow: 0 1px 2px rgba(20, 18, 12, 0.05), 0 4px 16px rgba(20, 18, 12, 0.07);
-  --shadow-lg: 0 4px 12px rgba(20, 18, 12, 0.1), 0 16px 48px rgba(20, 18, 12, 0.16);
+  --bg-sidebar: #f4f5f7;
+  --bg-hover: rgba(15, 23, 42, 0.04);
+  --bg-active: rgba(15, 23, 42, 0.07);
+  --text: #1a1d24;
+  --text-soft: #5b6471;
+  --text-faint: #9aa2af;
+  --border: #e7e9ee;
+  --border-strong: #d2d6df;
+  --accent: #9a7b4f;
+  --accent-soft: rgba(154, 123, 79, 0.12);
+  --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 4px 14px rgba(17, 24, 39, 0.06);
+  --shadow-lg: 0 4px 12px rgba(17, 24, 39, 0.09), 0 16px 48px rgba(17, 24, 39, 0.14);
   --radius: 8px;
 
   --tag-gray-bg: #ecebe9; --tag-gray-fg: #504f4b;
@@ -31,20 +32,21 @@
 }
 
 .dark .ws-root {
-  --bg: #191919;
-  --bg-raised: #202020;
-  --bg-sidebar: #1f1f1f;
-  --bg-hover: rgba(255, 255, 255, 0.055);
-  --bg-active: rgba(255, 255, 255, 0.1);
-  --text: #e8e6e3;
-  --text-soft: #9b9892;
-  --text-faint: #6b6963;
-  --border: #2e2d2b;
-  --border-strong: #403e3b;
-  --accent: #f97316;
-  --accent-soft: rgba(249, 115, 22, 0.14);
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.5), 0 16px 48px rgba(0, 0, 0, 0.55);
+  /* Quiet-luxury dark: deep slate-navy, soft warm-gold accent */
+  --bg: #14161c;
+  --bg-raised: #1b1e26;
+  --bg-sidebar: #161920;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.09);
+  --text: #e7e9ee;
+  --text-soft: #9aa2b1;
+  --text-faint: #646c7c;
+  --border: #282c36;
+  --border-strong: #383d49;
+  --accent: #c9a76b;
+  --accent-soft: rgba(201, 167, 107, 0.15);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.55), 0 16px 48px rgba(0, 0, 0, 0.6);
 
   --tag-gray-bg: #373735; --tag-gray-fg: #c8c6c1;
   --tag-blue-bg: #1d3a52; --tag-blue-fg: #8ec4ee;
@@ -83,7 +85,7 @@
 }
 .sidebar-logo {
   width: 28px; height: 28px; border-radius: 7px;
-  background: linear-gradient(135deg, #c2410c, #f59e0b);
+  background: linear-gradient(135deg, #2c303b, #c9a76b);
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 800; font-size: 13px; letter-spacing: -0.5px;
   flex-shrink: 0;
@@ -375,7 +377,7 @@ tr:hover .row-open-btn, .gallery-card:hover .row-open-btn, .list-row:hover .row-
 .ws-hero {
   position: relative; border-radius: 14px; overflow: hidden;
   min-height: 150px; display: flex; align-items: flex-end;
-  background: linear-gradient(120deg, #1c1917 0%, #44403c 55%, #92400e 130%);
+  background: linear-gradient(120deg, #14161c 0%, #2c303b 55%, #6b5836 130%);
   margin-bottom: 24px; box-shadow: var(--shadow);
 }
 .ws-hero img {
