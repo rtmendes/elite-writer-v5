@@ -1,6 +1,7 @@
+import { useLiveQuery } from "dexie-react-hooks";
 import React, { useState } from "react";
 import { Trash2, X } from "lucide-react";
-import { uid, updateDatabase } from "../db";
+import { db, uid, updateDatabase } from "../db";
 import { FIELD_TYPE_LABELS, OPTION_COLORS, type Database, type Field, type FieldType } from "../types";
 import { Menu, Tag } from "../ui";
 
@@ -19,20 +20,30 @@ export function FieldEditor({
   const [type, setType] = useState<FieldType>(field?.type ?? "text");
   const [options, setOptions] = useState(field?.options ?? []);
   const [newOption, setNewOption] = useState("");
+  const [relationDbId, setRelationDbId] = useState(field?.relationDbId ?? "");
+  const [lookupRelationId, setLookupRelationId] = useState(field?.lookupRelationId ?? "");
+  const [lookupFieldId, setLookupFieldId] = useState(field?.lookupFieldId ?? "");
+
+  const allDbs = useLiveQuery(() => db.databases.toArray(), []) ?? [];
+  const relationFields = database.fields.filter((f) => f.type === "relation");
+  const lookupTargetDb = allDbs.find((d) => d.id === relationFields.find((f) => f.id === lookupRelationId)?.relationDbId);
 
   const isFirst = field && database.fields[0]?.id === field.id;
 
   const save = async () => {
     const trimmed = name.trim() || "Untitled field";
+    const extra: Partial<Field> = {};
+    if (type === "relation") extra.relationDbId = relationDbId || undefined;
+    if (type === "lookup") { extra.lookupRelationId = lookupRelationId || undefined; extra.lookupFieldId = lookupFieldId || undefined; }
     if (field) {
       const fields = database.fields.map((f) =>
-        f.id === field.id ? { ...f, name: trimmed, type, options: needsOptions(type) ? options : undefined } : f,
+        f.id === field.id ? { ...f, name: trimmed, type, options: needsOptions(type) ? options : undefined, ...extra } : f,
       );
       await updateDatabase(database.id, { fields });
     } else {
       const fields = [
         ...database.fields,
-        { id: uid(), name: trimmed, type, options: needsOptions(type) ? options : undefined, width: 160 },
+        { id: uid(), name: trimmed, type, options: needsOptions(type) ? options : undefined, width: 160, ...extra },
       ];
       await updateDatabase(database.id, { fields });
     }
@@ -64,6 +75,36 @@ export function FieldEditor({
             <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
           ))}
         </select>
+
+        {type === "relation" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <div className="menu-label" style={{ padding: 0 }}>Link to which database?</div>
+            <select className="input" value={relationDbId} onChange={(e) => setRelationDbId(e.target.value)}>
+              <option value="">Pick a database…</option>
+              {allDbs.filter((d) => d.id !== database.id).map((d) => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {type === "lookup" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <div className="menu-label" style={{ padding: 0 }}>Through which link?</div>
+            <select className="input" value={lookupRelationId} onChange={(e) => { setLookupRelationId(e.target.value); setLookupFieldId(""); }}>
+              <option value="">Pick a relation field…</option>
+              {relationFields.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+            {lookupTargetDb && (
+              <>
+                <div className="menu-label" style={{ padding: 0 }}>Pull which field?</div>
+                <select className="input" value={lookupFieldId} onChange={(e) => setLookupFieldId(e.target.value)}>
+                  <option value="">Pick a field…</option>
+                  {lookupTargetDb.fields.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </>
+            )}
+            {relationFields.length === 0 && <div style={{ fontSize: 11.5, color: "var(--text-faint)" }}>Add a “Link to database” field first.</div>}
+          </div>
+        )}
 
         {needsOptions(type) && (
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>

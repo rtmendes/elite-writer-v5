@@ -259,7 +259,7 @@ export function RowModal({
                 {f.name}
               </div>
               <div style={{ border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-raised)" }}>
-                <Cell field={f} value={row.values[f.id]} onChange={(v) => setRowValue(row.id, f.id, v)} />
+                <Cell field={f} value={row.values[f.id]} onChange={(v) => setRowValue(row.id, f.id, v)} row={row} database={database} />
               </div>
             </div>
           ))}

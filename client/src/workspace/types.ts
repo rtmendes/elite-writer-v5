@@ -12,7 +12,9 @@ export type FieldType =
   | "checkbox"
   | "url"
   | "image"
-  | "rating";
+  | "rating"
+  | "relation"
+  | "lookup";
 
 export interface SelectOption {
   id: string;
@@ -26,6 +28,9 @@ export interface Field {
   type: FieldType;
   options?: SelectOption[];
   width?: number;
+  relationDbId?: ID;       // for "relation": the linked database
+  lookupRelationId?: ID;   // for "lookup": the relation field on this database
+  lookupFieldId?: ID;      // for "lookup": which field on the linked row to read
 }
 
 export type ViewType = "table" | "kanban" | "gallery" | "list";
@@ -97,6 +102,8 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   url: "URL",
   image: "Image / Thumbnail",
   rating: "Rating (1–5)",
+  relation: "Link to database",
+  lookup: "Lookup (from link)",
 };
 
 export const OPTION_COLORS = [

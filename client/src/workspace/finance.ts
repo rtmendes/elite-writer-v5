@@ -72,18 +72,26 @@ function payFromText(s: string): number {
 /** When an article's Publication is set, suggest its fee from the pay-rate swipe file. */
 export async function autoFillFeeFromPublication(database: Database, row: Row): Promise<boolean> {
   const feeField = database.fields.find((f) => f.type === "currency");
-  const pubField = database.fields.find((f) => f.name.toLowerCase().includes("publication") && f.type === "text");
-  if (!feeField || !pubField) return false;
+  if (!feeField) return false;
   const fresh = (await db.rows.get(row.id))!;
   if (Number(fresh.values[feeField.id]) > 0) return false; // don't overwrite
-  const pubName = String(fresh.values[pubField.id] ?? "").trim();
-  if (!pubName) return false;
 
   const pubsDb = (await db.databases.toArray()).find((d) => d.name === "Publications");
   if (!pubsDb) return false;
   const nameId = pubsDb.fields[0].id;
   const pubRows = await db.rows.where("dbId").equals(pubsDb.id).toArray();
-  const match = pubRows.find((r) => String(r.values[nameId] ?? "").trim().toLowerCase() === pubName.toLowerCase());
+
+  // Resolve linked outlet: relation field (row IDs) or text field (by name)
+  let match: Row | undefined;
+  const relField = database.fields.find((f) => f.type === "relation" && /publication|outlet/i.test(f.name));
+  if (relField) {
+    const ids = Array.isArray(fresh.values[relField.id]) ? (fresh.values[relField.id] as string[]) : [];
+    if (ids[0]) match = pubRows.find((r) => r.id === ids[0]);
+  } else {
+    const textField = database.fields.find((f) => f.type === "text" && /publication/i.test(f.name));
+    const pubName = textField ? String(fresh.values[textField.id] ?? "").trim() : "";
+    if (pubName) match = pubRows.find((r) => String(r.values[nameId] ?? "").trim().toLowerCase() === pubName.toLowerCase());
+  }
   if (!match) return false;
   const get = (fname: string) => {
     const f = pubsDb.fields.find((x) => x.name.toLowerCase() === fname.toLowerCase());

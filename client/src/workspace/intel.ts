@@ -22,6 +22,7 @@ export function ensureIntelligence(): Promise<void> {
 }
 async function doEnsureIntelligence() {
   await ensurePublications();
+  await ensureRelations();
   if (await db.kv.get("seed:ledger")) {
     await ensureClaimLedger();
     return;
@@ -357,10 +358,21 @@ ${summary}`,
 
   const best = out.match(/BEST:\s*(.+)/i)?.[1]?.trim();
   if (best) {
-    const pubField = (await db.databases.get(database.id))!.fields.find((f) => f.name.toLowerCase().includes("publication") && f.type === "text");
-    if (pubField) {
-      const fresh = (await db.rows.get(row.id))!;
-      if (!fresh.values[pubField.id]) await updateRow(row.id, { values: { ...fresh.values, [pubField.id]: best } });
+    const dbFresh = (await db.databases.get(database.id))!;
+    const relField = dbFresh.fields.find((f) => f.type === "relation" && /publication|outlet/i.test(f.name));
+    const fresh = (await db.rows.get(row.id))!;
+    if (relField?.relationDbId) {
+      // Link to the matching Publications record
+      const ids = Array.isArray(fresh.values[relField.id]) ? (fresh.values[relField.id] as string[]) : [];
+      if (ids.length === 0) {
+        const pubRows = await db.rows.where("dbId").equals(relField.relationDbId).toArray();
+        const pubsDb = (await db.databases.get(relField.relationDbId))!;
+        const match = pubRows.find((r) => String(r.values[pubsDb.fields[0].id] ?? "").trim().toLowerCase() === best.toLowerCase());
+        if (match) await updateRow(row.id, { values: { ...fresh.values, [relField.id]: [match.id] } });
+      }
+    } else {
+      const pubField = dbFresh.fields.find((f) => f.name.toLowerCase().includes("publication") && f.type === "text");
+      if (pubField && !fresh.values[pubField.id]) await updateRow(row.id, { values: { ...fresh.values, [pubField.id]: best } });
     }
   }
   await appendToNotes(row, "Publication matches", out);
@@ -485,9 +497,83 @@ function sectionText(row: Row, heading: RegExp): string {
   return out.trim();
 }
 
-function targetPublication(database: Database, row: Row): string {
-  const f = database.fields.find((x) => x.name.toLowerCase().includes("publication") && x.type === "text");
-  return f ? String(row.values[f.id] ?? "") : "";
+/** One-time migration: turn the Article Pipeline's "Publication" text field into
+ *  a real relation to Publications, map existing names → linked records, and add
+ *  Pay Rate + Editor lookups that pull live from the linked outlet. */
+async function ensureRelations() {
+  if (await db.kv.get("seed:relations:v1")) return;
+  const dbs = await db.databases.toArray();
+  const pipeline = dbs.find((d) => d.name === "Article Pipeline");
+  const pubs = dbs.find((d) => d.name === "Publications");
+  if (!pipeline || !pubs) return;
+
+  const fresh = (await db.databases.get(pipeline.id))!;
+  let pubField = fresh.fields.find((f) => f.name === "Publication" && f.type === "text");
+  const fields = [...fresh.fields];
+
+  if (pubField) {
+    // Convert text → relation in place
+    pubField = { ...pubField, type: "relation", relationDbId: pubs.id, width: 200 };
+    const idx = fields.findIndex((f) => f.id === pubField!.id);
+    fields[idx] = pubField;
+  } else if (!fresh.fields.some((f) => f.type === "relation" && /publication/i.test(f.name))) {
+    pubField = { id: uid(), name: "Publication", type: "relation", relationDbId: pubs.id, width: 200 };
+    fields.push(pubField);
+  } else {
+    pubField = fresh.fields.find((f) => f.type === "relation" && /publication/i.test(f.name))!;
+  }
+
+  // Add Pay Rate + Editor lookups through the relation
+  const pubsFresh = (await db.databases.get(pubs.id))!;
+  const payField = pubsFresh.fields.find((f) => f.name === "Pay Max ($)") ?? pubsFresh.fields.find((f) => f.name === "Pay Rate (Article)");
+  const editorField = pubsFresh.fields.find((f) => f.name === "Editor Name") ?? pubsFresh.fields.find((f) => f.name === "Best Editors to Pitch");
+  if (payField && !fields.some((f) => f.name === "Outlet Pay")) {
+    fields.push({ id: uid(), name: "Outlet Pay", type: "lookup", lookupRelationId: pubField.id, lookupFieldId: payField.id, width: 130 });
+  }
+  if (editorField && !fields.some((f) => f.name === "Outlet Editor")) {
+    fields.push({ id: uid(), name: "Outlet Editor", type: "lookup", lookupRelationId: pubField.id, lookupFieldId: editorField.id, width: 180 });
+  }
+  await updateDatabase(pipeline.id, { fields });
+
+  // Map existing text names → linked record IDs
+  const pubRows = await db.rows.where("dbId").equals(pubs.id).toArray();
+  const byName = new Map(pubRows.map((r) => [String(r.values[pubsFresh.fields[0].id] ?? "").trim().toLowerCase(), r.id]));
+  const rows = await db.rows.where("dbId").equals(pipeline.id).toArray();
+  for (const r of rows) {
+    const v = r.values[pubField.id];
+    if (typeof v === "string" && v.trim()) {
+      const id = byName.get(v.trim().toLowerCase());
+      await updateRow(r.id, { values: { ...r.values, [pubField.id]: id ? [id] : [] } });
+    }
+  }
+  await db.kv.put({ key: "seed:relations:v1", value: true });
+}
+
+/** Resolve the linked Publications row for an article — works whether the
+ *  Publication field is a relation (linked-record) or a plain text name. */
+export async function resolvePublicationRow(database: Database, row: Row): Promise<Row | null> {
+  const relField = database.fields.find((f) => f.type === "relation" && /publication|outlet/i.test(f.name));
+  if (relField?.relationDbId) {
+    const ids = Array.isArray(row.values[relField.id]) ? (row.values[relField.id] as string[]) : [];
+    if (ids[0]) return (await db.rows.get(ids[0])) ?? null;
+  }
+  const textField = database.fields.find((f) => f.type === "text" && /publication/i.test(f.name));
+  const name = textField ? String(row.values[textField.id] ?? "").trim() : "";
+  if (!name) return null;
+  const pubsDb = (await db.databases.toArray()).find((d) => d.name === "Publications");
+  if (!pubsDb) return null;
+  const pubRows = await db.rows.where("dbId").equals(pubsDb.id).toArray();
+  return pubRows.find((r) => String(r.values[pubsDb.fields[0].id] ?? "").trim().toLowerCase() === name.toLowerCase()) ?? null;
+}
+
+async function targetPublication(database: Database, row: Row): Promise<string> {
+  const pub = await resolvePublicationRow(database, row);
+  if (pub) {
+    const pubsDb = (await db.databases.toArray()).find((d) => d.name === "Publications");
+    return pubsDb ? String(pub.values[pubsDb.fields[0].id] ?? "") : "";
+  }
+  const textField = database.fields.find((f) => f.type === "text" && /publication/i.test(f.name));
+  return textField ? String(row.values[textField.id] ?? "") : "";
 }
 
 /** Markdown → BlockNote blocks (## heading, - bullet, paragraph). */
@@ -543,10 +629,11 @@ async function publicationStyleBrief(pubName: string): Promise<string> {
 
 export async function buildOutline(database: Database, row: Row): Promise<string> {
   const fresh = (await db.rows.get(row.id))!;
-  const styleBrief = await publicationStyleBrief(targetPublication(database, fresh));
+  const pubName = await targetPublication(database, fresh);
+  const styleBrief = await publicationStyleBrief(pubName);
   const brief = rowSummary(database, fresh) + "\n\nRESEARCH:\n" + notesText(fresh).slice(0, 8000) + styleBrief;
   const { wsTrpc } = await import("./trpcClient");
-  const res = await wsTrpc.workspace.buildOutline.mutate({ brief: brief.slice(0, 38000), publication: targetPublication(database, fresh), context: String(fresh.values[database.fields[0].id] ?? "") });
+  const res = await wsTrpc.workspace.buildOutline.mutate({ brief: brief.slice(0, 38000), publication: pubName, context: String(fresh.values[database.fields[0].id] ?? "") });
   await appendToNotes(fresh, "Outline", res.text);
   await setStatus(database, fresh, "outline");
   return res.text;
@@ -565,11 +652,12 @@ export async function writeFullArticle(database: Database, row: Row, accepted: s
   const fresh = (await db.rows.get(row.id))!;
   const outline = sectionText(fresh, /outline/i);
   if (!outline) throw new Error("Build and approve an outline first.");
-  const styleBrief = await publicationStyleBrief(targetPublication(database, fresh));
+  const pubName = await targetPublication(database, fresh);
+  const styleBrief = await publicationStyleBrief(pubName);
   const research = (sectionText(fresh, /research brief/i) || notesText(fresh).slice(0, 8000)) + styleBrief;
   const { wsTrpc } = await import("./trpcClient");
   const res = await wsTrpc.workspace.writeFullDraft.mutate({
-    outline, research: research.slice(0, 38000), publication: targetPublication(database, fresh), accepted, context: String(fresh.values[database.fields[0].id] ?? ""),
+    outline, research: research.slice(0, 38000), publication: pubName, accepted, context: String(fresh.values[database.fields[0].id] ?? ""),
   });
   // The full draft becomes the article body at the TOP of the editor; keep prior notes below a divider.
   const priorDoc = Array.isArray(fresh.doc) ? fresh.doc : [];
