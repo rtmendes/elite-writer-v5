@@ -137,16 +137,15 @@ export async function recordCentralCost(task: string, model: string, tokensIn: n
   }
 }
 
-/** Optional Telegram alerts (set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID). */
-export async function telegramAlert(message: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
+/** Optional Slack alerts via incoming webhook (set SLACK_WEBHOOK_URL). */
+export async function slackAlert(message: string) {
+  const webhook = process.env.SLACK_WEBHOOK_URL;
+  if (!webhook) return;
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text: message.slice(0, 3900) }),
+      body: JSON.stringify({ text: message.slice(0, 3900) }),
     });
   } catch { /* alerts are best-effort */ }
 }
@@ -212,7 +211,7 @@ async function agentCall(taskLabel: string, personaKey: keyof typeof AGENT_PERSO
   const budget = budgetLimit();
   if (budget > 0 && spent >= budget) {
     console.warn(`[proactive] budget reached ($${spent.toFixed(2)}/$${budget}) — skipping ${taskLabel}`);
-    void telegramAlert(`⛔ Elite Writer: monthly AI budget reached ($${spent.toFixed(2)}/$${budget}). Proactive agents paused until next month or budget raise.`);
+    void slackAlert(`⛔ Elite Writer: monthly AI budget reached ($${spent.toFixed(2)}/$${budget}). Proactive agents paused until next month or budget raise.`);
     return null;
   }
   const persona = AGENT_PERSONAS[personaKey];
@@ -325,7 +324,7 @@ Return STRICT JSON only — an array of exactly 3 objects:
     await saveRow(row);
   }
   console.log(`[proactive] Scout filed ${Math.min(ideas.length, 3)} ideas`);
-  void telegramAlert(`📰 Scout filed ${Math.min(ideas.length, 3)} fresh ideas:\n${ideas.slice(0, 3).map((i) => `• ${i.headline}`).join("\n")}`);
+  void slackAlert(`📰 Scout filed ${Math.min(ideas.length, 3)} fresh ideas:\n${ideas.slice(0, 3).map((i) => `• ${i.headline}`).join("\n")}`);
 }
 
 // ── Job 2: Scorer auto-scores new ideas ─────────────────────────────────────
@@ -452,7 +451,7 @@ async function followupJob() {
     const lines = stale.slice(0, 8).map((piece) =>
       `• ${piece.publicationName ?? "?"} — "${String(piece.articleTitle ?? "").slice(0, 60)}" (sent ${String(piece.sentAt).slice(0, 10)})`,
     );
-    void telegramAlert(`✉️ ${stale.length} pitch${stale.length === 1 ? "" : "es"} awaiting reply 4+ days — time for the polite follow-up:\n${lines.join("\n")}`);
+    void slackAlert(`✉️ ${stale.length} pitch${stale.length === 1 ? "" : "es"} awaiting reply 4+ days — time for the polite follow-up:\n${lines.join("\n")}`);
   } catch (err) {
     console.warn("[proactive] followup check failed:", err instanceof Error ? err.message : err);
   }
