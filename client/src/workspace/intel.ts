@@ -439,3 +439,99 @@ export async function tournamentDraft(database: Database, row: Row): Promise<str
     `${result.judge}\n\n${result.winner}`);
   return `Draft ${result.winnerLabel} won. Opening added to notes ($${result.cost.toFixed(3)}).`;
 }
+
+// ── Article assembly line ───────────────────────────────────────────────────
+// Status field is the live pipeline. Each stage has an agent action; the
+// workflow can pause at Outline (interactive AI suggestions) or auto-proceed.
+export const WORKFLOW_STAGES = ["Idea", "Research", "Outline", "Draft", "Edit", "Submit"] as const;
+
+function notesText(row: Row): string {
+  return Array.isArray(row.doc)
+    ? (row.doc as Array<{ content?: Array<{ text?: string }> }>)
+        .map((b) => (Array.isArray(b.content) ? b.content.map((c) => c.text ?? "").join("") : ""))
+        .join("\n")
+    : "";
+}
+
+function sectionText(row: Row, heading: RegExp): string {
+  const blocks = Array.isArray(row.doc) ? (row.doc as Array<{ type?: string; content?: Array<{ text?: string }> }>) : [];
+  const tx = (b: { content?: Array<{ text?: string }> }) => (Array.isArray(b.content) ? b.content.map((c) => c.text ?? "").join("") : "");
+  let start = -1;
+  blocks.forEach((b, i) => { if (b.type === "heading" && heading.test(tx(b))) start = i; });
+  if (start === -1) return "";
+  let out = "";
+  for (let i = start + 1; i < blocks.length; i++) {
+    if (blocks[i].type === "heading") break;
+    out += tx(blocks[i]) + "\n";
+  }
+  return out.trim();
+}
+
+function targetPublication(database: Database, row: Row): string {
+  const f = database.fields.find((x) => x.name.toLowerCase().includes("publication") && x.type === "text");
+  return f ? String(row.values[f.id] ?? "") : "";
+}
+
+/** Markdown → BlockNote blocks (## heading, - bullet, paragraph). */
+function mdToBlocks(md: string): unknown[] {
+  const blocks: unknown[] = [];
+  for (const line of md.split(/\n+/)) {
+    const t = line.trim();
+    if (!t) continue;
+    if (t.startsWith("## ")) blocks.push({ type: "heading", props: { level: 2 }, content: [{ type: "text", text: t.slice(3), styles: {} }] });
+    else if (t.startsWith("# ")) blocks.push({ type: "heading", props: { level: 1 }, content: [{ type: "text", text: t.slice(2), styles: {} }] });
+    else if (t.startsWith("- ") || t.startsWith("• ")) blocks.push({ type: "bulletListItem", content: [{ type: "text", text: t.slice(2), styles: {} }] });
+    else blocks.push({ type: "paragraph", content: [{ type: "text", text: t, styles: {} }] });
+  }
+  return blocks;
+}
+
+async function setStatus(database: Database, row: Row, stageName: string) {
+  const statusField = database.fields.find((f) => f.name.toLowerCase() === "status" && f.type === "select");
+  if (!statusField) return;
+  const opt = statusField.options?.find((o) => o.name.toLowerCase().includes(stageName.toLowerCase()));
+  if (opt) {
+    const fresh = (await db.rows.get(row.id))!;
+    await updateRow(row.id, { values: { ...fresh.values, [statusField.id]: opt.id } });
+  }
+}
+
+export async function buildOutline(database: Database, row: Row): Promise<string> {
+  const fresh = (await db.rows.get(row.id))!;
+  const brief = rowSummary(database, fresh) + "\n\nRESEARCH:\n" + notesText(fresh).slice(0, 8000);
+  const { wsTrpc } = await import("./trpcClient");
+  const res = await wsTrpc.workspace.buildOutline.mutate({ brief: brief.slice(0, 38000), publication: targetPublication(database, fresh), context: String(fresh.values[database.fields[0].id] ?? "") });
+  await appendToNotes(fresh, "Outline", res.text);
+  await setStatus(database, fresh, "outline");
+  return res.text;
+}
+
+export async function getOutlineSuggestions(_database: Database, row: Row): Promise<Array<{ area: string; suggestion: string }>> {
+  const fresh = (await db.rows.get(row.id))!;
+  const outline = sectionText(fresh, /outline/i) || notesText(fresh).slice(0, 8000);
+  if (!outline) throw new Error("Build the outline first.");
+  const { wsTrpc } = await import("./trpcClient");
+  const res = await wsTrpc.workspace.outlineSuggestions.mutate({ outline, context: String(fresh.values[_database.fields[0].id] ?? "") });
+  return res.suggestions;
+}
+
+export async function writeFullArticle(database: Database, row: Row, accepted: string[] = []): Promise<string> {
+  const fresh = (await db.rows.get(row.id))!;
+  const outline = sectionText(fresh, /outline/i);
+  if (!outline) throw new Error("Build and approve an outline first.");
+  const research = sectionText(fresh, /research brief/i) || notesText(fresh).slice(0, 8000);
+  const { wsTrpc } = await import("./trpcClient");
+  const res = await wsTrpc.workspace.writeFullDraft.mutate({
+    outline, research: research.slice(0, 38000), publication: targetPublication(database, fresh), accepted, context: String(fresh.values[database.fields[0].id] ?? ""),
+  });
+  // The full draft becomes the article body at the TOP of the editor; keep prior notes below a divider.
+  const priorDoc = Array.isArray(fresh.doc) ? fresh.doc : [];
+  const draftBlocks = [
+    { type: "heading", props: { level: 1 }, content: [{ type: "text", text: "Draft", styles: {} }] },
+    ...mdToBlocks(res.text),
+    { type: "paragraph", content: [{ type: "text", text: "— research & workflow notes below —", styles: { italic: true } }] },
+  ];
+  await updateRow(row.id, { doc: [...draftBlocks, ...priorDoc] });
+  await setStatus(database, fresh, "edit");
+  return `Full draft written ($${res.cost.toFixed(3)}) — now in the editor. Status → Edit. Your turn to refine.`;
+}
