@@ -1,8 +1,8 @@
 name: Deploy Elite Writer V5
 
+# Auto-deploy is handled on the VPS by scripts/deploy-poll.sh (cron) to avoid
+# burning GitHub Actions minutes. This workflow stays as a manual fallback only.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
