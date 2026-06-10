@@ -9,6 +9,7 @@ import {
   Zap, Menu, Building2, Moon, Sun, Inbox, Loader2,
   MessageSquare, Library, Globe, Map, Users,
   Flame, Calendar, Mic, Palette,
+  LayoutGrid,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +30,7 @@ const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { path: '/ideas', label: 'Ideas', icon: Lightbulb, description: 'Article idea pipeline' },
       { path: '/research', label: 'Research', icon: Search, description: 'Data & source gathering' },
       { path: '/writer', label: 'Writer', icon: PenTool, description: 'AI-enhanced editor' },
+      { path: '/workspace', label: 'Workspace', icon: LayoutGrid, description: 'Pages, databases & boards' },
       { path: '/queue', label: 'Queue', icon: Inbox, description: 'Pre-written article pipeline' },
       { path: '/agents', label: 'Agents', icon: Users, description: 'AI editorial team — chat & assign' },
     ],

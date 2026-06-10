@@ -5,6 +5,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AppLayout } from "./components/AppLayout";
 import Dashboard from "./pages/Dashboard";
+import WorkspaceShell from "./workspace/WorkspaceShell";
 import Giststack from "./pages/Giststack";
 import Ideas from "./pages/Ideas";
 import Research from "./pages/Research";
@@ -39,6 +40,7 @@ function Router() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/giststack" component={Giststack} />
+            <Route path="/workspace" component={WorkspaceShell} />
             <Route path="/ideas" component={Ideas} />
             <Route path="/research" component={Research} />
             <Route path="/writer" component={Writer} />
