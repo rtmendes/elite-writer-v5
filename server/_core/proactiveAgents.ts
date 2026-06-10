@@ -242,7 +242,53 @@ async function findPipeline(): Promise<WsDatabase | null> {
 }
 
 // ── Job 1: Scout files fresh ideas ──────────────────────────────────────────
+/** Scout: pull USA news, score relevance, match to the outlets whose topics fit,
+ *  and file news-pegged ideas (with the matched publication linked). USA-only. */
+async function fetchUsNews(): Promise<Array<{ title: string; source: string; url: string }>> {
+  const out: Array<{ title: string; source: string; url: string }> = [];
+  // NewsAPI — US top headlines
+  if (ENV.newsapiKey) {
+    try {
+      const r = await fetch(`https://newsapi.org/v2/top-headlines?country=us&pageSize=40&apiKey=${ENV.newsapiKey}`);
+      if (r.ok) {
+        const d = await r.json();
+        for (const a of d.articles ?? []) out.push({ title: a.title ?? "", source: a.source?.name ?? "", url: a.url ?? "" });
+      }
+    } catch { /* best effort */ }
+  }
+  // GNews — US English
+  if (ENV.gnewsKey && out.length < 30) {
+    try {
+      const r = await fetch(`https://gnews.io/api/v4/top-headlines?country=us&lang=en&max=25&apikey=${ENV.gnewsKey}`);
+      if (r.ok) {
+        const d = await r.json();
+        for (const a of d.articles ?? []) out.push({ title: a.title ?? "", source: a.source?.name ?? "", url: a.url ?? "" });
+      }
+    } catch { /* best effort */ }
+  }
+  // de-dup by title
+  const seen = new Set<string>();
+  return out.filter((a) => a.title && !seen.has(a.title.toLowerCase()) && seen.add(a.title.toLowerCase()));
+}
+
+async function buildPublicationIndex(): Promise<string> {
+  const databases = await loadDatabases();
+  const pubs = databases.find((d) => d.name === "Publications");
+  if (!pubs) return "";
+  const f = (n: string) => pubs.fields.find((x) => x.name.toLowerCase() === n.toLowerCase());
+  const nameF = pubs.fields[0], topicsF = f("Preferred Topics") ?? f("Topics"), catF = f("Category"), payF = f("Pay Max ($)");
+  const rows = await loadRows(pubs.id);
+  return rows.slice(0, 200).map((r) => {
+    const name = String(r.values[nameF.id] ?? "").trim();
+    const topics = topicsF ? String(r.values[topicsF.id] ?? "").slice(0, 120) : "";
+    const cat = catF ? String((catF.options?.find((o) => o.id === r.values[catF.id])?.name) ?? "") : "";
+    const pay = payF ? Number(r.values[payF.id]) || 0 : 0;
+    return name ? `${name}${cat ? ` [${cat}]` : ""}${pay ? ` ($${pay})` : ""}: ${topics}` : "";
+  }).filter(Boolean).join("\n");
+}
+
 async function scoutJob() {
+  if (process.env.SCOUT_ENABLED === "0") return;
   const pipeline = await findPipeline();
   if (!pipeline) return;
   const statusField = fieldByName(pipeline, "Status");
@@ -250,8 +296,6 @@ async function scoutJob() {
   if (!statusField || !ideaOpt) return;
 
   const rows = await loadRows(pipeline.id);
-
-  // Gap guard: at most one scout run per ~20h (look for recent scout ledger entries)
   const databases = await loadDatabases();
   const ledger = databases.find((d) => d.name === "AI Ledger");
   if (ledger) {
@@ -260,70 +304,75 @@ async function scoutJob() {
     );
     if (recent) return;
   }
-  // Flood guard: don't pile up unprocessed ideas
   const waiting = rows.filter((r) => r.values[statusField.id] === ideaOpt.id).length;
   if (waiting >= 12) return;
 
-  // Live headlines for real news pegs (optional)
-  let headlines = "";
-  if (ENV.newsapiKey) {
-    try {
-      const resp = await fetch(`https://newsapi.org/v2/top-headlines?language=en&pageSize=25&apiKey=${ENV.newsapiKey}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        headlines = (data.articles ?? [])
-          .map((a: { title?: string; source?: { name?: string } }) => `- ${a.title ?? ""} (${a.source?.name ?? ""})`)
-          .join("\n");
-      }
-    } catch { /* headlines are optional context */ }
-  }
-
+  const news = await fetchUsNews();
+  if (news.length === 0) { console.warn("[proactive] scout: no US news fetched (check NEWSAPI_KEY/GNEWS_KEY)"); return; }
+  const pubIndex = await buildPublicationIndex();
   const nicheField = pipeline.fields.find((f) => f.name === "Niche" && f.type === "multiselect");
-  const niches = nicheField?.options?.map((o) => o.name).join(", ") ?? "Finance, Tech, Health, Business";
+  const niches = process.env.SCOUT_NICHES || nicheField?.options?.map((o) => o.name).join(", ") || "Finance, Tech, Health, Business";
+  const minRel = Number(process.env.SCOUT_MIN_RELEVANCE ?? 6);
 
   const out = await agentCall(
     "Scout ideas",
     "scout",
-    "anthropic/claude-haiku-4.5",
-    `File 3 fresh, news-pegged article ideas worth $8,000+ each at premium outlets. Beats: ${niches}.
-${headlines ? `TODAY'S HEADLINES (peg ideas to these where possible):\n${headlines}\n` : ""}
-Return STRICT JSON only — an array of exactly 3 objects:
-[{"headline": "...", "peg": "<the news event and why now>", "niche": "<one beat from the list>", "angle": "<the contrarian/underreported angle in one sentence>", "peg_days": <integer 1-21: days until this peg goes stale>}]`,
-    "overnight scout run",
-    3000,
+    "anthropic/claude-sonnet-4.6",
+    `From the US news headlines below, file the 3 strongest news-pegged article ideas worth $8,000+ at premium outlets.
+HARD FILTERS:
+- USA audience only. Discard anything not relevant to a US readership.
+- Must match these beats (the author's expertise): ${niches}.
+- Each idea MUST map to a specific outlet from the OUTLET INDEX whose topics fit — only file if a named editor would plausibly accept it.
+- Must be genuinely news-pegged (tie to a dated event in the headlines).
+
+OUTLET INDEX (name [category] ($max pay): topics):
+${pubIndex.slice(0, 12000)}
+
+US HEADLINES:
+${news.map((a, i) => `${i + 1}. ${a.title} (${a.source})`).join("\n").slice(0, 8000)}
+
+Return STRICT JSON only — an array of up to 3 objects:
+[{"headline": "<the article headline you'd pitch>", "peg": "<the dated news event and why now>", "niche": "<one beat from the list>", "angle": "<the unique/contrarian angle>", "publication": "<exact outlet name from the index that fits best>", "relevance": <1-10 how strongly it matches the beats + that outlet>, "peg_days": <1-21 days until the peg goes stale>}]`,
+    "overnight scout run (US, matched)",
+    4000,
   );
   if (!out) return;
 
-  let ideas: Array<{ headline?: string; peg?: string; niche?: string; angle?: string; peg_days?: number }> = [];
-  try {
-    ideas = JSON.parse(out.replace(/^```(json)?|```$/g, "").trim());
-  } catch {
-    console.warn("[proactive] scout returned non-JSON, skipping");
-    return;
-  }
+  let ideas: Array<{ headline?: string; peg?: string; niche?: string; angle?: string; publication?: string; relevance?: number; peg_days?: number }> = [];
+  try { ideas = JSON.parse(out.replace(/^```(json)?|```$/g, "").trim()); }
+  catch { console.warn("[proactive] scout returned non-JSON, skipping"); return; }
+
+  ideas = ideas.filter((i) => i.headline && (Number(i.relevance) || 0) >= minRel);
+  if (ideas.length === 0) { console.log("[proactive] scout: no ideas cleared the relevance filter"); return; }
 
   const titleField = pipeline.fields[0];
   const pegField = fieldByName(pipeline, "News Peg");
   const expiresField = await ensureWsField(pipeline, "Peg Expires", "date");
+  const relField = pipeline.fields.find((f) => f.type === "relation" && /publication|outlet/i.test(f.name));
+  const pubs = databases.find((d) => d.name === "Publications");
+  const pubRows = pubs ? await loadRows(pubs.id) : [];
+
+  let filed = 0;
   for (const idea of ideas.slice(0, 3)) {
-    if (!idea.headline) continue;
     const now = Date.now();
-    const values: Record<string, unknown> = {
-      [titleField.id]: idea.headline,
-      [statusField.id]: ideaOpt.id,
-    };
+    const values: Record<string, unknown> = { [titleField.id]: idea.headline!, [statusField.id]: ideaOpt.id };
     if (pegField && idea.peg) values[pegField.id] = idea.peg;
-    const pegDays = Math.max(1, Math.min(21, Number(idea.peg_days) || 7));
-    values[expiresField.id] = new Date(now + pegDays * 864e5).toISOString().slice(0, 10);
+    values[expiresField.id] = new Date(now + Math.max(1, Math.min(21, Number(idea.peg_days) || 7)) * 864e5).toISOString().slice(0, 10);
     if (nicheField && idea.niche) {
       const opt = nicheField.options?.find((o) => o.name.toLowerCase() === idea.niche!.toLowerCase());
       if (opt) values[nicheField.id] = [opt.id];
     }
+    // Link the matched publication (relation)
+    if (relField && pubs && idea.publication) {
+      const match = pubRows.find((r) => String(r.values[pubs.fields[0].id] ?? "").trim().toLowerCase() === idea.publication!.trim().toLowerCase());
+      if (match) values[relField.id] = [match.id];
+    }
     const row: WsRow = { id: uid(), dbId: pipeline.id, values, sortOrder: now, createdAt: now, updatedAt: now };
-    appendNotes(row, "Filed by Scout (Thomas Fischer)", `Angle: ${idea.angle ?? ""}\nPeg: ${idea.peg ?? ""}`);
+    appendNotes(row, "Filed by Scout (Thomas Fischer)", `Matched outlet: ${idea.publication ?? "—"} (relevance ${idea.relevance ?? "?"}/10)\nAngle: ${idea.angle ?? ""}\nPeg: ${idea.peg ?? ""}`);
     await saveRow(row);
+    filed++;
   }
-  console.log(`[proactive] Scout filed ${Math.min(ideas.length, 3)} ideas`);
+  console.log(`[proactive] Scout filed ${filed} US-matched ideas`);
   // Ideas are actioned inside the app (Article Pipeline board) — no chat noise.
 }
 
