@@ -14,11 +14,12 @@ import {
   useCreateBlockNote,
 } from "@blocknote/react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { BarChart3, Table2 } from "lucide-react";
+import { BarChart3, Lightbulb, Table2 } from "lucide-react";
 import { useMemo } from "react";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
-  Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Pie, PieChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart,
+  ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis,
 } from "recharts";
 import { db } from "../db";
 import type { Database } from "../types";
@@ -81,6 +82,8 @@ function ChartRenderer({
                 <option value="line">Line</option>
                 <option value="area">Area</option>
                 <option value="pie">Pie</option>
+                <option value="scatter">Scatter</option>
+                <option value="radar">Radar</option>
               </select>
               <select className="input" value={labelFieldId} onChange={(e) => onChange({ labelFieldId: e.target.value })}>
                 <option value="">Group by…</option>
@@ -122,6 +125,23 @@ function ChartRenderer({
               <XAxis dataKey="name" fontSize={11} /> <YAxis fontSize={11} /> <Tooltip />
               <Area dataKey="value" stroke={CHART_COLORS[0]} fill={CHART_COLORS[0]} fillOpacity={0.18} strokeWidth={2.5} />
             </AreaChart>
+          ) : chartType === "scatter" ? (
+            <ScatterChart>
+              <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.35} />
+              <XAxis dataKey="name" fontSize={11} /> <YAxis dataKey="value" fontSize={11} /> <ZAxis range={[80, 80]} />
+              <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+              <Scatter data={data} fill={CHART_COLORS[0]}>
+                {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+              </Scatter>
+            </ScatterChart>
+          ) : chartType === "radar" ? (
+            <RadarChart data={data} outerRadius={95}>
+              <PolarGrid strokeOpacity={0.4} />
+              <PolarAngleAxis dataKey="name" fontSize={11} />
+              <PolarRadiusAxis fontSize={10} />
+              <Radar dataKey="value" stroke={CHART_COLORS[0]} fill={CHART_COLORS[0]} fillOpacity={0.35} />
+              <Tooltip />
+            </RadarChart>
           ) : (
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.35} vertical={false} />
@@ -208,8 +228,45 @@ const DbViewBlock = createReactBlockSpec(
   },
 );
 
+// ── Callout block (editable inline text + emoji + color) ───────────────────
+const CALLOUT_COLORS: Record<string, { bg: string; border: string }> = {
+  gray: { bg: "var(--bg-active)", border: "var(--border-strong)" },
+  blue: { bg: "var(--tag-blue-bg)", border: "var(--tag-blue-fg)" },
+  green: { bg: "var(--tag-green-bg)", border: "var(--tag-green-fg)" },
+  yellow: { bg: "var(--tag-yellow-bg)", border: "var(--tag-yellow-fg)" },
+  red: { bg: "var(--tag-red-bg)", border: "var(--tag-red-fg)" },
+  purple: { bg: "var(--tag-purple-bg)", border: "var(--tag-purple-fg)" },
+};
+
+const CalloutBlock = createReactBlockSpec(
+  { type: "callout", propSchema: { emoji: { default: "💡" }, color: { default: "yellow" } }, content: "inline" },
+  {
+    render: ({ block, editor, contentRef }) => {
+      const c = CALLOUT_COLORS[block.props.color] ?? CALLOUT_COLORS.yellow;
+      const EMOJIS = ["💡", "⚠️", "✅", "🔥", "📌", "❗", "💰", "🎯"];
+      return (
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: c.bg, borderLeft: `3px solid ${c.border}`, borderRadius: 6, padding: "10px 12px", margin: "4px 0", width: "100%" }}>
+          <button
+            contentEditable={false}
+            onClick={() => {
+              if (!editor.isEditable) return;
+              const i = EMOJIS.indexOf(block.props.emoji);
+              editor.updateBlock(block, { props: { ...block.props, emoji: EMOJIS[(i + 1) % EMOJIS.length] } });
+            }}
+            style={{ border: "none", background: "none", cursor: editor.isEditable ? "pointer" : "default", fontSize: 18, lineHeight: 1.4, padding: 0 }}
+            title="Click to change icon"
+          >
+            {block.props.emoji}
+          </button>
+          <div ref={contentRef} style={{ flex: 1 }} />
+        </div>
+      );
+    },
+  },
+);
+
 export const schema = BlockNoteSchema.create({
-  blockSpecs: { ...defaultBlockSpecs, chart: ChartBlock, dbview: DbViewBlock },
+  blockSpecs: { ...defaultBlockSpecs, chart: ChartBlock, dbview: DbViewBlock, callout: CalloutBlock },
 });
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -271,6 +328,14 @@ export function RichEditor({
                 group: "Data",
                 icon: <Table2 size={18} />,
                 onItemClick: () => insertOrUpdateBlock(editor, { type: "dbview" }),
+              },
+              {
+                title: "Callout",
+                subtext: "Highlighted note with an icon",
+                aliases: ["callout", "note", "tip", "warning", "highlight"],
+                group: "Basic blocks",
+                icon: <Lightbulb size={18} />,
+                onItemClick: () => insertOrUpdateBlock(editor, { type: "callout" }),
               },
             ],
             query,

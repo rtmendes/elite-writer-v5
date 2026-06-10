@@ -670,3 +670,34 @@ export async function writeFullArticle(database: Database, row: Row, accepted: s
   await setStatus(database, fresh, "edit");
   return `Full draft written ($${res.cost.toFixed(3)}) — now in the editor. Status → Edit. Your turn to refine.`;
 }
+
+// ── AI cover image (styled to the linked publication) ──────────────────────
+export async function generateCover(database: Database, row: Row): Promise<string> {
+  const fresh = (await db.rows.get(row.id))!;
+  const title = String(fresh.values[database.fields[0].id] ?? "article");
+  // Pull the linked publication's visual cues for style matching
+  const pub = await resolvePublicationRow(database, fresh);
+  let styleHint = "";
+  if (pub) {
+    const pubsDb = (await db.databases.toArray()).find((d) => d.name === "Publications");
+    const get = (n: string) => {
+      const f = pubsDb?.fields.find((x) => x.name.toLowerCase() === n.toLowerCase());
+      return f ? String(pub.values[f.id] ?? "").trim() : "";
+    };
+    styleHint = [get("Publication"), get("Category"), get("Writing Style"), get("Target Audience")].filter(Boolean).join(" — ").slice(0, 1800);
+  }
+  const { wsTrpc } = await import("./trpcClient");
+  const res = await wsTrpc.workspace.generateCoverImage.mutate({ title, styleHint, context: title });
+
+  // Set it as the article's image/thumbnail field
+  const imgField = database.fields.find((f) => f.type === "image");
+  if (imgField) {
+    await updateRow(row.id, { values: { ...fresh.values, [imgField.id]: res.dataUrl } });
+  } else {
+    // no image field — add one
+    const newField: Field = { id: uid(), name: "Cover", type: "image", width: 130 };
+    await updateDatabase(database.id, { fields: [...database.fields, newField] });
+    await updateRow(row.id, { values: { ...fresh.values, [newField.id]: res.dataUrl } });
+  }
+  return `Cover image generated ($${res.cost.toFixed(3)}) — set as the article thumbnail.`;
+}

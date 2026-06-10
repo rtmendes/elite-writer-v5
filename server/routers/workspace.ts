@@ -59,6 +59,22 @@ const TASK_MODELS: Record<AgentTask, { model: string; maxTokens: number; persona
 
 
 // Distilled from the "Large Publications Master Guide" — the house methodology.
+
+// Real winning-pitch structure, distilled from the master guide's accepted examples.
+const WINNING_PITCHES = `
+WINNING PITCH EXEMPLARS (match this shape — these got accepted at major outlets):
+
+Subject: Pitch: 300-pound traveler essay
+Body: "Hello {editor}, I'm responding to your {outlet} {section} call for pitches. My pitches are below. I'm the author of four books and a freelance writer published in CNET, Fortune, Forbes, Business Insider, SUCCESS, Parents, Travel & Leisure, and sixty other outlets. Cheers, {name}"
+Then 1-2 article ideas, each:
+  "{specific scroll-stopping headline}
+  {2-4 sentences: the personal/news hook, what the piece covers, the concrete takeaways and sources}."
+Then 3-5 relevant clips with outlet names.
+
+Column pitch shape (Tier 5): open with rapport → one-paragraph bio + bestselling/credibility → 3-4 writing samples (headline + outlet) → COLUMN IDEA = a "swim lane" (who you help + transformation) + a stat + why it drives page views + the article types it will run → 3 concrete article ideas with premises.
+
+Always: identifiable success peg, named sources, concrete numbers, and a soft tie back to the author's expertise/offer.`;
+
 const PLAYBOOK = `
 PITCHING & WRITING PLAYBOOK (follow this method):
 - PUBLICATION FIRST: match the target outlet's headline structure, article types, and tone exactly. Never generic; write for THEM.
@@ -224,7 +240,7 @@ export const workspaceRouter = router({
       const route = TASK_MODELS[input.task as AgentTask];
       const persona = route.persona ? AGENT_PERSONAS[route.persona] : undefined;
       const usePlaybook = ["create_offer", "headlines", "score_idea", "match_publications"].includes(input.task);
-      const system = (persona ? persona.systemPrompt + "\n" : "") + HOUSE_RULES + (usePlaybook ? PLAYBOOK : "");
+      const system = (persona ? persona.systemPrompt + "\n" : "") + HOUSE_RULES + (usePlaybook ? PLAYBOOK : "") + (input.task === "create_offer" ? WINNING_PITCHES : "");
 
       let prompt = input.prompt;
 
@@ -508,5 +524,34 @@ ${input.research || "(use the outline; mark anything needing reporting as [TK: .
       const cost = estimateCost(result.model ?? "opus", tIn, tOut);
       void recordCentralCost("write_full_draft", result.model ?? "opus", tIn, tOut, cost, input.context);
       return { text, tokensIn: tIn, tokensOut: tOut, cost: Math.round(cost * 10000) / 10000 };
+    }),
+  // ── AI cover image — near-free OpenRouter Gemini, in the publication's style ─
+  generateCoverImage: protectedProcedure
+    .input(z.object({ title: z.string().min(1).max(400), styleHint: z.string().max(2000).default(""), context: z.string().max(200).default("") }))
+    .mutation(async ({ input }) => {
+      if (!ENV.openrouterApiKey) throw new Error("OPENROUTER_API_KEY not configured");
+      const prompt = `Hyperrealistic editorial hero photograph for a premium magazine feature titled "${input.title}". ${input.styleHint ? `Match this publication's visual identity and mood: ${input.styleHint}.` : "Sophisticated, Condé Nast-caliber editorial aesthetic."} Wide 16:9 cinematic composition, natural light, shallow depth of field, film-grain realism. No text, no words, no logos, no watermarks. Leave the upper third calm for a headline overlay.`;
+      const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${ENV.openrouterApiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": ENV.appUrl || "https://elitewriter.insightprofit.live",
+          "X-Title": "Elite Writer V5",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image",
+          modalities: ["image", "text"],
+          max_tokens: 4000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (!resp.ok) throw new Error(`Image gen failed: ${resp.status} ${(await resp.text()).slice(0, 160)}`);
+      const data = await resp.json();
+      const url: string = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url ?? "";
+      if (!url.includes("base64,")) throw new Error("No image returned");
+      const cost = 0.003; // OpenRouter Gemini flash image ~ pennies
+      void recordCentralCost("cover_image", "google/gemini-2.5-flash-image", 0, 0, cost, input.context);
+      return { dataUrl: url, cost };
     }),
 });
