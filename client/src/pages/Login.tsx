@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 
 export default function Login() {
-  const [email, setEmail] = useState("rmreal@gmail.com");
-  const [password, setPassword] = useState("2001done");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [, navigate] = useLocation();
@@ -39,8 +39,15 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0e1a]">
-      <div className="w-full max-w-md p-8">
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0e1a] relative overflow-hidden">
+      <img
+        src="/images/login-hero.png"
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover opacity-40"
+        onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#0a0e1a]/60 via-transparent to-[#0a0e1a]" />
+      <div className="w-full max-w-md p-8 relative z-10">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 mb-4">

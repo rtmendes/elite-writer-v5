@@ -5,7 +5,7 @@ import { useCreateBlockNote } from "@blocknote/react";
 import React, { useMemo, useRef, useState } from "react";
 import { Loader2, Sparkles, Trash2 } from "lucide-react";
 import { deleteRow, setRowValue, updateRow } from "../db";
-import { createOffer, matchPublications, researchBrief, scoreIdea } from "../intel";
+import { createOffer, matchPublications, researchBrief, scoreIdea, tournamentDraft, verifyFacts } from "../intel";
 import type { Database, Row } from "../types";
 import { Modal } from "../ui";
 import { Cell } from "./cells";
@@ -15,6 +15,8 @@ const AGENT_ACTIONS = [
   { id: "score", label: "Score idea", run: scoreIdea },
   { id: "brief", label: "Research brief", run: researchBrief },
   { id: "match", label: "Match publications", run: matchPublications },
+  { id: "draft", label: "Tournament draft", run: tournamentDraft },
+  { id: "facts", label: "Verify facts", run: verifyFacts },
   { id: "offer", label: "Create offer", run: createOffer },
 ] as const;
 
@@ -47,6 +49,26 @@ function AgentBar({ database, row, onDone }: { database: Database; row: Row; onD
             {a.label}
           </button>
         ))}
+        <button
+          className="ai-chip"
+          disabled={busy !== null}
+          title="Send the latest Pitch offer from your connected Gmail and log it for the learning loop"
+          onClick={async () => {
+            setBusy("email");
+            setError(null);
+            try {
+              await emailPitch(database, row);
+              onDone();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : String(e));
+            } finally {
+              setBusy(null);
+            }
+          }}
+        >
+          {busy === "email" && <Loader2 size={12} className="spin" />}
+          Email pitch…
+        </button>
         <span style={{ fontSize: 11.5, color: "var(--text-faint)", marginLeft: "auto", paddingRight: 4 }}>
           results land in fields + notes · cost tracked in AI Ledger
         </span>
@@ -125,4 +147,50 @@ export function RowModal({
       </div>
     </Modal>
   );
+}
+
+/** Pull the latest "Pitch offer" section from the row notes, send via the
+ *  connected Gmail account, and log it into the pitches table (the outcome
+ *  data that feeds back into idea scoring and publication matching). */
+async function emailPitch(database: Database, row: Row) {
+  const { db } = await import("../db");
+  const fresh = (await db.rows.get(row.id))!;
+  const title = String(fresh.values[database.fields[0].id] ?? "article");
+  const blocks = Array.isArray(fresh.doc) ? (fresh.doc as Array<{ type?: string; content?: Array<{ text?: string }> }>) : [];
+  const text = (b: { content?: Array<{ text?: string }> }) => (Array.isArray(b.content) ? b.content.map((c) => c.text ?? "").join("") : "");
+
+  // Find the last "Pitch offer" heading and take everything after it
+  let start = -1;
+  blocks.forEach((b, i) => {
+    if (b.type === "heading" && /pitch offer/i.test(text(b))) start = i;
+  });
+  if (start === -1) throw new Error("No pitch offer found in notes — run “Create offer” first.");
+  let body = "";
+  for (let i = start + 1; i < blocks.length; i++) {
+    if (blocks[i].type === "heading" && /^(Idea score|Research brief|Publication matches|Claim verification|Tournament draft)/i.test(text(blocks[i]))) break;
+    body += text(blocks[i]) + "\n";
+  }
+  const subjectMatch = body.match(/Subject line.*?\n(.+)/i);
+  const subject = (subjectMatch?.[1] ?? `Pitch: ${title}`).trim().slice(0, 200);
+
+  const pubField = database.fields.find((f) => f.name.toLowerCase().includes("publication") && f.type === "text");
+  const publicationName = String((pubField && fresh.values[pubField.id]) || prompt("Publication name?") || "").trim();
+  if (!publicationName) throw new Error("Publication name required.");
+  const editorEmail = (prompt(`Editor email at ${publicationName}?`) || "").trim();
+  if (!/.+@.+\..+/.test(editorEmail)) throw new Error("A valid editor email is required.");
+  if (!confirm(`Send this pitch to ${editorEmail} (${publicationName}) from your connected Gmail?\n\nSubject: ${subject}`)) return;
+
+  const { wsTrpc } = await import("../trpcClient");
+  await wsTrpc.google.sendEmail.mutate({ to: editorEmail, subject, body: body.trim() });
+  await wsTrpc.workspace.recordPitch.mutate({
+    publicationName,
+    editorEmail,
+    subject,
+    body: body.trim(),
+    articleTitle: title,
+    sent: true,
+  });
+  const { updateRow } = await import("../db");
+  const doc = [...blocks, { type: "paragraph", content: [{ type: "text", text: `✉️ Pitch sent to ${editorEmail} (${publicationName}) on ${new Date().toLocaleDateString("en-US")} — logged for the learning loop.`, styles: {} }] }];
+  await updateRow(row.id, { doc });
 }

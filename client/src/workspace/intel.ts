@@ -39,6 +39,40 @@ export async function ensureIntelligence() {
     void enqueue("databases", database.id, "upsert");
   }
   await db.kv.put({ key: "seed:ledger", value: true });
+  await ensureClaimLedger();
+}
+
+async function ensureClaimLedger() {
+  if (await db.kv.get("seed:claims")) return;
+  const exists = (await db.databases.toArray()).some((d) => d.name === "Claim Ledger");
+  if (!exists) {
+    const now = Date.now();
+    const fields: Field[] = [
+      { id: uid(), name: "Claim", type: "longtext", width: 340 },
+      { id: uid(), name: "Article", type: "text", width: 220 },
+      { id: uid(), name: "Status", type: "select", width: 130, options: [
+        { id: uid(), name: "Verified", color: "green" },
+        { id: uid(), name: "TK", color: "yellow" },
+        { id: uid(), name: "Disputed", color: "red" },
+      ] },
+      { id: uid(), name: "Source", type: "url", width: 240 },
+      { id: uid(), name: "Note", type: "text", width: 260 },
+      { id: uid(), name: "Date", type: "date", width: 120 },
+    ];
+    const database: Database = {
+      id: uid(),
+      name: "Claim Ledger",
+      icon: "✅",
+      description: "Every factual claim, its verification status, and its source. Filter Status=TK for the reporting to-do list.",
+      fields,
+      views: [makeView("table", "All Claims"), { ...makeView("kanban", "By Status"), groupBy: fields[2].id }],
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.databases.add(database);
+    void enqueue("databases", database.id, "upsert");
+  }
+  await db.kv.put({ key: "seed:claims", value: true });
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -190,4 +224,66 @@ ${notes}`,
   );
   await appendToNotes(fresh, "Pitch offer", out);
   return out;
+}
+
+// ── Fact verification (the integrity layer) ────────────────────────────────
+export async function verifyFacts(database: Database, row: Row): Promise<string> {
+  const fresh = (await db.rows.get(row.id))!;
+  const title = String(fresh.values[database.fields[0].id] ?? "article");
+  const notesText = Array.isArray(fresh.doc)
+    ? (fresh.doc as Array<{ content?: Array<{ text?: string }> }>)
+        .map((b) => (Array.isArray(b.content) ? b.content.map((c) => c.text ?? "").join("") : ""))
+        .join("\n")
+    : "";
+  if (notesText.trim().length < 20) throw new Error("Not enough draft material in the notes to verify — write or generate something first.");
+
+  const { wsTrpc } = await import("./trpcClient");
+  const result = await wsTrpc.workspace.verifyFacts.mutate({ text: notesText.slice(0, 38000), context: title });
+
+  // Record into the Claim Ledger database
+  const claimDb = (await db.databases.toArray()).find((d) => d.name === "Claim Ledger");
+  if (claimDb && result.claims.length > 0) {
+    const f = (name: string) => claimDb.fields.find((x) => x.name === name);
+    const statusField = f("Status");
+    for (const c of result.claims) {
+      const opt = statusField?.options?.find((o) => o.name === c.status) ?? statusField?.options?.find((o) => o.name === "TK");
+      const { createRow } = await import("./db");
+      await createRow(claimDb.id, {
+        [f("Claim")?.id ?? ""]: c.claim,
+        [f("Article")?.id ?? ""]: title,
+        [statusField?.id ?? ""]: opt?.id ?? null,
+        [f("Source")?.id ?? ""]: c.source || "",
+        [f("Note")?.id ?? ""]: c.note || "",
+        [f("Date")?.id ?? ""]: new Date().toISOString().slice(0, 10),
+      });
+    }
+  }
+
+  const lines = result.claims.map((c) => `- [${c.status}] ${c.claim}${c.source ? ` — ${c.source}` : ""}`).join("\n");
+  await appendToNotes(fresh, "Claim verification (Raj Patel)", `${result.summary}\n${lines}`);
+
+  return result.summary;
+}
+
+// ── Tournament drafting ─────────────────────────────────────────────────────
+export async function tournamentDraft(database: Database, row: Row): Promise<string> {
+  const fresh = (await db.rows.get(row.id))!;
+  const title = String(fresh.values[database.fields[0].id] ?? "article");
+  const summary = rowSummary(database, fresh);
+  const notesText = Array.isArray(fresh.doc)
+    ? (fresh.doc as Array<{ content?: Array<{ text?: string }> }>)
+        .map((b) => (Array.isArray(b.content) ? b.content.map((c) => c.text ?? "").join("") : ""))
+        .join("\n")
+        .slice(0, 12000)
+    : "";
+
+  const { wsTrpc } = await import("./trpcClient");
+  const result = await wsTrpc.workspace.tournamentDraft.mutate({
+    brief: `${summary}\n\nRESEARCH AND NOTES:\n${notesText}`,
+    context: title,
+  });
+
+  await appendToNotes(fresh, `Tournament draft — winner ${result.winnerLabel} (Sofia Andersson × 2, judged by Priya Sharma)`,
+    `${result.judge}\n\n${result.winner}`);
+  return `Draft ${result.winnerLabel} won. Opening added to notes ($${result.cost.toFixed(3)}).`;
 }

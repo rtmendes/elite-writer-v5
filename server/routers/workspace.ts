@@ -87,6 +87,33 @@ async function fetchPerplexityContext(query: string): Promise<string> {
   }
 }
 
+/** Outcome learning: per-outlet pitch history (accepted/rejected/no_response). */
+async function fetchPitchHistory(): Promise<string> {
+  try {
+    const db = await getDb();
+    if (!db) return "";
+    const rows = await db.execute(sql.raw(
+      "SELECT publicationName, status, COUNT(*) as n FROM pitches WHERE publicationName IS NOT NULL GROUP BY publicationName, status",
+    ));
+    const list = (rows as unknown as [Array<Record<string, unknown>>])[0] ?? [];
+    if (list.length === 0) return "";
+    const byPub = new Map<string, Record<string, number>>();
+    for (const r of list) {
+      const name = String(r.publicationName);
+      const entry = byPub.get(name) ?? {};
+      entry[String(r.status)] = Number(r.n) || 0;
+      byPub.set(name, entry);
+    }
+    const lines: string[] = [];
+    byPub.forEach((counts, name) => {
+      lines.push(`${name}: accepted ${counts.accepted ?? 0}, rejected ${counts.rejected ?? 0}, no response ${counts.no_response ?? 0}, sent ${counts.sent ?? 0}`);
+    });
+    return lines.join("\n");
+  } catch {
+    return "";
+  }
+}
+
 async function fetchPublicationsList(): Promise<string> {
   try {
     const db = await getDb();
@@ -188,6 +215,12 @@ export const workspaceRouter = router({
         if (pubs) prompt += `\n\nOUTLET DATABASE (name | niche | pay | audience):\n${pubs}`;
       }
 
+      // Outcome learning: ground scoring + matching in real pitch results
+      if (input.task === "match_publications" || input.task === "score_idea") {
+        const history = await fetchPitchHistory();
+        if (history) prompt += `\n\nPITCH TRACK RECORD (weigh this heavily — these outlets' actual responses to past pitches):\n${history}`;
+      }
+
       const result = await invokeLLM({
         messages: [
           { role: "system", content: system },
@@ -207,4 +240,162 @@ export const workspaceRouter = router({
 
       return { text, model: result.model ?? route.model, tokensIn, tokensOut, cost: Math.round(cost * 10000) / 10000 };
     }),
+
+  // ── Fact-integrity layer ──────────────────────────────────────────────────
+  // Extract every factual claim from draft material, verify the batch against
+  // live web sources (Perplexity), return a structured claim ledger.
+  verifyFacts: protectedProcedure
+    .input(z.object({ text: z.string().min(20).max(40000), context: z.string().max(200).default("") }))
+    .mutation(async ({ input }) => {
+      const persona = AGENT_PERSONAS.factchecker;
+      const extract = await invokeLLM({
+        messages: [
+          { role: "system", content: persona.systemPrompt + HOUSE_RULES },
+          { role: "user", content: `Extract every verifiable factual claim from this draft material (statistics, dates, named facts, attributions). Return STRICT JSON only: an array of strings, max 12 claims, each a single self-contained sentence.\n\nMATERIAL:\n${input.text}` },
+        ],
+        model: "anthropic/claude-haiku-4.5",
+        maxTokens: 2000,
+      });
+      let claims: string[] = [];
+      try {
+        claims = JSON.parse((extract.choices?.[0]?.message?.content ?? "[]").replace(/^```(json)?|```$/g, "").trim());
+      } catch {
+        throw new Error("Claim extraction failed — try again");
+      }
+      if (!Array.isArray(claims) || claims.length === 0) {
+        return { claims: [], summary: "No verifiable claims found in this material." };
+      }
+      claims = claims.slice(0, 12).map(String);
+
+      const live = await fetchPerplexityContext(
+        `Verify each of these claims. For each, state TRUE, FALSE, or UNVERIFIABLE with the best source:\n${claims.map((c, i) => `${i + 1}. ${c}`).join("\n")}`,
+      );
+
+      const judge = await invokeLLM({
+        messages: [
+          { role: "system", content: persona.systemPrompt + HOUSE_RULES },
+          { role: "user", content: `Given these claims and the live verification research below, return STRICT JSON only:
+[{"claim": "...", "status": "Verified" | "TK" | "Disputed", "source": "<url or source name, empty if none>", "note": "<one short sentence>"}]
+Status rules: Verified = confirmed with a source; Disputed = contradicted; TK = could not confirm (needs reporting).
+
+CLAIMS:
+${claims.map((c, i) => `${i + 1}. ${c}`).join("\n")}
+
+LIVE VERIFICATION RESEARCH:
+${live || "(no live research available — mark all claims TK)"}` },
+        ],
+        model: "anthropic/claude-sonnet-4.6",
+        maxTokens: 4000,
+      });
+
+      let results: Array<{ claim: string; status: string; source: string; note: string }> = [];
+      try {
+        results = JSON.parse((judge.choices?.[0]?.message?.content ?? "[]").replace(/^```(json)?|```$/g, "").trim());
+      } catch {
+        throw new Error("Verification parsing failed — try again");
+      }
+
+      const tIn = (extract.usage?.prompt_tokens ?? 0) + (judge.usage?.prompt_tokens ?? 0);
+      const tOut = (extract.usage?.completion_tokens ?? 0) + (judge.usage?.completion_tokens ?? 0);
+      const cost = estimateCost("anthropic/claude-sonnet-4.6", tIn, tOut);
+      void recordCentralCost("verify_facts", "haiku+sonnet", tIn, tOut, cost, input.context);
+
+      const verified = results.filter((r) => r.status === "Verified").length;
+      const tk = results.filter((r) => r.status === "TK").length;
+      const disputed = results.filter((r) => r.status === "Disputed").length;
+      return {
+        claims: results,
+        tokensIn: tIn,
+        tokensOut: tOut,
+        cost: Math.round(cost * 10000) / 10000,
+        summary: `${results.length} claims checked: ${verified} verified, ${tk} need reporting (TK), ${disputed} disputed.`,
+      };
+    }),
+
+  // ── Tournament drafting ───────────────────────────────────────────────────
+  // Two agents draft the same piece from different angles; the scorer judges
+  // blind and the winner is returned with the judge's reasoning.
+  tournamentDraft: protectedProcedure
+    .input(z.object({ brief: z.string().min(20).max(40000), context: z.string().max(200).default("") }))
+    .mutation(async ({ input }) => {
+      const drafter = AGENT_PERSONAS.drafter;
+      const angles = [
+        { label: "A", model: "anthropic/claude-sonnet-4.6", instruction: "Lead with the strongest data point. Authoritative, analytical register." },
+        { label: "B", model: "anthropic/claude-opus-4.8", instruction: "Lead with a human scene or concrete moment. Narrative register, then widen to the stakes." },
+      ];
+      const drafts = await Promise.all(
+        angles.map(async (a) => {
+          const r = await invokeLLM({
+            messages: [
+              { role: "system", content: drafter.systemPrompt + HOUSE_RULES },
+              { role: "user", content: `Write the opening 4-6 paragraphs of this article. ${a.instruction} Insert [TK: ...] where reporting is needed — never invent facts.\n\nBRIEF AND MATERIAL:\n${input.brief}` },
+            ],
+            model: a.model,
+            maxTokens: 6000,
+          });
+          return { ...a, text: r.choices?.[0]?.message?.content?.trim() ?? "", usage: r.usage };
+        }),
+      );
+
+      const scorer = AGENT_PERSONAS.scorer;
+      const judgeRes = await invokeLLM({
+        messages: [
+          { role: "system", content: scorer.systemPrompt + HOUSE_RULES },
+          { role: "user", content: `Two drafts of the same article opening. Judge blind on hook strength, authority, voice, and momentum. Return EXACTLY:
+WINNER: A or B
+WHY: <3 short bullets starting with "- ">
+STEAL: <one line from the losing draft worth keeping, quoted>
+
+DRAFT A:
+${drafts[0].text}
+
+DRAFT B:
+${drafts[1].text}` },
+        ],
+        model: "anthropic/claude-haiku-4.5",
+        maxTokens: 1500,
+      });
+      const judgeText = judgeRes.choices?.[0]?.message?.content?.trim() ?? "";
+      const winnerLabel = /WINNER:\s*B/i.test(judgeText) ? "B" : "A";
+      const winner = drafts.find((d) => d.label === winnerLabel)!;
+      const loser = drafts.find((d) => d.label !== winnerLabel)!;
+
+      const tIn = drafts.reduce((sum, d) => sum + (d.usage?.prompt_tokens ?? 0), 0) + (judgeRes.usage?.prompt_tokens ?? 0);
+      const tOut = drafts.reduce((sum, d) => sum + (d.usage?.completion_tokens ?? 0), 0) + (judgeRes.usage?.completion_tokens ?? 0);
+      const cost = estimateCost("anthropic/claude-opus-4.8", tIn, tOut);
+      void recordCentralCost("tournament_draft", "sonnet+opus+haiku", tIn, tOut, cost, input.context);
+
+      return {
+        winner: winner.text,
+        winnerLabel,
+        judge: judgeText,
+        loserText: loser.text,
+        tokensIn: tIn,
+        tokensOut: tOut,
+        cost: Math.round(cost * 10000) / 10000,
+      };
+    }),
+
+  // ── Pitch CRM: send via Gmail-connected account + log for the flywheel ────
+  recordPitch: protectedProcedure
+    .input(z.object({
+      publicationName: z.string().min(1).max(200),
+      editorEmail: z.string().max(320).default(""),
+      subject: z.string().min(1).max(500),
+      body: z.string().min(1),
+      articleTitle: z.string().max(500).default(""),
+      sent: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      await db.execute(sql`
+        INSERT INTO pitches (userId, publicationId, publicationName, editorEmail, subject, body, articleTitle, status, sentAt)
+        VALUES (${ctx.user.id}, ${input.publicationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 90)},
+                ${input.publicationName}, ${input.editorEmail}, ${input.subject}, ${input.body},
+                ${input.articleTitle}, ${input.sent ? "sent" : "draft"}, ${input.sent ? new Date() : null})
+      `);
+      return { ok: true };
+    }),
 });
+

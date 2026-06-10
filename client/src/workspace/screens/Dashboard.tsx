@@ -4,6 +4,43 @@ import React from "react";
 import { createDatabase, createPage, db } from "../db";
 import { formatCurrency } from "../ui";
 
+function AgentActivity({ navigate }: { navigate: (hash: string) => void }) {
+  const databases = useLiveQuery(() => db.databases.toArray(), []) ?? [];
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  const rows = useLiveQuery(
+    async () => (ledger ? await db.rows.where("dbId").equals(ledger.id).toArray() : []),
+    [ledger?.id],
+  ) ?? [];
+  if (!ledger || rows.length === 0) return null;
+  const f = (name: string) => ledger.fields.find((x) => x.name === name)?.id ?? "";
+  const recent = [...rows].sort((a, b) => b.createdAt - a.createdAt).slice(0, 8);
+  const totalToday = rows
+    .filter((r) => r.createdAt > Date.now() - 864e5)
+    .reduce((sum, r) => sum + (Number(r.values[f("Cost")]) || 0), 0);
+  return (
+    <>
+      <div className="dash-section-title">
+        Agent activity — ${totalToday.toFixed(2)} spent today ·{" "}
+        <span style={{ cursor: "pointer", color: "var(--accent)", textTransform: "none", letterSpacing: 0 }} onClick={() => navigate(`#/db/${ledger.id}`)}>
+          open full ledger
+        </span>
+      </div>
+      <div style={{ background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "var(--shadow)", overflow: "hidden" }}>
+        {recent.map((r) => (
+          <div key={r.id} className="list-row" style={{ cursor: "default" }}>
+            <div className="list-title" style={{ fontWeight: 500 }}>{String(r.values[f("Entry")] ?? "")}</div>
+            <div className="list-meta">
+              <span>{String(r.values[f("Model")] ?? "")}</span>
+              <span>${(Number(r.values[f("Cost")]) || 0).toFixed(3)}</span>
+              <span>{new Date(r.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function Dashboard({ navigate }: { navigate: (hash: string) => void }) {
   const pages = useLiveQuery(() => db.pages.toArray(), []) ?? [];
   const databases = useLiveQuery(() => db.databases.toArray(), []) ?? [];
@@ -28,8 +65,17 @@ export function Dashboard({ navigate }: { navigate: (hash: string) => void }) {
   return (
     <div className="content-scroll">
       <div className="dash">
-        <h1>Your media engine</h1>
-        <div className="dash-sub">{today} — pick up where the story left off.</div>
+        <div className="ws-hero">
+          <img
+            src="/images/workspace-hero.png"
+            alt=""
+            onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
+          />
+          <div className="ws-hero-text">
+            <h1>Your media engine</h1>
+            <div className="dash-sub" style={{ marginBottom: 0 }}>{today} — pick up where the story left off.</div>
+          </div>
+        </div>
 
         <div className="stat-grid">
           <div className="stat-card">
@@ -70,6 +116,8 @@ export function Dashboard({ navigate }: { navigate: (hash: string) => void }) {
             <DatabaseZap size={15} /> New database
           </button>
         </div>
+
+        <AgentActivity navigate={navigate} />
 
         <div className="dash-section-title">Jump back in</div>
         <div className="recent-grid">

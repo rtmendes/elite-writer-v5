@@ -137,6 +137,19 @@ export async function recordCentralCost(task: string, model: string, tokensIn: n
   }
 }
 
+/** Optional Slack alerts via incoming webhook (set SLACK_WEBHOOK_URL). */
+export async function slackAlert(message: string) {
+  const webhook = process.env.SLACK_WEBHOOK_URL;
+  if (!webhook) return;
+  try {
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: message.slice(0, 3900) }),
+    });
+  } catch { /* alerts are best-effort */ }
+}
+
 const LEDGER_COLORS = ["purple", "teal", "blue", "orange", "green", "yellow", "pink", "gray", "red"];
 
 async function recordLedger(taskLabel: string, model: string, tokensIn: number, tokensOut: number, cost: number, context: string) {
@@ -198,6 +211,7 @@ async function agentCall(taskLabel: string, personaKey: keyof typeof AGENT_PERSO
   const budget = budgetLimit();
   if (budget > 0 && spent >= budget) {
     console.warn(`[proactive] budget reached ($${spent.toFixed(2)}/$${budget}) — skipping ${taskLabel}`);
+    void slackAlert(`⛔ Elite Writer: monthly AI budget reached ($${spent.toFixed(2)}/$${budget}). Proactive agents paused until next month or budget raise.`);
     return null;
   }
   const persona = AGENT_PERSONAS[personaKey];
@@ -274,13 +288,13 @@ async function scoutJob() {
     `File 3 fresh, news-pegged article ideas worth $8,000+ each at premium outlets. Beats: ${niches}.
 ${headlines ? `TODAY'S HEADLINES (peg ideas to these where possible):\n${headlines}\n` : ""}
 Return STRICT JSON only — an array of exactly 3 objects:
-[{"headline": "...", "peg": "<the news event and why now>", "niche": "<one beat from the list>", "angle": "<the contrarian/underreported angle in one sentence>"}]`,
+[{"headline": "...", "peg": "<the news event and why now>", "niche": "<one beat from the list>", "angle": "<the contrarian/underreported angle in one sentence>", "peg_days": <integer 1-21: days until this peg goes stale>}]`,
     "overnight scout run",
     3000,
   );
   if (!out) return;
 
-  let ideas: Array<{ headline?: string; peg?: string; niche?: string; angle?: string }> = [];
+  let ideas: Array<{ headline?: string; peg?: string; niche?: string; angle?: string; peg_days?: number }> = [];
   try {
     ideas = JSON.parse(out.replace(/^```(json)?|```$/g, "").trim());
   } catch {
@@ -290,6 +304,7 @@ Return STRICT JSON only — an array of exactly 3 objects:
 
   const titleField = pipeline.fields[0];
   const pegField = fieldByName(pipeline, "News Peg");
+  const expiresField = await ensureWsField(pipeline, "Peg Expires", "date");
   for (const idea of ideas.slice(0, 3)) {
     if (!idea.headline) continue;
     const now = Date.now();
@@ -298,6 +313,8 @@ Return STRICT JSON only — an array of exactly 3 objects:
       [statusField.id]: ideaOpt.id,
     };
     if (pegField && idea.peg) values[pegField.id] = idea.peg;
+    const pegDays = Math.max(1, Math.min(21, Number(idea.peg_days) || 7));
+    values[expiresField.id] = new Date(now + pegDays * 864e5).toISOString().slice(0, 10);
     if (nicheField && idea.niche) {
       const opt = nicheField.options?.find((o) => o.name.toLowerCase() === idea.niche!.toLowerCase());
       if (opt) values[nicheField.id] = [opt.id];
@@ -307,6 +324,7 @@ Return STRICT JSON only — an array of exactly 3 objects:
     await saveRow(row);
   }
   console.log(`[proactive] Scout filed ${Math.min(ideas.length, 3)} ideas`);
+  void slackAlert(`📰 Scout filed ${Math.min(ideas.length, 3)} fresh ideas:\n${ideas.slice(0, 3).map((i) => `• ${i.headline}`).join("\n")}`);
 }
 
 // ── Job 2: Scorer auto-scores new ideas ─────────────────────────────────────
@@ -318,8 +336,16 @@ async function scorerJob() {
   const earlyIds = (statusField.options ?? []).filter((o) => /idea|research/i.test(o.name)).map((o) => o.id);
   const scoreField = await ensureWsField(pipeline, "AI Score", "rating");
 
+  const expires = fieldByName(pipeline, "Peg Expires");
   const rows = await loadRows(pipeline.id);
-  const todo = rows.filter((r) => earlyIds.includes(r.values[statusField.id] as string) && !r.values[scoreField.id]).slice(0, 3);
+  const todo = rows
+    .filter((r) => earlyIds.includes(r.values[statusField.id] as string) && !r.values[scoreField.id])
+    .sort((a, b) => {
+      const av = expires ? String(a.values[expires.id] ?? "9999") : "9999";
+      const bv = expires ? String(b.values[expires.id] ?? "9999") : "9999";
+      return av.localeCompare(bv); // soonest-expiring pegs first
+    })
+    .slice(0, 3);
 
   for (const row of todo) {
     const summary = pipeline.fields
@@ -415,6 +441,22 @@ ${notesText || "(no notes yet — judge on the fields alone, and say so)"}`,
   }
 }
 
+// ── Job 4: pitch follow-up nudges ───────────────────────────────────────────
+async function followupJob() {
+  try {
+    const stale = await dbExec(
+      "SELECT id, publicationName, editorEmail, articleTitle, sentAt FROM pitches WHERE status = 'sent' AND sentAt < DATE_SUB(NOW(), INTERVAL 4 DAY) AND sentAt > DATE_SUB(NOW(), INTERVAL 30 DAY)",
+    );
+    if (stale.length === 0) return;
+    const lines = stale.slice(0, 8).map((piece) =>
+      `• ${piece.publicationName ?? "?"} — "${String(piece.articleTitle ?? "").slice(0, 60)}" (sent ${String(piece.sentAt).slice(0, 10)})`,
+    );
+    void slackAlert(`✉️ ${stale.length} pitch${stale.length === 1 ? "" : "es"} awaiting reply 4+ days — time for the polite follow-up:\n${lines.join("\n")}`);
+  } catch (err) {
+    console.warn("[proactive] followup check failed:", err instanceof Error ? err.message : err);
+  }
+}
+
 // ── Scheduler ───────────────────────────────────────────────────────────────
 async function safely(name: string, job: () => Promise<void>) {
   try {
@@ -446,6 +488,10 @@ export function initProactiveAgents() {
   setInterval(() => {
     void safely("scout", scoutJob);
   }, 60 * 60_000);
+
+  setInterval(() => {
+    void safely("followup", followupJob);
+  }, 12 * 3600_000);
 
   console.log("[proactive] agent loop armed: scout (≤1/20h), scorer + guardian (every 10m), budget $" + budgetLimit() + "/mo");
 }
