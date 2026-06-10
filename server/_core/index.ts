@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
+import { initProactiveAgents } from "./proactiveAgents";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
@@ -158,6 +159,7 @@ async function startServer() {
 
   server.listen(port, "0.0.0.0", () => {
     console.log(`🚀 Elite Writer V5 running on http://0.0.0.0:${port}/`);
+    initProactiveAgents();
     console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
     console.log(`   Database: ${process.env.DATABASE_URL ? "configured" : "NOT configured"}`);
     console.log(`   Anthropic: ${process.env.ANTHROPIC_API_KEY ? "configured" : "NOT configured"}`);

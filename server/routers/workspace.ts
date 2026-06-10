@@ -16,6 +16,7 @@ import { invokeLLM } from "../_core/llm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { AGENT_PERSONAS } from "./agents";
+import { estimateCost, recordCentralCost } from "../_core/proactiveAgents";
 
 const SYNC_TABLES = { pages: "wsPages", databases: "wsDatabases", rows: "wsRows" } as const;
 type SyncTable = keyof typeof SYNC_TABLES;
@@ -54,43 +55,6 @@ const TASK_MODELS: Record<AgentTask, { model: string; maxTokens: number; persona
   continue: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "continuator" },
 };
 
-// $/1M tokens — estimates for the expense ledger.
-const PRICING: Array<{ match: RegExp; in: number; out: number }> = [
-  { match: /haiku/i, in: 1, out: 5 },
-  { match: /sonnet/i, in: 3, out: 15 },
-  { match: /opus/i, in: 5, out: 25 },
-  { match: /./, in: 3, out: 15 },
-];
-
-function estimateCost(model: string, tokensIn: number, tokensOut: number): number {
-  const p = PRICING.find((x) => x.match.test(model))!;
-  return (tokensIn / 1e6) * p.in + (tokensOut / 1e6) * p.out;
-}
-
-/** Best-effort report into the central InsightProfit cost system. */
-async function recordCentralCost(task: string, model: string, tokensIn: number, tokensOut: number, cost: number, context: string) {
-  const url = ENV.supabaseUrl || "https://supabase.insightprofit.live";
-  const key = ENV.supabaseServiceKey;
-  if (!key) return;
-  try {
-    await fetch(`${url.replace(/\/$/, "")}/rest/v1/rpc/record_cost_event`, {
-      method: "POST",
-      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        p_agent: "elite-writer-v5-workspace",
-        p_tool: task,
-        p_model: model,
-        p_event_type: "llm_call",
-        p_input_tokens: tokensIn,
-        p_output_tokens: tokensOut,
-        p_cost_usd: Math.round(cost * 10000) / 10000,
-        p_metadata: { context: context.slice(0, 120) },
-      }),
-    });
-  } catch (err) {
-    console.warn("[workspace] record_cost_event failed:", err instanceof Error ? err.message : err);
-  }
-}
 
 const HOUSE_RULES = `
 House rules (always apply):
