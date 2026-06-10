@@ -324,7 +324,7 @@ Return STRICT JSON only — an array of exactly 3 objects:
     await saveRow(row);
   }
   console.log(`[proactive] Scout filed ${Math.min(ideas.length, 3)} ideas`);
-  void slackAlert(`📰 Scout filed ${Math.min(ideas.length, 3)} fresh ideas:\n${ideas.slice(0, 3).map((i) => `• ${i.headline}`).join("\n")}`);
+  // Ideas are actioned inside the app (Article Pipeline board) — no chat noise.
 }
 
 // ── Job 2: Scorer auto-scores new ideas ─────────────────────────────────────
