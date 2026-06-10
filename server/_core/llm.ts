@@ -66,38 +66,21 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const temperature = params.temperature ?? 0.7;
   const model = params.model ?? "claude-sonnet-4";
 
-  // If model is explicitly OpenRouter or starts with a known OpenRouter pattern
-  if (params.model?.includes("/") && ENV.openrouterApiKey) {
+  // Priority: OpenRouter (cheapest, multi-model) → OpenAI → Anthropic → Forge
+  // OpenRouter handles all model prefixes (anthropic/, openai/, google/, etc.)
+
+  // Step 1: OpenRouter first — handles any model, cheapest routing
+  if (ENV.openrouterApiKey) {
     try {
-      return await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: params.model });
+      // Use the model as-is if it has a prefix, otherwise default to anthropic/claude-sonnet-4
+      const orModel = params.model?.includes("/") ? params.model : `anthropic/${model}`;
+      return await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: orModel });
     } catch (err: any) {
       console.warn(`[LLM] OpenRouter failed (${err?.message?.slice(0, 100)}), falling back...`);
-      // Fall through to try direct APIs
     }
   }
 
-  // Try Anthropic direct (works for claude models)
-  if (ENV.anthropicApiKey) {
-    try {
-      // Map OpenRouter model names back to Anthropic model names
-      let anthropicModel = model;
-      if (params.model?.startsWith("anthropic/")) {
-        anthropicModel = params.model.replace("anthropic/", "");
-      } else if (params.model?.startsWith("openai/") || params.model?.startsWith("google/") || params.model?.startsWith("deepseek/")) {
-        // Non-Anthropic model — try OpenAI or skip to next fallback
-        if (ENV.openaiApiKey && (params.model?.startsWith("openai/") || !ENV.anthropicApiKey)) {
-          return await invokeOpenAI(params.messages, { maxTokens, format, temperature });
-        }
-        // For Google/DeepSeek models, still fall through to Anthropic as a general fallback
-        anthropicModel = "claude-sonnet-4";
-      }
-      return await invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model: anthropicModel });
-    } catch (err: any) {
-      console.warn(`[LLM] Anthropic failed (${err?.message?.slice(0, 100)}), falling back...`);
-    }
-  }
-
-  // Fallback: OpenAI
+  // Step 2: OpenAI direct
   if (ENV.openaiApiKey) {
     try {
       return await invokeOpenAI(params.messages, { maxTokens, format, temperature });
@@ -106,16 +89,23 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     }
   }
 
-  // Fallback: OpenRouter (any model)
-  if (ENV.openrouterApiKey) {
+  // Step 3: Anthropic direct (last resort for paid APIs — balance may be low)
+  if (ENV.anthropicApiKey) {
     try {
-      return await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: "anthropic/claude-sonnet-4" });
+      let anthropicModel = model;
+      if (params.model?.startsWith("anthropic/")) {
+        anthropicModel = params.model.replace("anthropic/", "");
+      } else if (params.model?.includes("/")) {
+        // Non-Anthropic model requested but OpenRouter/OpenAI failed — use default Claude
+        anthropicModel = "claude-sonnet-4";
+      }
+      return await invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model: anthropicModel });
     } catch (err: any) {
-      console.warn(`[LLM] OpenRouter last-resort failed: ${err?.message?.slice(0, 100)}`);
+      console.warn(`[LLM] Anthropic failed (${err?.message?.slice(0, 100)}), falling back...`);
     }
   }
 
-  // Legacy: Forge API
+  // Step 4: Legacy Forge API
   if (ENV.forgeApiKey && ENV.forgeApiUrl) {
     return invokeForge(params);
   }
@@ -310,12 +300,12 @@ async function invokeForge(params: InvokeParams): Promise<InvokeResult> {
 }
 
 /**
- * Stream LLM response using Anthropic's streaming API.
+ * Stream LLM response using OpenRouter (preferred) or Anthropic streaming API.
  * Returns an async generator of text chunks.
  */
 export async function* streamLLM(params: InvokeParams): AsyncGenerator<string> {
-  if (!ENV.anthropicApiKey) {
-    throw new Error("Streaming requires ANTHROPIC_API_KEY");
+  if (!ENV.openrouterApiKey && !ENV.anthropicApiKey) {
+    throw new Error("Streaming requires OPENROUTER_API_KEY or ANTHROPIC_API_KEY");
   }
 
   let systemPrompt = "";
@@ -335,15 +325,64 @@ export async function* streamLLM(params: InvokeParams): AsyncGenerator<string> {
     systemPrompt = "";
   }
 
-  const payload: Record<string, unknown> = {
+  const maxTokens = params.maxTokens ?? params.max_tokens ?? 4096;
+  const temperature = params.temperature ?? 0.7;
+
+  // Try OpenRouter streaming first (OpenAI-compatible SSE format)
+  if (ENV.openrouterApiKey) {
+    const orModel = params.model?.includes("/") ? params.model : `anthropic/${params.model ?? "claude-sonnet-4"}`;
+    const orPayload: Record<string, unknown> = {
+      model: orModel,
+      max_tokens: maxTokens,
+      temperature,
+      stream: true,
+      messages: [
+        ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
+        ...conversationMessages,
+      ],
+    };
+
+    let orResponse;
+    try {
+      orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${ENV.openrouterApiKey}`,
+          "HTTP-Referer": ENV.appUrl || "https://elitewriter.insightprofit.live",
+          "X-Title": "Elite Writer V5",
+        },
+        body: JSON.stringify(orPayload),
+      });
+
+      if (orResponse.ok) {
+        // OpenRouter uses OpenAI-compatible SSE: choices[0].delta.content
+        yield* parseSSEStream(orResponse, "openrouter");
+        return;
+      }
+    } catch (err: any) {
+      console.warn(`[streamLLM] OpenRouter network error (${err?.message}), falling back to Anthropic`);
+    }
+
+    // If OpenRouter fails and we have Anthropic, fall through
+    if (!ENV.anthropicApiKey) {
+      throw new Error(`OpenRouter stream error: ${orResponse?.status || 'Network error'}`);
+    }
+    if (orResponse && !orResponse.ok) {
+      console.warn(`[streamLLM] OpenRouter streaming failed (${orResponse.status}), falling back to Anthropic`);
+    }
+  }
+
+  // Anthropic streaming fallback
+  const anthropicPayload: Record<string, unknown> = {
     model: params.model ?? "claude-sonnet-4",
-    max_tokens: params.maxTokens ?? params.max_tokens ?? 4096,
-    temperature: params.temperature ?? 0.7,
+    max_tokens: maxTokens,
+    temperature,
     messages: conversationMessages,
     stream: true,
   };
 
-  if (systemPrompt) payload.system = systemPrompt;
+  if (systemPrompt) anthropicPayload.system = systemPrompt;
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -352,13 +391,20 @@ export async function* streamLLM(params: InvokeParams): AsyncGenerator<string> {
       "x-api-key": ENV.anthropicApiKey,
       "anthropic-version": "2023-06-01",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(anthropicPayload),
   });
 
   if (!response.ok) {
     throw new Error(`Anthropic stream error: ${response.status}`);
   }
 
+  yield* parseSSEStream(response, "anthropic");
+}
+
+/**
+ * Parse SSE stream from either Anthropic or OpenRouter/OpenAI format.
+ */
+async function* parseSSEStream(response: Response, provider: "anthropic" | "openrouter"): AsyncGenerator<string> {
   const reader = response.body?.getReader();
   if (!reader) throw new Error("No response body");
 
@@ -380,8 +426,17 @@ export async function* streamLLM(params: InvokeParams): AsyncGenerator<string> {
 
       try {
         const event = JSON.parse(jsonStr);
-        if (event.type === "content_block_delta" && event.delta?.text) {
-          yield event.delta.text;
+        if (provider === "anthropic") {
+          // Anthropic format: content_block_delta → delta.text
+          if (event.type === "content_block_delta" && event.delta?.text) {
+            yield event.delta.text;
+          }
+        } else {
+          // OpenRouter/OpenAI format: choices[0].delta.content
+          const text = event.choices?.[0]?.delta?.content;
+          if (text) {
+            yield text;
+          }
         }
       } catch {
         // Skip non-JSON lines
