@@ -40,7 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (dbLoading) return;
 
     if (dbData && isAuthenticated) {
-      mergeDbData(dbData);
+      mergeDbData(dbData as Parameters<typeof mergeDbData>[0]);
       hydrationDone.current = true;
     } else if (!isAuthenticated && !dbLoading) {
       markHydratedNoAuth();

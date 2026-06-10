@@ -17,7 +17,7 @@ export const giveRouter = router({
     .input(z.object({
       prompt: z.string().min(1, "Describe the visualization you want"),
       data: z.any().optional(),
-      parameters: z.record(z.any()).optional(),
+      parameters: z.record(z.string(), z.any()).optional(),
     }))
     .mutation(async ({ input }) => {
       const startTime = Date.now();

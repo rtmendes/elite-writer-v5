@@ -185,7 +185,7 @@ export function scoreAndFilter(
 ): { scores: ArticleScores; filterResult: ContentFilterResult } {
   const scores = scoreArticleLocally(content, publicationId);
   
-  const filterCheck = checkContentFilters(scores, publicationId, publicationCategory);
+  const filterCheck = checkContentFilters(scores as unknown as Record<string, number>, publicationId, publicationCategory);
   const weakDimensions = filterCheck.violations.map(v => v.dimension);
   const enhancementPrompt = getEnhancementPrompt(publicationId, weakDimensions, publicationCategory);
   

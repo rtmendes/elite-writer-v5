@@ -264,7 +264,7 @@ export const researchRouter = router({
   triggerWebhook: protectedProcedure
     .input(z.object({
       event: z.enum(["article_published", "article_scored", "research_complete", "pitch_sent", "custom"]),
-      payload: z.record(z.any()),
+      payload: z.record(z.string(), z.any()),
     }))
     .mutation(async ({ input }) => {
       if (!ENV.activepiecesWebhook) throw new Error("ACTIVEPIECES_WEBHOOK_URL not configured");

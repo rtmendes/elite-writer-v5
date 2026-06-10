@@ -57,6 +57,7 @@ export const queueRouter = router({
   // ─── Get Queue Stats ──────────────────────────────────
   stats: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
+      if (!db) throw new Error("Database not available");
     const allArticles = await db.select().from(articles)
       .where(eq(articles.userId, ctx.user.id));
 
@@ -128,6 +129,7 @@ Return JSON:
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
+      if (!db) throw new Error("Database not available");
       const steps: string[] = [];
 
       // Step 1: Research
@@ -316,6 +318,7 @@ Return JSON:
         try {
           // Use the same pipeline but call inline
           const db = await getDb();
+      if (!db) throw new Error("Database not available");
 
           // Research (fast model)
           const researchText = await callModel("gemini-flash", [
@@ -379,6 +382,7 @@ Return JSON:
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
+      if (!db) throw new Error("Database not available");
       await db.update(articles).set({ status: input.status })
         .where(and(eq(articles.id, input.articleId), eq(articles.userId, ctx.user.id)));
       syncArticleToPipeline({ articleId: input.articleId, title: "", status: input.status });
@@ -390,6 +394,7 @@ Return JSON:
     .input(z.object({ articleId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
+      if (!db) throw new Error("Database not available");
       await db.delete(articles)
         .where(and(eq(articles.id, input.articleId), eq(articles.userId, ctx.user.id)));
       return { success: true };
