@@ -587,7 +587,11 @@ export function getScoringWeights(publicationId: string): Record<string, number>
     expertise_depth: 1.1, readability: 1, conclusion_cta: 0.8,
   };
   if (sop?.scoringWeightOverrides) {
-    return { ...defaultWeights, ...sop.scoringWeightOverrides };
+    const merged: Record<string, number> = { ...defaultWeights };
+    for (const [k, v] of Object.entries(sop.scoringWeightOverrides)) {
+      if (typeof v === "number") merged[k] = v;
+    }
+    return merged;
   }
   return defaultWeights;
 }

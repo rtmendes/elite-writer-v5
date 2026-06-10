@@ -238,3 +238,19 @@ describe('invokeLLM Fallbacks and Errors', () => {
     vi.restoreAllMocks();
   });
 });
+
+describe('resolveModelSlug', () => {
+  it('maps bare aliases to the correct provider family', async () => {
+    const { resolveModelSlug } = await import('./llm');
+    expect(resolveModelSlug('gemini-flash')).toBe('google/gemini-2.5-flash');
+    expect(resolveModelSlug('gpt-4o')).toBe('openai/gpt-4o');
+    expect(resolveModelSlug('claude-sonnet')).toBe('anthropic/claude-sonnet-4.6');
+    expect(resolveModelSlug('deepseek-r1')).toBe('deepseek/deepseek-r1');
+  });
+  it('passes through prefixed slugs and defaults unknown bare names to anthropic', async () => {
+    const { resolveModelSlug } = await import('./llm');
+    expect(resolveModelSlug('openai/gpt-4o-mini')).toBe('openai/gpt-4o-mini');
+    expect(resolveModelSlug('claude-future-9')).toBe('anthropic/claude-future-9');
+    expect(resolveModelSlug(undefined)).toBe('anthropic/claude-sonnet-4');
+  });
+});

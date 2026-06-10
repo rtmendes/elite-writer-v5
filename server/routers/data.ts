@@ -407,7 +407,7 @@ const settingsRouter = router({
     return rows.length > 0 ? rows[0].settings : null;
   }),
   upsert: protectedProcedure.input(z.object({
-    settings: z.record(z.any()),
+    settings: z.record(z.string(), z.any()),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database unavailable");

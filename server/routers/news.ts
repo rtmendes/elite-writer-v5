@@ -325,7 +325,7 @@ export const newsRouter = router({
               url: article.url || "",
               category: scored.niche_tags?.[0] || article.category || "general",
               relevanceScore: scored.viral_score || 50,
-              saved: false,
+              saved: 0,
               metadata: {
                 sentiment: scored.sentiment,
                 viral_score: scored.viral_score,

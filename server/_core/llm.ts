@@ -59,6 +59,31 @@ function extractText(content: MessageContent | MessageContent[]): string {
  * Invoke LLM using direct Anthropic Claude API.
  * OpenAI-compatible response shape for backward compatibility with v5 router code.
  */
+
+/**
+ * Legacy/bare model aliases used across v5 routers, normalized to valid
+ * OpenRouter slugs so the OpenRouter-first chain routes to the RIGHT family
+ * (a bare "gemini-flash" must never silently become an Anthropic/OpenAI call).
+ */
+const MODEL_ALIASES: Record<string, string> = {
+  "claude-sonnet": "anthropic/claude-sonnet-4.6",
+  "claude-sonnet-4": "anthropic/claude-sonnet-4",
+  "claude-opus": "anthropic/claude-opus-4.8",
+  "claude-haiku": "anthropic/claude-haiku-4.5",
+  "gpt-4o": "openai/gpt-4o",
+  "gpt-4o-mini": "openai/gpt-4o-mini",
+  "gemini": "google/gemini-2.5-flash",
+  "gemini-flash": "google/gemini-2.5-flash",
+  "gemini-pro": "google/gemini-2.5-pro",
+  "deepseek-r1": "deepseek/deepseek-r1",
+};
+
+export function resolveModelSlug(model?: string): string {
+  const m = model ?? "claude-sonnet-4";
+  if (m.includes("/")) return m;
+  return MODEL_ALIASES[m] ?? `anthropic/${m}`;
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const maxTokens = params.maxTokens ?? params.max_tokens ?? 4096;
   const format = params.response_format ?? params.responseFormat;
@@ -72,8 +97,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // Step 1: OpenRouter first — handles any model, cheapest routing
   if (ENV.openrouterApiKey) {
     try {
-      // Use the model as-is if it has a prefix, otherwise default to anthropic/claude-sonnet-4
-      const orModel = params.model?.includes("/") ? params.model : `anthropic/${model}`;
+      // Normalize bare aliases to valid OpenRouter slugs (right model family)
+      const orModel = resolveModelSlug(params.model ?? model);
       return await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: orModel });
     } catch (err: any) {
       console.warn(`[LLM] OpenRouter failed (${err?.message?.slice(0, 100)}), falling back...`);
@@ -330,7 +355,7 @@ export async function* streamLLM(params: InvokeParams): AsyncGenerator<string> {
 
   // Try OpenRouter streaming first (OpenAI-compatible SSE format)
   if (ENV.openrouterApiKey) {
-    const orModel = params.model?.includes("/") ? params.model : `anthropic/${params.model ?? "claude-sonnet-4"}`;
+    const orModel = resolveModelSlug(params.model);
     const orPayload: Record<string, unknown> = {
       model: orModel,
       max_tokens: maxTokens,

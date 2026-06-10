@@ -591,7 +591,7 @@ export default function Agents() {
               <Card
                 key={chat.id}
                 className="border-border hover:border-primary/30 cursor-pointer transition-all group"
-                onClick={() => handleOpenExistingChat(chat)}
+                onClick={() => handleOpenExistingChat(chat as unknown as Parameters<typeof handleOpenExistingChat>[0])}
               >
                 <CardContent className="p-3">
                   <div className="flex items-start justify-between gap-2">
@@ -1014,7 +1014,7 @@ function ChatInterface({ agentIds, messages, input, sending, onInputChange, onSe
   onInputChange: (v: string) => void;
   onSend: () => void;
   onClose: () => void;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const agents = agentIds.map(id => getAgent(id));
   const isGroup = agentIds.length > 1;

@@ -612,7 +612,7 @@ Restructure the content to fit this template while preserving all facts, data, a
         temperature: 0.7,
       });
 
-      const restructuredContent = result.choices[0]?.message?.content || article.content;
+      const restructuredContent = result.choices[0]?.message?.content || article.content || "";
       const newWordCount = restructuredContent.trim().split(/\s+/).length;
 
       await db.update(articles).set({
@@ -701,7 +701,7 @@ Rules:
         temperature: 0.6,
       });
 
-      const enrichedContent = result.choices[0]?.message?.content || article.content;
+      const enrichedContent = result.choices[0]?.message?.content || article.content || "";
       const newWordCount = enrichedContent.trim().split(/\s+/).length;
 
       await db.update(articles).set({
@@ -1063,7 +1063,7 @@ No AI clichés. US English. Every sentence earns its place.`;
       steps.push({ step: "save", status: "complete", detail: `Article #${saved.id}` });
       syncArticleToPipeline({
         articleId: saved.id, title: input.topic, status: "scored",
-        brandId: input.brandContextId, score: scoreData.overall, wordCount,
+        brandId: input.brandContextId != null ? String(input.brandContextId) : null, score: scoreData.overall, wordCount,
         targetPublication: input.targetPublication,
       });
 

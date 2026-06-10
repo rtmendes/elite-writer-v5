@@ -323,10 +323,11 @@ Return the enhanced section. If you add data points, cite sources. If you restru
 
       return {
         success: true,
-        comparisons: results.map((r, i) => ({
-          model: input.models[i],
-          ...(r.status === "fulfilled" ? r.value : { text: `Error: ${(r as any).reason?.message}`, tokens: 0 }),
-        })),
+        comparisons: results.map((r, i) =>
+          r.status === "fulfilled"
+            ? r.value
+            : { model: input.models[i], text: `Error: ${(r as any).reason?.message}`, tokens: 0 },
+        ),
       };
     }),
 

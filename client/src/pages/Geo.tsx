@@ -25,6 +25,7 @@ import {
   Globe, Plus, Loader2, Trash2, Search, Eye, Brain,
   Target, BarChart3, Shield, Sparkles, FileText, Wand2,
   CheckCircle2, AlertTriangle, XCircle, TrendingUp, Radar,
+  Copy,
 } from "lucide-react";
 
 function ScoreBadge({ score, label }: { score: number; label: string }) {
