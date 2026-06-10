@@ -57,6 +57,20 @@ const TASK_MODELS: Record<AgentTask, { model: string; maxTokens: number; persona
 
 
 
+
+// Distilled from the "Large Publications Master Guide" — the house methodology.
+const PLAYBOOK = `
+PITCHING & WRITING PLAYBOOK (follow this method):
+- PUBLICATION FIRST: match the target outlet's headline structure, article types, and tone exactly. Never generic; write for THEM.
+- SUCCESS PEG (required on every idea): answer "why is this relevant right now?" with at least one of — a concrete success metric, a news peg, a trending-topic tie-in, a relatable everyday story, or a big-name tie-in.
+- HEADLINES: lead with a concrete, scroll-stopping, identifiable metric or hook the average reader relates to (e.g. "I run an 8-figure biscuit business that started as a side gig"). The number/specific is the hook, not the abstract topic.
+- PITCH SUBJECT LINE: exactly "Pitch: <a few words from the idea>" — lowercase, 10 words max, NO period, never "I can help / this can help".
+- PITCH BODY: 1-2 line intro → brief credibility (where you've been published) → 2-3 article pitch ideas, each = a headline + a 2-4 sentence premise (the story, what it covers, sources you'd use) → a few relevant clips.
+- TIERS: Tier 1-3 (open applications, editor calls, direct pitches) win on the IDEA alone — no expert proof needed. Tier 4-5 (assigned articles, columns) require social proof + expertise + a column hook.
+- COLUMN HOOK: a clear "swim lane" (who you help + the transformation), why the column drives page views, and a slate of article ideas (how-to, reported features, news rewrites, success stories).
+- FOLLOW-UP: four follow-ups, seven business days apart; the third adds two fresh pitch ideas.
+- FUNNEL: every article builds the author as a recurring columnist authority and ties softly to a backend offer.`;
+
 const AUTHORITY_FUNNEL = `
 This article is a $10,000-caliber feature for a premium outlet AND a node in the author's
 authority funnel. Every piece must:
@@ -209,7 +223,8 @@ export const workspaceRouter = router({
     .mutation(async ({ input }) => {
       const route = TASK_MODELS[input.task as AgentTask];
       const persona = route.persona ? AGENT_PERSONAS[route.persona] : undefined;
-      const system = (persona ? persona.systemPrompt + "\n" : "") + HOUSE_RULES;
+      const usePlaybook = ["create_offer", "headlines", "score_idea", "match_publications"].includes(input.task);
+      const system = (persona ? persona.systemPrompt + "\n" : "") + HOUSE_RULES + (usePlaybook ? PLAYBOOK : "");
 
       let prompt = input.prompt;
 
@@ -416,7 +431,7 @@ ${drafts[1].text}` },
       const persona = AGENT_PERSONAS.outliner;
       const result = await invokeLLM({
         messages: [
-          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + HOUSE_RULES },
+          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + PLAYBOOK + HOUSE_RULES },
           { role: "user", content: `Build the outline for this article${input.publication ? ` targeted at ${input.publication}` : ""}. Return EXACTLY:
 THESIS: <one sharp sentence>
 UNIQUE ANGLE: <the non-obvious observation/contrarian read in one sentence>
@@ -448,7 +463,7 @@ ${input.brief}` },
       const persona = AGENT_PERSONAS.analyst;
       const result = await invokeLLM({
         messages: [
-          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + HOUSE_RULES },
+          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + PLAYBOOK + HOUSE_RULES },
           { role: "user", content: `Critique this outline for a premium publication. Return STRICT JSON only — an array of 3-5 objects, each a concrete upgrade:
 [{"area": "<angle|data|actionable|offer|structure>", "suggestion": "<one sharp, specific improvement>"}]
 Push for more original observations, harder data, stronger reader payoff, and a smarter offer tie-in.
@@ -475,7 +490,7 @@ ${input.outline}` },
       const accepted = input.accepted.length ? `\n\nFOLD IN THESE APPROVED IMPROVEMENTS:\n- ${input.accepted.join("\n- ")}` : "";
       const result = await invokeLLM({
         messages: [
-          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + HOUSE_RULES },
+          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + PLAYBOOK + HOUSE_RULES },
           { role: "user", content: `Write the COMPLETE article from this outline${input.publication ? ` for ${input.publication}` : ""} — every section, fully developed, 1500-2200 words. Markdown: ## for section headings, real paragraphs. Where a statistic or source is needed but unverified, insert [TK: what to verify]. Weave the offer tie-in naturally per the outline. Strong columnist-authority voice.${accepted}
 
 OUTLINE:
