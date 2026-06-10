@@ -12,7 +12,14 @@ import type { Database, Field, Row, SelectOption } from "./types";
 const opt = (name: string, color: string): SelectOption => ({ id: uid(), name, color });
 
 // ── Idempotent seeding of the intelligence databases ───────────────────────
-export async function ensureIntelligence() {
+// Single-flight: React StrictMode double-mounts the boot effect, which would
+// otherwise seed each database twice before the kv flag is written.
+let intelPromise: Promise<void> | null = null;
+export function ensureIntelligence(): Promise<void> {
+  if (!intelPromise) intelPromise = doEnsureIntelligence();
+  return intelPromise;
+}
+async function doEnsureIntelligence() {
   await ensurePublications();
   if (await db.kv.get("seed:ledger")) {
     await ensureClaimLedger();
@@ -58,7 +65,9 @@ export async function ensureIntelligence() {
 // never overwriting anything you've already edited.
 const PUB_FIELD_DEFS: Array<{ key: string; name: string; type: Field["type"]; width: number }> = [
   { key: "name", name: "Publication", type: "text", width: 220 },
+  { key: "logo", name: "Logo", type: "image", width: 90 },
   { key: "category", name: "Category", type: "select", width: 150 },
+  { key: "website", name: "Website", type: "url", width: 180 },
   { key: "traffic", name: "Monthly Traffic", type: "text", width: 150 },
   { key: "pay", name: "Pay Range", type: "text", width: 170 },
   { key: "payMax", name: "Pay Max ($)", type: "currency", width: 120 },
@@ -122,7 +131,7 @@ async function ensurePublications() {
       views: [
         { ...makeView("table", "All Outlets"), sorts: [{ fieldId: byKey.get("payMax")!.id, dir: "desc" }] },
         { ...makeView("kanban", "By Status"), groupBy: byKey.get("status")!.id },
-        makeView("gallery", "Cards"),
+        { ...makeView("gallery", "Cards"), thumbnailField: byKey.get("logo")!.id },
       ],
       createdAt: now,
       updatedAt: now,

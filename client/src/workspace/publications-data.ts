@@ -1,7 +1,8 @@
-// Auto-merged from 4 'Publications That Pay' CSVs — 124 outlets, rich fields.
+// Auto-merged from 4 'Publications That Pay' CSVs — 124 outlets, rich fields incl. website + logo.
 export interface PubSeed {
   name: string; category?: string; traffic?: string; pay?: string; payMax?: number;
   topics?: string; editors?: string; submission?: string; applicationForm?: string;
+  website?: string; logo?: string;
 }
 export const PUBLICATIONS: PubSeed[] = [
  {
@@ -12,7 +13,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topic that relates to women. The articles can be any type of article as long as it's relevant to women.",
   "editors": "Kara McGrath (all submissions): kara_mcgrath@condenast.com | Nicola Dall'Asen (Reported and news-pegged): nicola_dallasen@condenast.com",
   "submission": "https://www.allure.com/info/about-allure",
-  "payMax": 30000
+  "website": "https://allure.com",
+  "payMax": 30000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=allure.com"
  },
  {
   "name": "Brides",
@@ -22,7 +25,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Brides, getting married, fashion, weddings, and it can be any type of article.",
   "editors": "editors@brides.com",
   "submission": "https://www.brides.com/editorial-guidelines-5222899#toc-writers-and-sourcing",
-  "payMax": 30000
+  "website": "https://brides.com",
+  "payMax": 30000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=brides.com"
  },
  {
   "name": "Cosmopolitan",
@@ -32,7 +37,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to women.",
   "editors": "Grace H for Lifestyle: grace.henry@hearst.co.uk | Nicole Pasulka for Features: nicole.pasulka@hearst.com | Tamara Fuentes for Entertainment: tfuentes@hearst.com",
   "submission": "https://www.cosmopolitan.com/uk/work/careers/a25425/write-for-cosmopolitan/",
-  "payMax": 30000
+  "website": "https://cosmopolitan.com",
+  "payMax": 30000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=cosmopolitan.com"
  },
  {
   "name": "Harper's Bazaar",
@@ -52,7 +59,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "National conversation and journalism.",
   "editors": "readings@harpers.org (General) | Jess Bergman: jess@harpers.org | Joe Kloc: joe@harpers.org | Christine Smallwood: christine@harpers.org",
   "submission": "https://harpers.org/submissions/",
-  "payMax": 30000
+  "website": "https://harpers.org",
+  "payMax": 30000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=harpers.org"
  },
  {
   "name": "BBC",
@@ -82,7 +91,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article.",
   "editors": "buzzfeedpitches@buzzfeed.com (General) | Lara Parker (Personal Essays): lara.parker@buzzfeed.com",
   "submission": "https://www.buzzfeed.com/buzzfeedstaff/how-to-write-for-buzzfeed",
-  "payMax": 20000
+  "website": "https://buzzfeed.com",
+  "payMax": 20000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=buzzfeed.com"
  },
  {
   "name": "Maxim",
@@ -102,7 +113,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article and any topic.",
   "editors": "James Covert (Business): jcovert@nypost.com | Erin Geismar (Digital): online@nypost.com",
   "submission": "No official submissions page.",
-  "payMax": 20000
+  "website": "https://linkedin.com",
+  "payMax": 20000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Oprah Daily",
@@ -119,14 +132,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "14.55 million monthly",
   "pay": "$1,500 to $6,000 per written article | $8,000 to $20,000 per video article",
   "submission": "Fashion, beauty, lifestyle, commerce: https://www.linkedin.com/feed/update/urn:li:activity:7415096381578895360/",
-  "payMax": 20000
+  "website": "https://linkedin.com",
+  "payMax": 20000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "BDG",
   "traffic": "200 million monthly",
   "pay": "$1,000 to $6,000 per article | $5,000 to $15,000 per video article.",
   "submission": "Fashion, beauty, pharma, and braded content: https://www.linkedin.com/posts/marinkatherine_hi-world-are-you-a-freelance-fashion-beauty-share-7425255595311644672-HX8H/",
-  "payMax": 15000
+  "website": "https://linkedin.com",
+  "payMax": 15000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "CNBC Make It",
@@ -146,16 +163,20 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Food, eating, resturants, reciepes, and it can be any type of article.",
   "editors": "Megan Ginsberg (Senior Editor): megan.ginsberg@eatingwell.com | Carolyn Malcoun (Editorial Director): carolyn.malcoun@eatingwell.com",
   "submission": "https://www.eatingwell.com/writers-guidelines/",
-  "payMax": 15000
+  "website": "https://eatingwell.com",
+  "payMax": 15000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=eatingwell.com"
  },
  {
   "name": "Esquire",
   "traffic": "16.1 million monthly",
   "pay": "$1 to $3 per word | $10,000 to $15,000 per video article.",
   "submission": "Features and essays: https://x.com/chris_hatler/status/1985391168859890085",
+  "website": "https://x.com",
   "category": "Men's Topics",
   "applicationForm": "Form: https://docs.google.com/forms/d/17D4HEE6X10gcpp76zyngbCIOrPS4nAFVdrCC_t4b8c4/viewform?edit_requested=true",
-  "payMax": 15000
+  "payMax": 15000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com"
  },
  {
   "name": "Good Housekeeping",
@@ -165,7 +186,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to lifestyle.",
   "editors": "ghdigital@hearst.com",
   "submission": "https://www.goodhousekeeping.com/about/a37261766/good-housekeeping-freelancers-pitch-guidelines/",
-  "payMax": 15000
+  "website": "https://goodhousekeeping.com",
+  "payMax": 15000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=goodhousekeeping.com"
  },
  {
   "name": "Harvard Business Review",
@@ -173,7 +196,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "4.6 million monthly",
   "pay": "$1 to $3 per word $10,000 to $15,000 per video article.",
   "applicationForm": "Form: https://hbr.org/guidelines-for-authors",
-  "payMax": 15000
+  "website": "https://hbr.org",
+  "payMax": 15000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=hbr.org"
  },
  {
   "name": "Men's Health",
@@ -193,7 +218,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to women and lifestyle.",
   "editors": "Katie Holdefehr (Editorial Director): katie.holdefehr@dotdashmdp.com | Leslie Corona (Associate Editorial Director): leslie.corona@dotdashmdp.com",
   "submission": "No official submissions page.",
-  "payMax": 15000
+  "website": "https://realsimple.com",
+  "payMax": 15000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=realsimple.com"
  },
  {
   "name": "Redbook Magazine",
@@ -213,7 +240,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article.",
   "editors": "Sam Escobar (Beauty, Health, and Wellness): sam.escobar@thedailybeast.com | Mathew Murphy (News): mathew.murphy@thedailybeast.com | Jackie Salo (Deputy): jackie.salo@thedailybeast.com",
   "submission": "No official submissions page.",
-  "payMax": 15000
+  "website": "https://thedailybeast.com",
+  "payMax": 15000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thedailybeast.com"
  },
  {
   "name": "Alantic (The)",
@@ -223,7 +252,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article.",
   "editors": "Politics: politics@theatlantic.com | Business: ideas@theatlantic.com | Culture and Books: culture@theatlantic.com | Science, Technology, and Health: science@theatlantic.com | Family: family@theatlantic.com | Fiction And Poetry: poetry@theatlantic.com politics@theatlantic.com",
   "submission": "https://support.theatlantic.com/hc/en-us/articles/360011374734-Submit-a-piece-for-editorial-consideration-at-The-Atlantic",
-  "payMax": 10000
+  "website": "https://support.theatlantic.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=support.theatlantic.com"
  },
  {
   "name": "Bustle",
@@ -233,7 +264,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article.",
   "editors": "For Life and/or Wellness pitches: lifestylepitches@bustle.com; for Style pitches: fashionbeautypitches@bustle.com; for Entertainment pitches: entertainmentpitches@bustle.com",
   "submission": "https://www.bustle.com/news/how-to-submit-freelance-pitches-to-bustle-11914601",
-  "payMax": 10000
+  "website": "https://bustle.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=bustle.com"
  },
  {
   "name": "Fortune",
@@ -243,7 +276,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Business, careers, finance. Preferred articles are reported and news-pegged articles, but features and profiles are accepted.",
   "editors": "Matthew Heimer (Features): matt.heimer@fortune.com | Ashley Lutz (Life & Well): ashley.lutz@fortune.com | Nick Lichtenberg (Business): nick.lichtenberg@fortune.com | Alexei Oreskovic (Tech): alexei.oreskovic@fortune.com | Orianna Rosa Royle (Success): orianna.royle@fortune.com",
   "submission": "https://fortune.com/2021/04/15/how-to-pitch-fortune-get-a-story-picked-up-business-magazine-freelance-work-pitching-advice/",
-  "payMax": 10000
+  "website": "https://fortune.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=fortune.com"
  },
  {
   "name": "HuffPost",
@@ -253,8 +288,10 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topic and any type of article.",
   "editors": "Personal Vertical: Noah Michelson (Noah.Michelson@huffpost.com) | Lifestyle Vertical: Kristen Aiken (https://x.com/kristenaiken) kristen.aiken@huffpost.com",
   "submission": "https://www.huffpost.com/static/how-to-pitch-huffpost",
+  "website": "https://huffpost.com",
   "applicationForm": "Family & Relationship: https://docs.google.com/forms/d/e/1FAIpQLSdVVTTGdo9CfZN4FUujM5hODF1RVsfTRvnguCB9QiXYnod8jw/viewform",
-  "payMax": 10000
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=huffpost.com"
  },
  {
   "name": "Kiplinger's Personal Finance",
@@ -281,7 +318,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "80.9 million monthly",
   "pay": "$1,000 to $5,000 per article | $5,000 to $10,000 per video article.",
   "submission": "Science and tech features: https://www.linkedin.com/posts/courtneylinder_my-team-at-popular-mechanics-is-seeking-seasoned-activity-7423107271905345537-zLIT/",
-  "payMax": 10000
+  "website": "https://popsci.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=popsci.com"
  },
  {
   "name": "Slate",
@@ -290,7 +329,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topic and any style of article.",
   "editors": "Tony Ho Tran (Business and Technology): tony.tran@slate.com | Forrest Wickman (movies, music, features): forrest.wickman@slate.com | Jenny G. Zhang (television, features, essays): jenny.zhang@slate.com | Leah Prinzivalli (health): leah.prinzivalli@slate.com | Isabelle Kohn (workplace, relationships, sex): isabelle.kohn@slate.com",
   "submission": "https://slate.com/pitch",
-  "payMax": 10000
+  "website": "https://slate.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=slate.com"
  },
  {
   "name": "The Cut (New York Magazine)",
@@ -300,7 +341,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article.",
   "editors": "General: cutsubmissions@nymag.com",
   "submission": "https://www.thecut.com/article/how-to-pitch-the-cut.html",
-  "payMax": 10000
+  "website": "https://thecut.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thecut.com"
  },
  {
   "name": "The HuffPost",
@@ -310,7 +353,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article and any topic.",
   "editors": "Noah Michelson (Personal Essays): noah.michelson@huffpost.com | Kristen Aiken (Life and Commerce): kristen.aiken@huffpost.com",
   "submission": "https://www.huffpost.com/static/how-to-pitch-huffpost",
-  "payMax": 10000
+  "website": "https://huffpost.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=huffpost.com"
  },
  {
   "name": "The New Republic",
@@ -330,7 +375,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article. Preferred articles are reported and news-pegged articles, but features and profiles are accepted.",
   "editors": "Emma Barker (Contributors) emma.barker@time.com | Lucy Feldman (Editorial Director): lucy.feldman@time.com",
   "submission": "No official submissions page.",
-  "payMax": 10000
+  "website": "https://time.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=time.com"
  },
  {
   "name": "Travel & Leisure",
@@ -340,7 +387,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to travel.",
   "editors": "Alisha Prakash (Associate Editorial Director) alisha.prakash@dotdashmdp.com | Nina Ruggiero (Editorial Director) nina.ruggiero@dotdashmdp.com",
   "submission": "https://www.travelandleisure.com/travel-tips/how-to-pitch-travel-and-leisure",
-  "payMax": 10000
+  "website": "https://travelandleisure.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=travelandleisure.com"
  },
  {
   "name": "VOX",
@@ -350,7 +399,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article. Preferred articles are reported and news-pegged articles, but features and profiles are accepted.",
   "editors": "firstperson@vox.com (General) | futureperfectfreelance@vox.com (General) | Elbert Ventura (Executive Editor): elbert.ventura@vox.com",
   "submission": "https://www.vox.com/pages/how-to-pitch-vox-pitching-guidelines",
-  "payMax": 10000
+  "website": "https://vox.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=vox.com"
  },
  {
   "name": "Wired",
@@ -360,14 +411,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of tech-related article. Preferred articles are reported and news-pegged articles, but features and profiles are accepted.",
   "editors": "Amit Katwala (Features): amit_katwala@wired.com | John Gravois (Senior): john_gravois@wired.com | Anthony Lydgate (Senior): anthony_lydgate@wired.com | Sandra Upson (Features): sandra_upson@wired.com",
   "submission": "https://www.wired.com/2016/08/how-to-submit-to-wired-opinion/",
-  "payMax": 10000
+  "website": "https://wired.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=wired.com"
  },
  {
   "name": "WIRED",
   "traffic": "17.7 million monthly",
   "pay": "$2,500 to $10,000 per article | $5,000 to $10,000 per audio or video article.",
   "submission": "Middle East stories: https://www.linkedin.com/posts/dana-alomar_calling-freelancers-were-open-to-contributions-activity-7406243416583622656-Hj_R/",
-  "payMax": 10000
+  "website": "https://wired.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=wired.com"
  },
  {
   "name": "Women's Health",
@@ -387,14 +442,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article. Preferred articles are reported and news-pegged articles, but features and profiles are accepted.",
   "editors": "editorial@worth.com",
   "submission": "https://worth.com/about/",
-  "payMax": 10000
+  "website": "https://worth.com",
+  "payMax": 10000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=worth.com"
  },
  {
   "name": "Narratively",
   "traffic": "475,000 monthly",
   "pay": "$1,500 to $8,000 per article.",
   "submission": "True crime stories: https://www.narrativelyacademy.com/p/call-for-pitches-true-crime-epics",
-  "payMax": 8000
+  "website": "https://narrativelyacademy.com",
+  "payMax": 8000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=narrativelyacademy.com"
  },
  {
   "name": "AFAR",
@@ -404,16 +463,20 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article as it relates to travel.",
   "editors": "Katherine LaGrave (Contributors): klagrave@afar.com",
   "submission": "https://www.afar.com/about/pitch-guidelines",
-  "payMax": 5000
+  "website": "https://afar.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=afar.com"
  },
  {
   "name": "Business Insider",
   "traffic": "108 million monthly",
   "pay": "$200 to $1,500 per article | $5,000 per video article.",
   "submission": "Family essays: https://www.linkedin.com/posts/frank-olito-09093812a_freelancers-journorequests-freelance-activity-7391886114917134338-aP1Y/",
+  "website": "https://businessinsider.com",
   "category": "All Topics",
   "applicationForm": "Relocation Stories (Paige): https://docs.google.com/forms/d/e/1FAIpQLSfsGMi72ItAifPMhnxXwYUe3QxPQcLU2dZZmP8qPvr7Lg2hzw/viewform",
-  "payMax": 5000
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=businessinsider.com"
  },
  {
   "name": "Business Insider.com",
@@ -423,7 +486,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Story-based articles and essays. Articles can be about any topic as long as it's your story or someone else's story. Lifestyle topics here: https://docs.google.com/document/d/1xLM9LfSmiA-zGqYn59zDMGcVbqkV-ik8JyW1xPo_6Dk/mobilebasic",
   "editors": "Edith Honan (Long Reads): ehonan@businessinsider.com | Lauryn Haas (Business and Careers): lhaas@businessinsider.com | Frank Olito (Personal Essays): folito@insider.com | Conz Preti (Parenting and Health): cpreti@insider.com | Rosemary Donahue (Parenting and Health): rdonahue@businessinsider.com | Paige DiFore (Lifestyle): pdifiore@insider.com | Jessica Orwig (Business, Careers, Lifestyle): jorwig@businessinsider.com",
   "submission": "https://www.businessinsider.com/how-to-write-for-business-insider-2020-4",
-  "payMax": 5000
+  "website": "https://businessinsider.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=businessinsider.com"
  },
  {
   "name": "Essence Magazine",
@@ -443,15 +508,19 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to travel.",
   "editors": "pitches@fodors.com",
   "submission": "https://www.fodors.com/wp-content/uploads/2025/02/Fodors-Pitching-Guidelines-2025.pdf",
+  "website": "https://fodors.com",
   "applicationForm": "Video articles: https://docs.google.com/forms/d/1Z1M2WrxMipDmqix7CgUgFlYRgx5x9zM8c8FvnmSwfuk/viewform",
-  "payMax": 5000
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=fodors.com"
  },
  {
   "name": "GQ",
   "traffic": "7.9 million monthly",
   "pay": "$500 to $2,000 per article | $5,000 per video article.",
   "submission": "Style and grooming: https://www.linkedin.com/posts/robert-leedham-25046726_fancy-writing-for-british-gq-were-on-the-activity-7422700038587596803-uaq-/",
-  "payMax": 5000
+  "website": "https://linkedin.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "High Time Magazines",
@@ -461,14 +530,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to cannabis.",
   "editors": "hteditor@hightimes.com",
   "submission": "https://hightimes.com/submissions/",
-  "payMax": 5000
+  "website": "https://hightimes.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=hightimes.com"
  },
  {
   "name": "Intrepid Travel",
   "traffic": "1.8 million monthly",
   "pay": "$1 per word | $5,000 per video article.",
   "submission": "Travel stories: https://www.linkedin.com/posts/laura-holt-48992217_were-commissioning-over-at-intrepid-travel-activity-7414622192770072576-KFkX?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAAhlLoUBZFsHVGiE17CHhnlPvTouG_kAQsU",
-  "payMax": 5000
+  "website": "https://linkedin.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Money",
@@ -478,7 +551,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to finance.",
   "editors": "Julia Glum (Contributors) julia@money.com",
   "submission": "No official submissions page.",
-  "payMax": 5000
+  "website": "https://money.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=money.com"
  },
  {
   "name": "Newsweek",
@@ -488,7 +563,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article and any topic.",
   "editors": "Rheana Murray (Personal Essays): r.murray@newsweek.com | Marc Vargas (Life): m.vargas@newsweek.com | Carrie Anderson (Digital): c.anderson@newsweek.com",
   "submission": "No official submissions page.",
-  "payMax": 5000
+  "website": "https://x.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com"
  },
  {
   "name": "Oxygen Magazine",
@@ -498,7 +575,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to health.",
   "editors": "successstories@oxygenmag.com (Stories)| editorial@oxygenmag.com (General)",
   "submission": "https://www.oxygenmag.com/contact-us/",
-  "payMax": 5000
+  "website": "https://oxygenmag.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=oxygenmag.com"
  },
  {
   "name": "Parents",
@@ -508,7 +587,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to parenting and family.",
   "editors": "DeVonne Good (News Editor): devonne.goode@dotdashmdp.com | Anna Halkidis (General Editor): anna.halkidis@dotdashmdp.com | Sari Hitchins (Editorial Director): shitchins@dotdashmdp.com",
   "submission": "No official submissions page.",
-  "payMax": 5000
+  "website": "https://parents.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=parents.com"
  },
  {
   "name": "Thrillist",
@@ -526,14 +607,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "1.1 million monthly",
   "pay": "$1,500 to $5,000 per video article $200 to $1,500 per article",
   "applicationForm": "Form: https://docs.google.com/forms/d/e/1FAIpQLSeeGR9JcMDP9kMNSiDwRP7UvLdDxN3S05U7w5CP0JPG4IwmZg/viewform",
-  "payMax": 5000
+  "website": "https://docs.google.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
   "name": "Vogue Business",
   "traffic": "48,000 monthly",
   "pay": "$500 to $2,000 per article | $5,000 per video article.",
   "submission": "Features, compelling stories, analysis and news pitches: https://www.linkedin.com/feed/update/urn:li:activity:7420849163992449025/",
-  "payMax": 5000
+  "website": "https://linkedin.com",
+  "payMax": 5000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Conde Nast Traveler",
@@ -543,7 +628,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to travel.",
   "editors": "Megan Spurrell (Associate Director) megan_spurrell@condenast.com",
   "submission": "https://www.cntraveler.com/info/how-to-pitch-conde-nast-traveler",
-  "payMax": 3000
+  "website": "https://cntraveler.com",
+  "payMax": 3000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=cntraveler.com"
  },
  {
   "name": "Health Magazine",
@@ -553,7 +640,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topic and any article style as long it relates to health and wellness.",
   "editors": "Anisa Arsenault (Editorial Director): anisa.arsenault@dotdashmdp.com | Vera Sizensky (Senior Editor): vera.sizensky@dotdashmdp.com",
   "submission": "https://www.health.com/about-us",
-  "payMax": 3000
+  "website": "https://health.com",
+  "payMax": 3000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=health.com"
  },
  {
   "name": "American Forests",
@@ -563,16 +652,20 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Outdoors and nature articles that are any type of article.",
   "editors": "magazine@americanforests.org",
   "submission": "https://www.americanforests.org/magazine/writers-guidelines/",
-  "payMax": 2000
+  "website": "https://americanforests.org",
+  "payMax": 2000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=americanforests.org"
  },
  {
   "name": "Babylist",
   "traffic": "10.5 million monthly",
   "pay": "$500 to $2,000 per article.",
   "submission": "Finance freelancers: https://www.linkedin.com/posts/michelleberninger_freelance-writer-financial-services-activity-7404892912855166977-TI71/",
+  "website": "https://babylist.com",
   "category": "Family and Finance",
   "applicationForm": "Finance freelancers: https://docs.google.com/forms/d/e/1FAIpQLSdiXp0yUoB8Q4wM9FwVY1DdywApcabI0O4YV2CeMVrjH0j8pA/viewform",
-  "payMax": 2000
+  "payMax": 2000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=babylist.com"
  },
  {
   "name": "Longreads",
@@ -582,7 +675,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it's nonfiction.",
   "editors": "hello@longreads.com",
   "submission": "https://longreads.com/submissions/",
-  "payMax": 2000
+  "website": "https://longreads.com",
+  "payMax": 2000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=longreads.com"
  },
  {
   "name": "The Drive",
@@ -592,7 +687,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article as it relates to automotive.",
   "editors": "pitches@thedrive.com",
   "submission": "https://www.thedrive.com/news/32451/how-to-pitch-stories-to-the-drive",
-  "payMax": 2000
+  "website": "https://thedrive.com",
+  "payMax": 2000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thedrive.com"
  },
  {
   "name": "The Food Section",
@@ -602,7 +699,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article as it relates to lifestyle.",
   "editors": "raskin@thefoodsection.com",
   "submission": "https://thefoodsection.com/how-to-write-for-the-food-section/",
-  "payMax": 2000
+  "website": "https://thefoodsection.com",
+  "payMax": 2000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thefoodsection.com"
  },
  {
   "name": "Fuller",
@@ -610,7 +709,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "100,000 monthly",
   "pay": "$150 to $1,500 per article.",
   "applicationForm": "Motherhood: https://form.asana.com/?k=lvkeBd9fzKVL5-Ey_OPQ8w&d=318624707713691",
-  "payMax": 1500
+  "website": "https://form.asana.com",
+  "payMax": 1500,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=form.asana.com"
  },
  {
   "name": "Scary Mommy",
@@ -618,7 +719,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "1.6 million monthly",
   "pay": "$200 to $1,500 per article.",
   "applicationForm": "Form: https://docs.google.com/forms/d/e/1FAIpQLSccX7myfNo1XTbMfEIbboQ-BNr2z12L0d0p5HKfttALAKZOxQ/viewform",
-  "payMax": 1500
+  "website": "https://docs.google.com",
+  "payMax": 1500,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
   "name": "The Sick Times",
@@ -628,14 +731,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article as it relates to health.",
   "editors": "editors@thesicktimes.org",
   "submission": "https://thesicktimes.org/write-for-us-part-time-opportunities/",
-  "payMax": 1300
+  "website": "https://thesicktimes.org",
+  "payMax": 1300,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thesicktimes.org"
  },
  {
   "name": "Intrepid Times",
   "traffic": "1.6 million monthly",
   "pay": "$500 to $1,000 per article.",
   "submission": "Travel pitches: https://www.linkedin.com/feed/update/urn:li:activity:7394310453293748224/",
-  "payMax": 1000
+  "website": "https://linkedin.com",
+  "payMax": 1000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Romper",
@@ -645,7 +752,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to parenting and family.",
   "editors": "pitches@romper.com (general) | april.hussar@bustle.com (essays or stories)",
   "submission": "https://www.romper.com/p/how-to-pitch-romper-302",
-  "payMax": 1000
+  "website": "https://romper.com",
+  "payMax": 1000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=romper.com"
  },
  {
   "name": "Yahoo News",
@@ -655,14 +764,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article and any topic.",
   "editors": "Naureen Khan: naureen.khan@yahooinc.com",
   "submission": "No official submissions page.",
-  "payMax": 1000
+  "website": "https://linkedin.com",
+  "payMax": 1000,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "GameSpot’s",
   "traffic": "90 million montly",
   "pay": "$150 to $800 per article.",
   "submission": "Games and internet culture pitches: https://bsky.app/profile/awildjessichu.bsky.social/post/3mboyhobyok2f",
-  "payMax": 800
+  "website": "https://bsky.app",
+  "payMax": 800,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=bsky.app"
  },
  {
   "name": "Motley Bloom",
@@ -672,7 +785,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to Neurodivergence.",
   "editors": "pitch@motley-bloom.com",
   "submission": "https://www.motley-bloom.com/submissions",
-  "payMax": 500
+  "website": "https://motley-bloom.com",
+  "payMax": 500,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=motley-bloom.com"
  },
  {
   "name": "The American Scholar",
@@ -680,7 +795,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "85,000 monthly",
   "pay": "$300 to $500 per article.",
   "applicationForm": "Form: https://theamericanscholar.submittable.com/submit",
-  "payMax": 500
+  "website": "https://theamericanscholar.submittable.com",
+  "payMax": 500,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=theamericanscholar.submittable.com"
  },
  {
   "name": "Fast Company",
@@ -690,14 +807,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any career or business topic that's how-to, topic based, and reported articles.",
   "editors": "Shalene Gupta (Work-Life/Contributors): sgupta@fastcompany.com | Morgan Clendaniel (Main Digital): mclendaniel@fastcompany.com |",
   "submission": "https://fastcompany.zendesk.com/hc/en-us/articles/360000291906-How-can-I-submit-an-editorial-contribution-",
-  "payMax": 400
+  "website": "https://fastcompany.com",
+  "payMax": 400,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=fastcompany.com"
  },
  {
   "name": "Matador Network",
   "traffic": "248,000 monthly",
   "pay": "$200 to $300 per article.",
   "submission": "Travel pitches and creators: https://creators.matadornetwork.com/paid-gigs/0nj3m9n6/",
-  "payMax": 300
+  "website": "https://creators.matadornetwork.com",
+  "payMax": 300,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=creators.matadornetwork.com"
  },
  {
   "name": "More to Her Story",
@@ -705,7 +826,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "100,000 monthly",
   "pay": "$300 per story.",
   "applicationForm": "Form: https://www.moretoherstory.com/pitch",
-  "payMax": 300
+  "website": "https://moretoherstory.com",
+  "payMax": 300,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=moretoherstory.com"
  },
  {
   "name": "MyHealthTeam",
@@ -713,7 +836,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "769,500 monthly",
   "pay": "$300 per article.",
   "applicationForm": "Medical: https://docs.google.com/forms/d/e/1FAIpQLScBYjxkhrG8u0na7xAbJvDH9k9gPxp39QQGpNlpvHirCzpthQ/viewform",
-  "payMax": 300
+  "website": "https://docs.google.com",
+  "payMax": 300,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
   "name": "National Wildlife",
@@ -723,7 +848,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to nature.",
   "editors": "NWeditor@nwf.org",
   "submission": "https://www.nwf.org/Magazines/National-Wildlife/Pitch-Guide",
-  "payMax": 250
+  "website": "https://nwf.org",
+  "payMax": 250,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=nwf.org"
  },
  {
   "name": "East End Taste",
@@ -731,7 +858,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "55,000 monthly",
   "pay": "$150 per article.",
   "applicationForm": "Lifestyle pitches: https://docs.google.com/forms/d/e/1FAIpQLSdDgUUVeKrfJd7OE_h3gPaUmizfb4teVURqabW-iZPtHUcbWQ/viewform",
-  "payMax": 150
+  "website": "https://docs.google.com",
+  "payMax": 150,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
   "name": "Late Checkout",
@@ -741,14 +870,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to lifestyle.",
   "editors": "daria@latecheckouttime.com",
   "submission": "https://docs.google.com/document/d/1VkBxIpyYkFrs6TyVkdIenmOpuwZy1wLhjW5qEaxZJhk/edit?tab=t.0",
-  "payMax": 150
+  "website": "https://docs.google.com",
+  "payMax": 150,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
   "name": "The Kitchn",
   "traffic": "29.4 million monthly",
   "pay": "$150 per 300-word article.",
   "submission": "Pitches about home: https://www.linkedin.com/posts/micki-wagner-a9800a134_calling-all-freelance-shopping-writers-activity-7417284376478134272-0V1b/",
-  "payMax": 150
+  "website": "https://linkedin.com",
+  "payMax": 150,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "SUCCESS",
@@ -756,7 +889,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "550,000 monthly",
   "pay": "$100 for 500-words.",
   "applicationForm": "Form (News Writers): https://docs.google.com/forms/d/e/1FAIpQLSe2LLmxp7YelF03XCGlLiQHwxsc6KfJPTnYGLuHqPDY5RsKGg/viewform",
-  "payMax": 100
+  "website": "https://docs.google.com",
+  "payMax": 100,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
   "name": "Forbes",
@@ -764,7 +899,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "pay": "$10 for each New Paid Subscription Conversion on one of your posts or profile page | $15 for each New Paid Subscription Conversion if you convert five (5) or more subscribers in a given month | $1 for each New Registered Reader Conversion through the \"follow,\" \"comment\" or \"save\" options on one of your posts or profile page.",
   "editors": "DeArbea Walker: dwalker@forbes.com (SportsMoney, Food & Drink, Venture Capital, Creator Economy and Entrepreneurs) | Jair Hilburn: jhilburn@forbes.com (CMO, Media, Hollywood & Entertainment, Social Media, ForbesBLK and Games) | Sarah Chandler Perez: schandler@forbes.com (Forbes Women) | Jeff Marcus: jmarcus@forbes.com (Main editor in charge of the entire contributor program) | Leigh Cuen lcuen@forbes.com (Leadership Strategy) | Helen Popki hpopkin@forbes.com (Careers)",
   "submission": "No official submissions page.",
-  "payMax": 15
+  "website": "https://forbes.com",
+  "payMax": 15,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=forbes.com"
  },
  {
   "name": "USA Today",
@@ -774,7 +911,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article and any topic.",
   "editors": "Danielle Page (Features/Branded Content): dpage@gannett.com | Michelle Maltais (Finance): mmaltais@usatoday.com | Romina Ruiz-Goiriena (Stories): rruizg@usatoday.com",
   "submission": "https://static.usatoday.com/submitcolumn/ and https://www.usatoday.com/story/opinion/2016/09/29/submission-guidelines-usatoday-opinion-column-oped-howto-letters-editor/89964600/",
-  "payMax": 4
+  "website": "https://static.usatoday.com",
+  "payMax": 4,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=static.usatoday.com"
  },
  {
   "name": "Bon Appetit",
@@ -784,8 +923,10 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Food, eating, resturants, reciepes, travel, and it can be any type of article.",
   "editors": "culture@bonappetit.com | Noah_Kaufman@condenast.com",
   "submission": "https://www.bonappetit.com/story/how-to-pitch",
+  "website": "https://bonappetit.com",
   "applicationForm": "Lifestyle and food: https://docs.google.com/forms/d/e/1FAIpQLSeNMWfbQtLilewU3tK444WdaicO0l0JexR2yUEV6G84GBQwHw/viewform",
-  "payMax": 3
+  "payMax": 3,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=bonappetit.com"
  },
  {
   "name": "MIT Technology Review",
@@ -795,7 +936,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Tech topics. Preferred articles are reported and news-pegged articles, but features and profiles are accepted.",
   "editors": "Rachel Courtland (Contributors): rachel.courtland@technologyreview.com",
   "submission": "https://www.technologyreview.com/how-to-pitch-mit-technology-review/",
-  "payMax": 3
+  "website": "https://technologyreview.com",
+  "payMax": 3,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=technologyreview.com"
  },
  {
   "name": "Strategy & Business Magazine",
@@ -805,7 +948,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to business.",
   "editors": "info@strategy-business.com",
   "submission": "https://www.strategy-business.com/press/writers",
-  "payMax": 3
+  "website": "https://strategy-business.com",
+  "payMax": 3,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=strategy-business.com"
  },
  {
   "name": "AARP",
@@ -815,7 +960,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Work and Money: investments, savings, retirement, and job issues. Health and Fitness: tips, trends, studies. Food and Nutrition: recipes, emphasis on healthy eating. Travel: tips and trends on how and where to travel. Consumerism: practical information and advice. Relationships: family matters, caregiving, living arrangements, grandparenting. Human Interest: dramatic, recent, inspiring narratives about people over 50. Personal Essay: thoughtful, timely, new takes on matters of importance to our readers.",
   "editors": "pubspitches@aarp.org, AARP Magazine: AARPMagazine@aarp.org, AARP Bulletin:bulletin@aarp.org",
   "submission": "https://www.aarp.org/about-aarp/info-05-2010/writers-guidelines-aarp-magazine.html or AARP Bulletin: https://help.aarp.org/s/article/aarp-the-magazine-or-bulletin-story-ideas",
-  "payMax": 2
+  "website": "https://aarp.org",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=aarp.org"
  },
  {
   "name": "Discover Magazine",
@@ -825,7 +972,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to science.",
   "editors": "editorial@discovermagazine.com (general) | Sam Walter (History): swalters@discovermagazine.com | Jack Knudson (Story): jknudson@discovermagazine.com | Steve George (Tech): sgeorge@discovermagazine.comsgeorge@discovermagazine.com",
   "submission": "https://www.discovermagazine.com/pitch-guide",
-  "payMax": 2
+  "website": "https://discovermagazine.com",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=discovermagazine.com"
  },
  {
   "name": "FinanceBuzz",
@@ -833,7 +982,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "21.7 million monthly",
   "pay": "$1 to $2 per word.",
   "applicationForm": "Finance and money freelancers: https://docs.google.com/forms/d/e/1FAIpQLSdBUGk93XMyXET7uRkbVJgSHEIF_LOCQp9_CisxNzSjurkUqA/viewform",
-  "payMax": 2
+  "website": "https://docs.google.com",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
   "name": "Gizmodo",
@@ -843,7 +994,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to tech and science.",
   "editors": "pitches@gizmodo.com",
   "submission": "https://gizmodo.com/how-to-pitch-gizmodo-and-io9-1819155900",
-  "payMax": 2
+  "website": "https://gizmodo.com",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=gizmodo.com"
  },
  {
   "name": "National Geographic",
@@ -853,15 +1006,19 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to nature, science, and travel.",
   "editors": "Starlight Williams (Contrubutors): starlight.williams@natgeo.com",
   "submission": "No official submissions page.",
+  "website": "https://nationalgeographic.com",
   "applicationForm": "Kids stories form: https://ttj51ygan9g.typeform.com/to/vtdwJSXl?typeform",
-  "payMax": 2
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=nationalgeographic.com"
  },
  {
   "name": "New Scientist",
   "traffic": "3.2 million monthly",
   "pay": "$1 to $2 per word.",
   "submission": "Health, neuroscience and psychology-related stories: https://www.linkedin.com/posts/alexandra-thompson-51b4b758_happy-new-year-i-know-were-five-days-in-activity-7413954998235205632-qsuI/",
-  "payMax": 2
+  "website": "https://linkedin.com",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Playboy",
@@ -871,7 +1028,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to men.",
   "editors": "Magdalene J. Taylor: magdalene.taylor@playboycontractors.com",
   "submission": "No official submissions page.",
-  "payMax": 2
+  "website": "https://x.com",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com"
  },
  {
   "name": "Science dot org",
@@ -881,7 +1040,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to science.",
   "editors": "News Editor David Grimm: science_news@aaas.org | General: nsider@aaas.org",
   "submission": "https://www.science.org/content/page/freelancer-guidelines",
-  "payMax": 2
+  "website": "https://science.org",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=science.org"
  },
  {
   "name": "Scientific American",
@@ -891,7 +1052,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to science.",
   "editors": "opinion@sciam.com (General) | Dava Sobel (Contributors) dsobel@sciam.com",
   "submission": "https://www.scientificamerican.com/page/submission-instructions/",
-  "payMax": 2
+  "website": "https://scientificamerican.com",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=scientificamerican.com"
  },
  {
   "name": "The Economist",
@@ -901,7 +1064,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Business, careers, finance. Preferred articles are reported and news-pegged articles, but features and profiles are accepted.",
   "editors": "Anna Baddeley: annabaddeley@economist.com| Kylie Warner: kyliewarner@economist.com",
   "submission": "https://www.economist.com/1843/2021/08/15/pitching-guidelines",
-  "payMax": 2
+  "website": "https://economist.com",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=economist.com"
  },
  {
   "name": "The Washington Post",
@@ -909,14 +1074,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "82.5 million monthly",
   "pay": "$1 to $2 per word",
   "applicationForm": "Essays and opinion pieces: https://thewashingtonpost.formstack.com/forms/submit_a_guest_opinion",
-  "payMax": 2
+  "website": "https://thewashingtonpost.formstack.com",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thewashingtonpost.formstack.com"
  },
  {
   "name": "Wine Enthusiast",
   "traffic": "600,000 monthly",
   "pay": "$1 to $2 per word.",
   "submission": "Lifestyle pitches for the print magazine: https://docs.google.com/document/d/11lQkqF1Z2crjI8gPZp4rkTI1p2Kp3sdg/edit",
-  "payMax": 2
+  "website": "https://docs.google.com",
+  "payMax": 2,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
   "name": "Atlantic Business Magazine",
@@ -926,28 +1095,36 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Business topics with a focus on relevance to Canada.",
   "editors": "Dawn Chafe: dchafe@atlanticbusinessmagazine.ca",
   "submission": "https://atlanticbusinessmagazine.ca/about/",
-  "payMax": 1
+  "website": "https://atlanticbusinessmagazine.ca",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=atlanticbusinessmagazine.ca"
  },
  {
   "name": "AzureRoad",
   "traffic": "1.3 million monthly",
   "pay": "$1 per word.",
   "submission": "Travel and lifestyle pitches: https://www.linkedin.com/feed/update/urn:li:activity:7413957598200283137/",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Cyclingnews",
   "traffic": "2.6 million monthly",
   "pay": "$1 per word.",
   "submission": "Cycling: https://www.linkedin.com/posts/matilda-price-462065144_im-looking-to-add-a-few-new-freelance-feature-activity-7396146243644858368-4UAG/",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "DiningOut Magazine",
   "traffic": "30,000 monthly",
   "pay": "$1 per word.",
   "submission": "Dallas, Houston, and Atlanta writers: https://www.linkedin.com/feed/update/urn:li:activity:7396572909345017856/",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Douglas Business Magazine",
@@ -957,7 +1134,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Business topics with a focus on relevance to Canada.",
   "editors": "pitch@pageonepublishing.ca",
   "submission": "https://www.pageonepublishing.ca/submission-guidelines/",
-  "payMax": 1
+  "website": "https://pageonepublishing.ca",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=pageonepublishing.ca"
  },
  {
   "name": "EDTECH",
@@ -967,7 +1146,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to education.",
   "editors": "Victor Rivero: victor@edtechdigest.blog",
   "submission": "https://edtechdigest.blog/about-us/submissions/",
-  "payMax": 1
+  "website": "https://edtechdigest.blog",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=edtechdigest.blog"
  },
  {
   "name": "Foreign Policy",
@@ -975,56 +1156,72 @@ export const PUBLICATIONS: PubSeed[] = [
   "traffic": "5 million monthly",
   "pay": "$1 per word.",
   "applicationForm": "Politics: https://foreignpolicy.submittable.com/submit",
-  "payMax": 1
+  "website": "https://foreignpolicy.submittable.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=foreignpolicy.submittable.com"
  },
  {
   "name": "Hims & Hers",
   "traffic": "4.8 million monthly",
   "pay": "$1 per word.",
   "submission": "Health and women's freelancers: https://www.linkedin.com/posts/corinne-o-keefe-osborn_calling-all-health-writers-and-editors-activity-7402035572841816064-HEKB/",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Honest Talk",
   "traffic": "20,000 monthly",
   "pay": "$1 per word.",
   "submission": "Women stories: https://www.linkedin.com/posts/the-honest-talk_freelancer-calloutthe-honest-talk-is-growing-activity-7354219645219872768-DlZF/",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "International Living",
   "traffic": "688,000 monthly",
   "pay": "$1 per word.",
   "submission": "Travel pitches: https://internationalliving.com/about-il/write-for-il/",
-  "payMax": 1
+  "website": "https://internationalliving.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=internationalliving.com"
  },
  {
   "name": "National Culinary Review",
   "traffic": "200,000 monthly",
   "pay": "$1 per word.",
   "submission": "Food and hospitality: https://www.linkedin.com/posts/kerstin-kuhn21_hello-linkedin-community-as-i-step-into-activity-7401684722650644481-DbhL",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Noem Magazine",
   "traffic": "178,000 monthly",
   "pay": "$1.50 per word.",
   "submission": "AI and tech: https://bsky.app/profile/franciswade.bsky.social/post/3lhvyqpt3os2p",
-  "payMax": 1
+  "website": "https://bsky.app",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=bsky.app"
  },
  {
   "name": "NOTHING PERSONAL",
   "traffic": "49,600 monthly",
   "pay": "$1 per word.",
   "submission": "Tech freelancers: https://www.linkedin.com/posts/bourreelam_nothing-personal-a-new-editorial-platform-activity-7388625549642035201-Siqb/",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Questrade",
   "traffic": "13.4 million monthly",
   "pay": "$1 per word.",
   "submission": "Pitches about money: https://www.linkedin.com/posts/katangus_calling-all-writers-im-the-deputy-editor-activity-7412948608146309120-Sme5/",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Reader's Digest",
@@ -1034,7 +1231,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to lifestyle.",
   "editors": "Dawn Yanek: dawn.yanek@tmbi.com",
   "submission": "No official submissions page.",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Rest of the World",
@@ -1044,14 +1243,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it's a feature.",
   "editors": "victoria@restofworld.org | https://restofworld.org/about/team/",
   "submission": "https://docs.google.com/document/d/19ZLDzw2II1RM_5fxD6dw658gJlggqHbtqrpYeMWqFgU/edit?tab=t.0",
-  "payMax": 1
+  "website": "https://docs.google.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
   "name": "RUNHER",
   "traffic": "150,000 monthly",
   "pay": ".50 to $1 per word.",
   "submission": "Women's runners: https://x.com/ashleymateo/status/1995500258009440273",
-  "payMax": 1
+  "website": "https://x.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com"
  },
  {
   "name": "Senior Planet",
@@ -1061,7 +1264,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to seniors.",
   "editors": "lkristofka@oats.org",
   "submission": "No official submissions page.",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "Spirituality and Health Magazine",
@@ -1071,7 +1276,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to spirituality.",
   "editors": "editors@spiritualityhealth.com",
   "submission": "https://www.spiritualityhealth.com/submissions",
-  "payMax": 1
+  "website": "https://spiritualityhealth.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=spiritualityhealth.com"
  },
  {
   "name": "Stylist",
@@ -1081,7 +1288,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to style and lifestyle for women.",
   "editors": "Ellen C Scott: ellen.scott@stylist.co.uk",
   "submission": "No official submissions page.",
-  "payMax": 1
+  "website": "https://linkedin.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
  },
  {
   "name": "The Hustle",
@@ -1091,7 +1300,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article as it relates to business and finance.",
   "editors": "Katherine Laidlaw: katherine.laidlaw@gmail.com",
   "submission": "https://docs.google.com/document/d/1tx9NV87x6KpOTrSInGSpdHDlG7_jpMWQb2E4hWb5_H0/edit?tab=t.0",
-  "payMax": 1
+  "website": "https://docs.google.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
  },
  {
   "name": "The Nation",
@@ -1101,14 +1312,18 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to politics.",
   "editors": "digital@thenation.com",
   "submission": "https://www.thenation.com/submission-guidelines/",
-  "payMax": 1
+  "website": "https://thenation.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thenation.com"
  },
  {
   "name": "The Telegraph",
   "traffic": "42.2 milllion monthly",
   "pay": "$1 per word.",
   "submission": "Finance pitches: https://x.com/ipr1ya/status/1990426007317188826",
-  "payMax": 1
+  "website": "https://x.com",
+  "payMax": 1,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com"
  },
  {
   "name": "Black Enterprise",
@@ -1118,7 +1333,9 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article, as long as it ties back to people of color.",
   "editors": "Sidnee Michelle Douyon: douyons@blackenterprise.com",
   "submission": "https://www.blackenterprise.com/how-to-get-into-black-enterprise-pitch-the-right-editor/",
-  "payMax": 0
+  "website": "https://blackenterprise.com",
+  "payMax": 0,
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=blackenterprise.com"
  },
  {
   "name": "Inc.com",
