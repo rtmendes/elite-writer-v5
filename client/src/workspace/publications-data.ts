@@ -2,7 +2,7 @@
 export interface PubSeed {
   name: string; category?: string; traffic?: string; pay?: string; payMax?: number;
   topics?: string; editors?: string; submission?: string; applicationForm?: string;
-  website?: string; logo?: string;
+  website?: string; logo?: string; keywordFilter?: string;
   writingStyle?: string; targetAudience?: string; editorStyle?: string; editorLikes?: string;
   payArticle?: string; payAV?: string; projection?: string; wordCount?: string;
   editorName?: string; editorEmail?: string; writingInstruction?: string; styleGuide?: string;
@@ -24,7 +24,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write authoritative beauty journalism that combines science-backed skincare advice with inclusive beauty coverage and product expertise. Use a knowledgeable, empowering tone that treats beauty as both science and self-expression, always grounding recommendations in dermatological expertise and ingredient analysis. Focus on skincare, makeup, and beauty innovation with Allure's commitment to diversity and scientific rigor.",
   "targetAudience": "Beauty-obsessed readers seeking science-backed, inclusive beauty and skincare advice",
   "editorStyle": "American Forests",
-  "editorLikes": "Environmentalists, nature lovers, forest conservation advocates, and outdoor enthusiasts"
+  "editorLikes": "Environmentalists, nature lovers, forest conservation advocates, and outdoor enthusiasts",
+  "keywordFilter": "Women's Topics, women's, topics, topic, relates, women, articles, type, article, long, it's, relevant, beauty-obsessed, readers, seeking"
  },
  {
   "name": "Brides",
@@ -40,7 +41,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write inclusive, modern wedding content that celebrates diverse love stories and helps couples plan authentic celebrations that reflect their values. Use an enthusiastic, supportive tone that makes wedding planning feel joyful rather than stressful, always emphasizing personalization over tradition. Focus on real weddings, vendor recommendations, and planning advice that serves all couples regardless of background or budget.",
   "targetAudience": "Engaged couples planning weddings, with emphasis on diverse, modern, and inclusive celebrations",
   "editorStyle": "Business Insider",
-  "editorLikes": "Business professionals, entrepreneurs, young professionals interested in money, careers, and lifestyle"
+  "editorLikes": "Business professionals, entrepreneurs, young professionals interested in money, careers, and lifestyle",
+  "keywordFilter": "Women's Topics, women's, topics, brides, getting, married, fashion, weddings, type, article, engaged, couples, planning, emphasis, diverse"
  },
  {
   "name": "Cosmopolitan",
@@ -65,7 +67,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "styleGuide": "AI Content Writer Prompt: Write a bold, engaging, and conversational article that blends informality with journalistic integrity, fitting seamlessly into Cosmopolitan’s signature tone. The article should appeal to a millennial and Gen Z audience with a mix of humor, personal anecdotes, and social commentary. Keep the voice empathetic, relatable, and assertive while covering contemporary issues like culture, identity, and relationships. Style Guidelines: • Conversational Tone: Use second-person (\"you\") to make the reader feel directly engaged, almost like talking to a close friend. • Cultural Relevance: Incorporate pop culture references, current events, and modern slang to create familiarity. Ensure the content feels fresh and in-the-moment. • Emotional Resonance: Share personal stories and humanize the subject to evoke empathy, while maintaining a tone that feels empowering. • Humor and Wit: Inject moments of sarcasm or humor, without overpowering the article. Ensure it’s clever, not snarky. • Structured Narrative: Organize the article into short, easily digestible sections or paragraphs that are highly scannable. Use subheadings, lists, and bullets for clarity. • Use of Real Quotes: When applicable, include quotes from interviews or social media posts to support the narrative and add authenticity. • Tackle Serious Topics with Sensitivity: Balance serious, often challenging subjects with a tone of hope, resilience, and insight, leaving the reader feeling informed but also empowered. Editing Feedback Instructions: 1. Optimize for Empathy: Rewrite sentences that feel too formal. Use contractions, active voice, and personal pronouns to strengthen emotional connection. 2. Cultural Accuracy: Ensure references are current and relevant. Fact-check all pop culture and social trends to avoid outdated phrases. 3. Tone Calibration: Balance light-hearted humor with seriousness based on the subject matter. Avoid making jokes that may seem tone-deaf in sensitive contexts. 4. Flow and Engagement: Ensure that each paragraph builds onto the next seamlessly, with cliffhangers at the end of sections to keep the reader interested. 5. Empowering Messaging: Ensure the final tone leaves readers feeling knowledgeable, motivated, or inspired to take action, especially in articles related to self-care, relationships, or personal growth.",
   "doNotWrite": "[\"Op-Ed\",\"Personal Essays\",\"Trend Stories\"]",
   "columnIdea": "https://chatgpt.com/share/676f719a-ae90-800a-a55f-0657897c3735",
-  "niche": "[\"Women\"]"
+  "niche": "[\"Women\"]",
+  "keywordFilter": "Women's Topics, women's, topics, type, article, long, relates, women, under, millennial, gen, readers, interested, culture, identity"
  },
  {
   "name": "Harper's Bazaar",
@@ -79,7 +82,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write elevated fashion journalism that treats style as art and cultural commentary, using sophisticated prose and high-fashion authority. Employ an elegant, intellectually engaged tone that explores luxury, beauty, and culture with depth and aesthetic discernment. Focus on high fashion, beauty innovation, and cultural criticism that serves sophisticated, style-conscious women.",
   "targetAudience": "Fashion-forward, culturally sophisticated women interested in luxury, style, and cultural commentary",
   "editorStyle": "Harper's Magazine",
-  "editorLikes": "Highly educated readers who value long-form literary journalism, essays, and cultural criticism"
+  "editorLikes": "Highly educated readers who value long-form literary journalism, essays, and cultural criticism",
+  "keywordFilter": "Lifestyle, lifestyle, type, article, long, relates, fashion, fashion-forward, culturally, sophisticated, women, interested, luxury, style, cultural"
  },
  {
   "name": "Harpers Magazine",
@@ -91,7 +95,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://harpers.org/submissions/",
   "website": "https://harpers.org",
   "payMax": 30000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=harpers.org"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=harpers.org",
+  "keywordFilter": "Lifestyle, lifestyle, national, conversation, journalism"
  },
  {
   "name": "BBC",
@@ -101,7 +106,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any topics and any style of article.",
   "editors": "Eileen Murphy: eileen.murphy@bbc.co.uk",
   "submission": "No official submissions page.",
-  "payMax": 20000
+  "payMax": 20000,
+  "keywordFilter": "All Topics, topics, style, article"
  },
  {
   "name": "Bloomberg Businessweek",
@@ -115,7 +121,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write sophisticated financial journalism with narrative flair, using Bloomberg's distinctive blend of hard data, insider access, and compelling storytelling. Employ a knowing, sometimes irreverent tone that assumes financial literacy while making complex markets and corporate strategy accessible through vivid characters and scenes. Focus on the human drama behind business decisions while maintaining analytical rigor and market intelligence.",
   "targetAudience": "Finance professionals, investors, corporate executives, and economically literate readers",
   "editorStyle": "Bon Appetit",
-  "editorLikes": "Home cooks and food enthusiasts who see cooking as culture, creativity, and connection"
+  "editorLikes": "Home cooks and food enthusiasts who see cooking as culture, creativity, and connection",
+  "keywordFilter": "Career/Business/Finance, career/business/finance, business, careers, finance, preferred, articles, reported, news-pegged, features, profiles, accepted, professionals, investors, corporate"
  },
  {
   "name": "BuzzFeed",
@@ -127,7 +134,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.buzzfeed.com/buzzfeedstaff/how-to-write-for-buzzfeed",
   "website": "https://buzzfeed.com",
   "payMax": 20000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=buzzfeed.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=buzzfeed.com",
+  "keywordFilter": "All Topics, topics, style, article"
  },
  {
   "name": "Maxim",
@@ -141,7 +149,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write entertaining men's lifestyle content that celebrates sports, cars, women, and nightlife with unapologetic masculine energy. Use a bold, sometimes irreverent tone that appeals to young men seeking entertainment and aspiration, always emphasizing fun and visual appeal. Focus on beautiful women, sports, gear, and entertainment with Maxim's signature blend of humor and testosterone.",
   "targetAudience": "Young men 18-35 interested in entertainment, sports, cars, fitness, and nightlife",
   "editorStyle": "Men's Health",
-  "editorLikes": "Health-conscious men seeking fitness, nutrition, mental health, and lifestyle optimization advice"
+  "editorLikes": "Health-conscious men seeking fitness, nutrition, mental health, and lifestyle optimization advice",
+  "keywordFilter": "Men's Topics, men's, topics, type, article, long, relates, men, young, interested, entertainment, sports, cars, fitness, nightlife"
  },
  {
   "name": "New York Post",
@@ -153,7 +162,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "No official submissions page.",
   "website": "https://linkedin.com",
   "payMax": 20000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=linkedin.com",
+  "keywordFilter": "All Topics, topics, type, article, topic"
  },
  {
   "name": "Oprah Daily",
@@ -169,7 +179,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorName": "Abigail Greene",
   "suggestedTypes": "Leadership development, managing energy for success",
   "targetAudience": "Personal growth seekers, business professionals",
-  "website": "https://www.oprahdaily.com"
+  "website": "https://www.oprahdaily.com",
+  "keywordFilter": "Women's Topics, women's, topics, type, article, long, relates, women, personal, growth, seekers, business, professionals"
  },
  {
   "name": "US Weekly",
@@ -182,7 +193,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write entertaining celebrity news and gossip that gives readers insider access to stars' lives with breathless enthusiasm. Use an upbeat, tabloid-style tone that makes celebrity watching fun, always emphasizing exclusive details, photos, and relationship drama. Focus on celebrity relationships, fashion, and lifestyle with US Weekly's signature blend of gossip and glamour.",
   "targetAudience": "Pop culture fans who want the latest celebrity news, entertainment gossip, and lifestyle inspiration from stars",
   "editorStyle": "USA Today",
-  "editorLikes": "Broad, mainstream American audience seeking accessible, reliable news and lifestyle content"
+  "editorLikes": "Broad, mainstream American audience seeking accessible, reliable news and lifestyle content",
+  "keywordFilter": "pop, culture, fans, want, latest, celebrity, news, entertainment, gossip, lifestyle, inspiration, stars"
  },
  {
   "name": "BDG",
@@ -205,7 +217,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write aspirational money and career content for young professionals focused on earning more, spending smarter, and building wealth. Use an optimistic, actionable tone that makes financial success feel achievable, always providing specific strategies, salary data, and success stories. Focus on career advancement, side hustles, and money management with millennial-focused advice and real numbers.",
   "targetAudience": "Young professionals and millennials focused on earning more, spending smarter, and building wealth",
   "editorStyle": "CNET (Voices)",
-  "editorLikes": "Career professionals (NOT entrepreneurs or business owners), tech-curious general audience"
+  "editorLikes": "Career professionals (NOT entrepreneurs or business owners), tech-curious general audience",
+  "keywordFilter": "All Topics, topics, story-based, articles, essays, topic, long, it's, story, someone, else's, young, professionals, millennials, focused"
  },
  {
   "name": "Eating Well",
@@ -217,7 +230,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.eatingwell.com/writers-guidelines/",
   "website": "https://eatingwell.com",
   "payMax": 15000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=eatingwell.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=eatingwell.com",
+  "keywordFilter": "Food, food, eating, resturants, reciepes, type, article"
  },
  {
   "name": "Esquire",
@@ -230,7 +244,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "payMax": 15000,
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com",
   "editorName": "Chris Hatler",
-  "formToSubmit": "https://docs.google.com/forms/d/17D4HEE6X10gcpp76zyngbCIOrPS4nAFVdrCC_t4b8c4/viewform?edit_requested=true"
+  "formToSubmit": "https://docs.google.com/forms/d/17D4HEE6X10gcpp76zyngbCIOrPS4nAFVdrCC_t4b8c4/viewform?edit_requested=true",
+  "keywordFilter": "Men's Topics, men's, topics"
  },
  {
   "name": "Good Housekeeping",
@@ -246,7 +261,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write trustworthy, tested content for women managing households, using Good Housekeeping's authority on product testing and practical advice. Employ a warm, reliable tone that helps readers make confident decisions about home, family, and products, always grounding recommendations in testing and expert vetting. Focus on solutions that work, products that deliver, and advice readers can trust completely.",
   "targetAudience": "Women 30-60 managing households who want tested, reliable advice on home, family, health, and products",
   "editorStyle": "GQ",
-  "editorLikes": "Style-conscious, culturally engaged men interested in fashion, culture, politics, and living well"
+  "editorLikes": "Style-conscious, culturally engaged men interested in fashion, culture, politics, and living well",
+  "keywordFilter": "Lifestyle, lifestyle, type, article, long, relates, women, managing, households, want, tested, reliable, advice, home, family"
  },
  {
   "name": "Harvard Business Review",
@@ -261,7 +277,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "targetAudience": "Senior executives, management consultants, MBA students, corporate strategists",
   "editorStyle": "Health Magazine",
   "editorLikes": "Health-conscious readers seeking reliable, science-backed wellness, fitness, and nutrition information",
-  "tier": "[\"Tier 1: Open Applications\"]"
+  "tier": "[\"Tier 1: Open Applications\"]",
+  "keywordFilter": "Business/Careers, business/careers, senior, executives, management, consultants, mba, students, corporate, strategists"
  },
  {
   "name": "Men's Health",
@@ -271,7 +288,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to men.",
   "editors": "Rachel Epstein (Contributors): rachel.epstein@hearst.com | Kengo Tsutsumi (Digital): kengo.tsutsumi@hearst.com | Evan Romano (Features): evan.romano@hearst.com",
   "submission": "No official submissions page.",
-  "payMax": 15000
+  "payMax": 15000,
+  "keywordFilter": "Health, health, type, article, long, relates, men"
  },
  {
   "name": "Real Simple",
@@ -283,7 +301,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "No official submissions page.",
   "website": "https://realsimple.com",
   "payMax": 15000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=realsimple.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=realsimple.com",
+  "keywordFilter": "Lifestyle, lifestyle, type, article, long, relates, women"
  },
  {
   "name": "Redbook Magazine",
@@ -297,7 +316,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write relatable, solutions-focused content for women balancing multiple roles, using a supportive, friend-to-friend tone that acknowledges real challenges. Focus on practical advice for career, relationships, parenting, and self-care that fits into busy lives, always emphasizing achievable strategies over perfection. Use personal stories and expert insights to create content that feels both aspirational and attainable.",
   "targetAudience": "Women 25-45 balancing career, family, relationships, and personal fulfillment",
   "editorStyle": "Rest of the World",
-  "editorLikes": "Globally minded readers interested in how technology impacts lives outside the US and Europe"
+  "editorLikes": "Globally minded readers interested in how technology impacts lives outside the US and Europe",
+  "keywordFilter": "Women's Topics, women's, topics, topic, relates, women, articles, type, article, long, it's, relevant, balancing, career, family"
  },
  {
   "name": "The Daily Beast",
@@ -316,7 +336,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorName": "Allegra Frank, Senior Lifestyle Editor",
   "editorEmail": "allegra.frank@thedailybeast.dot.com",
   "editorStyle": "She’s responsive and covers the lifestyle and entertainment verticals, to which all of your art, culture, and entertainment topics would fit.",
-  "columnIdea": "Four pitch ideas that are one each of your topics. The pitch ideas should be one personal story, two that are topic-based, and one news-based pitch on one of your topics. The Daily Beast is flexible with contributor articles – you can do as many or as few as you’d like but need to pitch each story."
+  "columnIdea": "Four pitch ideas that are one each of your topics. The pitch ideas should be one personal story, two that are topic-based, and one news-based pitch on one of your topics. The Daily Beast is flexible with contributor articles – you can do as many or as few as you’d like but need to pitch each story.",
+  "keywordFilter": "All Topics, topics, style, article"
  },
  {
   "name": "Alantic (The)",
@@ -328,7 +349,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://support.theatlantic.com/hc/en-us/articles/360011374734-Submit-a-piece-for-editorial-consideration-at-The-Atlantic",
   "website": "https://support.theatlantic.com",
   "payMax": 10000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=support.theatlantic.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=support.theatlantic.com",
+  "keywordFilter": "All Topics, topics, style, article"
  },
  {
   "name": "Bustle",
@@ -344,7 +366,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write relatable, identity-focused content for millennial women navigating relationships, career, and culture with honesty and humor. Use a conversational, friend-to-friend tone that validates readers' experiences while providing advice and cultural commentary. Focus on dating, sex, career, mental health, and pop culture with progressive values and millennial sensibility.",
   "targetAudience": "Millennial and Gen Z women navigating career, relationships, culture, and identity",
   "editorStyle": "BuzzFeed",
-  "editorLikes": "Internet-savvy general audience, primarily millennials and Gen Z, who consume content socially"
+  "editorLikes": "Internet-savvy general audience, primarily millennials and Gen Z, who consume content socially",
+  "keywordFilter": "All Topics, topics, style, article, millennial, gen, women, navigating, career, relationships, culture, identity"
  },
  {
   "name": "Fortune",
@@ -368,7 +391,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorEmail": "matt.heimer@fortune.com",
   "suggestedTypes": "Effective sales strategies, business growth case studies",
   "columnIdea": "Three pitch ideas that cover a personal business win, a topic-based piece on AI, and a how-to piece on content. Fortune is flexible on contributor articles – you can do as many or as few as you’d like, but need to pitch each story.",
-  "frequency": "2x per month"
+  "frequency": "2x per month",
+  "keywordFilter": "All Topics, topics, business, careers, finance, preferred, articles, reported, news-pegged, features, profiles, accepted, leaders, entrepreneurs, senior"
  },
  {
   "name": "HuffPost",
@@ -381,7 +405,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "website": "https://huffpost.com",
   "applicationForm": "Family & Relationship: https://docs.google.com/forms/d/e/1FAIpQLSdVVTTGdo9CfZN4FUujM5hODF1RVsfTRvnguCB9QiXYnod8jw/viewform",
   "payMax": 10000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=huffpost.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=huffpost.com",
+  "keywordFilter": "All Topics, topics, topic, type, article"
  },
  {
   "name": "Kiplinger's Personal Finance",
@@ -395,7 +420,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write practical, trustworthy financial advice for middle-to-upper income Americans focused on retirement planning, investing, and wealth building. Use clear, authoritative prose that explains complex financial concepts without jargon, always providing specific recommendations and actionable strategies. Focus on long-term financial security, tax efficiency, and smart money management with conservative, time-tested wisdom.",
   "targetAudience": "Middle-to-upper income Americans focused on retirement planning, investing, taxes, and building long-term wealth",
   "editorStyle": "Late Checkout",
-  "editorLikes": "Hospitality industry professionals, travel tech enthusiasts, and hotel entrepreneurs"
+  "editorLikes": "Hospitality industry professionals, travel tech enthusiasts, and hotel entrepreneurs",
+  "keywordFilter": "Finance, finance, type, article, long, relates, middle-to-upper, income, americans, focused, retirement, planning, investing, taxes, building"
  },
  {
   "name": "Men's Journal",
@@ -409,7 +435,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write adventure-focused lifestyle content for active men who prioritize outdoor experiences, fitness, and gear over fashion and grooming. Use an energetic, authoritative tone that speaks to serious outdoor enthusiasts and athletes, always emphasizing performance, adventure, and the well-lived active life. Focus on outdoor sports, travel, fitness, and gear with expert knowledge and adventurous spirit.",
   "targetAudience": "Active men 25-49 interested in outdoor adventure, gear, fitness, travel, and a well-lived life",
   "editorStyle": "MIT Technology Review",
-  "editorLikes": "Tech-aware general public who want deep understanding of how technology is changing the world"
+  "editorLikes": "Tech-aware general public who want deep understanding of how technology is changing the world",
+  "keywordFilter": "Men's Topics, men's, topics, type, article, long, relates, men, active, interested, outdoor, adventure, gear, fitness, travel"
  },
  {
   "name": "Popular Science",
@@ -422,7 +449,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write accessible, forward-looking science and technology journalism that explores innovation and discovery with wonder and clarity. Use engaging, explanatory prose that makes complex science exciting for general readers, always emphasizing practical applications and future implications. Focus on emerging technology, scientific breakthroughs, and the innovations shaping tomorrow with optimistic curiosity.",
   "targetAudience": "Curious readers who love science, technology, and innovation and want to understand what's coming next",
   "editorStyle": "Questrade",
-  "editorLikes": "Self-directed Canadian investors and traders seeking financial education and investment platform guidance"
+  "editorLikes": "Self-directed Canadian investors and traders seeking financial education and investment platform guidance",
+  "keywordFilter": "curious, readers, love, science, technology, innovation, want, understand, what's, coming, next"
  },
  {
   "name": "Slate",
@@ -433,7 +461,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://slate.com/pitch",
   "website": "https://slate.com",
   "payMax": 10000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=slate.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=slate.com",
+  "keywordFilter": "topic, style, article"
  },
  {
   "name": "The Cut (New York Magazine)",
@@ -449,7 +478,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write sharp, culturally astute content about fashion, beauty, sex, and power that explores how women navigate and challenge systems. Use an intelligent, sometimes provocative tone that treats style and culture as serious subjects worthy of critical analysis. Focus on the intersection of fashion, feminism, and power with New York sophistication and cultural commentary.",
   "targetAudience": "Smart, culturally aware women interested in fashion, beauty, politics, sex, and power dynamics",
   "editorStyle": "The Daily Beast",
-  "editorLikes": "News-savvy, culturally engaged readers who enjoy bold takes on entertainment, lifestyle, and current events"
+  "editorLikes": "News-savvy, culturally engaged readers who enjoy bold takes on entertainment, lifestyle, and current events",
+  "keywordFilter": "All Topics, topics, style, article, smart, culturally, aware, women, interested, fashion, beauty, politics, sex, power, dynamics"
  },
  {
   "name": "The HuffPost",
@@ -461,7 +491,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.huffpost.com/static/how-to-pitch-huffpost",
   "website": "https://huffpost.com",
   "payMax": 10000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=huffpost.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=huffpost.com",
+  "keywordFilter": "All Topics, topics, type, article, topic"
  },
  {
   "name": "The New Republic",
@@ -475,7 +506,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write progressive political and cultural criticism with intellectual rigor and literary ambition, challenging power and conventional wisdom. Use sharp, argumentative prose that doesn't shy from strong positions while maintaining analytical depth, always grounding arguments in evidence and historical context. Focus on politics, culture, and ideas with left-leaning perspective and intellectual sophistication.",
   "targetAudience": "Politically engaged, liberal-leaning intellectuals who value sharp analysis and literary criticism",
   "editorStyle": "The New Yorker",
-  "editorLikes": "Intellectuals, culture enthusiasts, literary-minded readers who value depth and craft"
+  "editorLikes": "Intellectuals, culture enthusiasts, literary-minded readers who value depth and craft",
+  "keywordFilter": "All Topics, topics, preferred, articles, reported, news-pegged, features, profiles, accepted, politically, engaged, liberal-leaning, intellectuals, value, sharp"
  },
  {
   "name": "TIME",
@@ -497,7 +529,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "columnIdea": "Pitches and tips to emma.barker@time.com",
   "classification": "Freelance - Pay Per Article",
   "tier": "[\"Tier 4: Pitching Publications That Assign Articles\"]",
-  "niche": "[\"Leadership\",\"Innovation\",\"Business\",\"Entrepreneur\",\"News\",\"Parenting\"]"
+  "niche": "[\"Leadership\",\"Innovation\",\"Business\",\"Entrepreneur\",\"News\",\"Parenting\"]",
+  "keywordFilter": "All Topics, topics, type, article, preferred, articles, reported, news-pegged, features, profiles, accepted, informed, general, readers, industry"
  },
  {
   "name": "Travel & Leisure",
@@ -509,7 +542,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.travelandleisure.com/travel-tips/how-to-pitch-travel-and-leisure",
   "website": "https://travelandleisure.com",
   "payMax": 10000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=travelandleisure.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=travelandleisure.com",
+  "keywordFilter": "Travel, travel, type, article, long, relates"
  },
  {
   "name": "VOX",
@@ -525,7 +559,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write explanatory journalism that unpacks complex news and policy issues through clear, accessible prose that assumes intelligence but not expertise. Use the 'explain like I'm smart' approach with data visualization, expert sourcing, and step-by-step breakdowns that reveal underlying systems and mechanisms. Structure pieces to answer 'why this matters' explicitly, connecting individual stories to broader trends and policy implications.",
   "targetAudience": "Educated, curious readers who want to deeply understand the news, policy, and cultural forces shaping the world",
   "editorStyle": "Wine Enthusiast",
-  "editorLikes": "Wine lovers from curious beginners to serious collectors seeking reliable reviews, education, and wine-lifestyle content"
+  "editorLikes": "Wine lovers from curious beginners to serious collectors seeking reliable reviews, education, and wine-lifestyle content",
+  "keywordFilter": "All Topics, topics, type, article, preferred, articles, reported, news-pegged, features, profiles, accepted, educated, curious, readers, want"
  },
  {
   "name": "Wired",
@@ -541,7 +576,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write forward-looking technology journalism that explores how innovation shapes culture, business, and society with intellectual depth and narrative flair. Use sophisticated, idea-driven prose that assumes tech literacy while making complex concepts accessible through storytelling and real-world examples. Focus on the human and societal implications of technology, always asking 'what does this mean for the future?'",
   "targetAudience": "Tech enthusiasts, business professionals, gadget lovers, and general readers curious about how technology shapes the future",
   "editorStyle": "Women's Health",
-  "editorLikes": "Health-conscious women seeking fitness, nutrition, mental health, and wellness content backed by experts"
+  "editorLikes": "Health-conscious women seeking fitness, nutrition, mental health, and wellness content backed by experts",
+  "keywordFilter": "Tech, tech, type, tech-related, article, preferred, articles, reported, news-pegged, features, profiles, accepted, enthusiasts, business, professionals"
  },
  {
   "name": "WIRED",
@@ -554,7 +590,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write forward-looking technology journalism that explores how innovation shapes culture, business, and society with intellectual depth and narrative flair. Use sophisticated, idea-driven prose that assumes tech literacy while making complex concepts accessible through storytelling and real-world examples. Focus on the human and societal implications of technology, always asking 'what does this mean for the future?'",
   "targetAudience": "Tech enthusiasts, business professionals, gadget lovers, and general readers curious about how technology shapes the future",
   "editorStyle": "Women's Health",
-  "editorLikes": "Health-conscious women seeking fitness, nutrition, mental health, and wellness content backed by experts"
+  "editorLikes": "Health-conscious women seeking fitness, nutrition, mental health, and wellness content backed by experts",
+  "keywordFilter": "tech, enthusiasts, business, professionals, gadget, lovers, general, readers, curious, how, technology, shapes, future"
  },
  {
   "name": "Wired Business",
@@ -568,7 +605,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "suggestedTypes": "AI advancements in business, digital marketing trends",
   "targetAudience": "Tech enthusiasts, business professionals",
   "topics": "AI, emerging technologies, the economy, growing business, digital marketing, chatbots, marketing software (Go High Level, ClickFunnels), webinars, podcasting",
-  "website": "https://www.wired.com/tag/business"
+  "website": "https://www.wired.com/tag/business",
+  "keywordFilter": "emerging, technologies, economy, growing, business, digital, marketing, chatbots, software, high, level, clickfunnels, webinars, podcasting"
  },
  {
   "name": "Women's Health",
@@ -578,7 +616,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of women-related article. Preferred articles are reported and news-pegged articles, but features and profiles are accepted.",
   "editors": "Laura McLaughlin (Managing) laura.mclaughlin@hearst.com | Christian Gollayan (Commerce): christian.gollayan@hearst.com | Lindsay Geller (Lifestyle): lindsay.geller@hearst.com",
   "submission": "No official submissions page.",
-  "payMax": 10000
+  "payMax": 10000,
+  "keywordFilter": "Women's Topics, women's, topics, type, women-related, article, preferred, articles, reported, news-pegged, features, profiles, accepted"
  },
  {
   "name": "Worth Magazine",
@@ -590,7 +629,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://worth.com/about/",
   "website": "https://worth.com",
   "payMax": 10000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=worth.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=worth.com",
+  "keywordFilter": "Business/Finance/Lifestyle, business/finance/lifestyle, type, article, preferred, articles, reported, news-pegged, features, profiles, accepted"
  },
  {
   "name": "Forbes",
@@ -612,7 +652,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "columnIdea": "Closing the Wealth Gap Through Community Economic Development and Black Generational Wealth The idea is a column on how to create meaningful financial progress in the Black community through proactive financial education that is not reactive to our current situation. This column will cover generational wealth and community economic development strategies and black individuals and companies that contribute to this goal.",
   "classification": "Columnist",
   "frequency": "6x / month",
-  "topics": "CEO"
+  "topics": "CEO",
+  "keywordFilter": "ceo, business, owners, c-suite, executives, investors, financial, professionals"
  },
  {
   "name": "Narratively",
@@ -625,7 +666,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write deeply personal, character-driven stories that reveal the extraordinary in ordinary lives through intimate narrative journalism. Use literary, immersive prose that builds scenes and develops characters like fiction, always centering human stories that have never been told. Focus on untold stories from everyday people with narrative craft, empathy, and attention to detail that makes readers care deeply.",
   "targetAudience": "Readers who crave deeply personal, untold human stories that reveal the extraordinary in ordinary lives",
   "editorStyle": "National Culinary Review",
-  "editorLikes": "Culinary professionals, chefs, culinary students, and food industry leaders seeking industry news and professional development"
+  "editorLikes": "Culinary professionals, chefs, culinary students, and food industry leaders seeking industry news and professional development",
+  "keywordFilter": "readers, crave, deeply, personal, untold, human, stories, reveal, extraordinary, ordinary, lives"
  },
  {
   "name": "National Geographic",
@@ -645,7 +687,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorLikes": "Nature lovers, wildlife advocates, and conservation-minded readers supporting the National Wildlife Federation",
   "payArticle": "$1 a word, and there is no limit on word count. This could be $2,500 to $7,500 per article",
   "editorEmail": "starlight.williams@natgeo.com",
-  "columnIdea": "Seeking conversation starters. Timely culture, history, health/wellness, and trend explainers/stories. Lover of all mythology, supernatural, strange history, fitness trend stories. Can intersect with travel. ~$1/w"
+  "columnIdea": "Seeking conversation starters. Timely culture, history, health/wellness, and trend explainers/stories. Lover of all mythology, supernatural, strange history, fitness trend stories. Can intersect with travel. ~$1/w",
+  "keywordFilter": "All Topics, topics, type, article, long, relates, nature, science, travel, curious, educated, general, readers, fascinated, culture"
  },
  {
   "name": "AFAR",
@@ -658,7 +701,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "website": "https://afar.com",
   "payMax": 5000,
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=afar.com",
-  "editorName": "https://x.com/kjlagrave/status/1851327309808112056"
+  "editorName": "https://x.com/kjlagrave/status/1851327309808112056",
+  "keywordFilter": "Travel, travel, topics, style, article, relates"
  },
  {
   "name": "Business Insider",
@@ -669,7 +713,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "category": "All Topics",
   "applicationForm": "Relocation Stories (Paige): https://docs.google.com/forms/d/e/1FAIpQLSfsGMi72ItAifPMhnxXwYUe3QxPQcLU2dZZmP8qPvr7Lg2hzw/viewform",
   "payMax": 5000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=businessinsider.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=businessinsider.com",
+  "keywordFilter": "All Topics, topics"
  },
  {
   "name": "Business Insider.com",
@@ -681,7 +726,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.businessinsider.com/how-to-write-for-business-insider-2020-4",
   "website": "https://businessinsider.com",
   "payMax": 5000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=businessinsider.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=businessinsider.com",
+  "keywordFilter": "All Topics, topics, story-based, articles, essays, topic, long, it's, story, someone, else's, lifestyle, here, https, docs"
  },
  {
   "name": "Essence Magazine",
@@ -700,7 +746,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "payAV": "$2,000",
   "editorName": "Dawn Baskerville",
   "suggestedTypes": "Success stories of entrepreneurs of color, business growth strategies",
-  "website": "https://www.essence.com"
+  "website": "https://www.essence.com",
+  "keywordFilter": "All Topics, topics, type, article, long, relates, people, color, black, entrepreneurs, professionals, community, leaders"
  },
  {
   "name": "Fodor's Travel",
@@ -713,7 +760,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "website": "https://fodors.com",
   "applicationForm": "Video articles: https://docs.google.com/forms/d/1Z1M2WrxMipDmqix7CgUgFlYRgx5x9zM8c8FvnmSwfuk/viewform",
   "payMax": 5000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=fodors.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=fodors.com",
+  "keywordFilter": "Travel, travel, type, article, long, relates"
  },
  {
   "name": "GQ",
@@ -734,7 +782,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://hightimes.com/submissions/",
   "website": "https://hightimes.com",
   "payMax": 5000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=hightimes.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=hightimes.com",
+  "keywordFilter": "Alternative Health, alternative, health, type, article, long, relates, cannabis"
  },
  {
   "name": "Intrepid Travel",
@@ -763,7 +812,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "payArticle": "$1,500",
   "payAV": "$4,000",
   "editorName": "Brad Tuttle",
-  "suggestedTypes": "Strategic financial planning, innovative money management"
+  "suggestedTypes": "Strategic financial planning, innovative money management",
+  "keywordFilter": "Finance, finance, type, article, long, relates, enthusiasts, entrepreneurs, professionals, managing, personal, business, finances"
  },
  {
   "name": "Newsweek",
@@ -779,7 +829,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write opinion-driven news analysis that goes beyond headlines to explore what stories mean and why they matter. Use a sharp, analytical tone that provides perspective and argument alongside reporting, always emphasizing interpretation and significance. Focus on politics, culture, and current events with strong editorial voice and diverse viewpoints.",
   "targetAudience": "News-engaged readers who want sharp analysis and opinion beyond the headlines",
   "editorStyle": "Noema",
-  "editorLikes": "Intellectuals, policy thinkers, and educated readers interested in the big ideas shaping civilization"
+  "editorLikes": "Intellectuals, policy thinkers, and educated readers interested in the big ideas shaping civilization",
+  "keywordFilter": "All Topics, topics, type, article, topic, news-engaged, readers, want, sharp, analysis, opinion, beyond, headlines"
  },
  {
   "name": "Oxygen Magazine",
@@ -795,7 +846,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write motivational, results-focused fitness content specifically for women serious about strength training and physique development. Use an empowering, no-nonsense tone that treats readers as dedicated athletes, providing detailed workout programming, nutrition science, and training strategies with technical precision. Focus on building strength and muscle with expert-backed advice that goes beyond general fitness platitudes.",
   "targetAudience": "Women serious about fitness, strength training, and building a strong, healthy physique",
   "editorStyle": "Parents",
-  "editorLikes": "Parents (especially new and expecting) seeking trustworthy, expert-backed guidance on raising children"
+  "editorLikes": "Parents (especially new and expecting) seeking trustworthy, expert-backed guidance on raising children",
+  "keywordFilter": "Health, health, type, article, long, relates, women, serious, fitness, strength, training, building, strong, healthy, physique"
  },
  {
   "name": "Parents",
@@ -807,7 +859,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "No official submissions page.",
   "website": "https://parents.com",
   "payMax": 5000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=parents.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=parents.com",
+  "keywordFilter": "Family, family, type, article, long, relates, parenting"
  },
  {
   "name": "Thrillist",
@@ -817,7 +870,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "topics": "Any type of article as long as it relates to travel and lifestyle.",
   "editors": "Lindsay Schrupp (EIC): lindsay.schrupp@voxmedia.com",
   "submission": "No official submissions page.",
-  "payMax": 5000
+  "payMax": 5000,
+  "keywordFilter": "Lifestyle, lifestyle, type, article, long, relates, travel"
  },
  {
   "name": "Venture Music",
@@ -831,7 +885,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write practical music business content for independent musicians building sustainable careers, focusing on entrepreneurship and industry navigation. Use an empowering, insider tone that demystifies the music industry while providing actionable strategies for marketing, monetization, and career development. Focus on the business side of music with specific tactics that help artists succeed independently.",
   "targetAudience": "Independent musicians, music industry professionals, and music entrepreneurs building careers",
   "editorStyle": "Vogue Business",
-  "editorLikes": "Business owners, entrepreneurs, and professionals at the intersection of fashion, luxury, and commerce"
+  "editorLikes": "Business owners, entrepreneurs, and professionals at the intersection of fashion, luxury, and commerce",
+  "keywordFilter": "Music, music, independent, musicians, industry, professionals, entrepreneurs, building, careers"
  },
  {
   "name": "Vogue Business",
@@ -846,7 +901,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorName": "Hilary Milnes",
   "suggestedTypes": "SEO strategies for businesses, branding for growth",
   "targetAudience": "Business owners, entrepreneurs",
-  "topics": "SEO, podcasting, business growth strategy, sales, lead generation, branding, entrepreneurial mindset, business owner assistance"
+  "topics": "SEO, podcasting, business growth strategy, sales, lead generation, branding, entrepreneurial mindset, business owner assistance",
+  "keywordFilter": "seo, podcasting, business, growth, strategy, sales, lead, generation, branding, entrepreneurial, mindset, owner, assistance, owners"
  },
  {
   "name": "Conde Nast Traveler",
@@ -858,7 +914,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.cntraveler.com/info/how-to-pitch-conde-nast-traveler",
   "website": "https://cntraveler.com",
   "payMax": 3000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=cntraveler.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=cntraveler.com",
+  "keywordFilter": "Travel, travel, type, article, long, relates"
  },
  {
   "name": "Health Magazine",
@@ -870,7 +927,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.health.com/about-us",
   "website": "https://health.com",
   "payMax": 3000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=health.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=health.com",
+  "keywordFilter": "Health, health, topic, article, style, long, relates, wellness"
  },
  {
   "name": "People Magazine",
@@ -884,7 +942,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorName": "Alex Apatoff",
   "suggestedTypes": "Starting a successful side hustle, business growth stories",
   "topics": "Personal finance, Entrepreneurial success stories, Starting and growing a business, Side hustles, Making money online",
-  "website": "https://people.com"
+  "website": "https://people.com",
+  "keywordFilter": "personal, finance, entrepreneurial, success, stories, starting, growing, business, side, hustles, making, money, online, general"
  },
  {
   "name": "Business Insider 2024 Business Insider Freelance Lifestyle Pitchs",
@@ -905,7 +964,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "niche": "[\"Business\"]",
   "targetAudience": "Business professionals, entrepreneurs",
   "topics": "https://docs.google.com/document/d/1JhK6-UCAjNSrup6iGCagUc4WpAoynewCv96qlGlkl1w/edit?tab=t.0 Ideas for stories freelancers to source: Big Ideas/Personal Essay topics: People sharing their salary journeys Lottery winners or people who come in big sums of money suddenly People who invested their way out of the 9-to-5 Parenting and workaholics — how long hours impacts relationships and kids Comparision stories: I worked at TK Big Tech companies, TK consulting firms, VC firms, I lived in Tk big cities/countries here’s how they compare As told to 600-800 words, please send potential sources/interviewees for these ideas to kfields@insider.com Sources should be comfortable presenting their stories in the “as-told-to” format. Top Priority: I worked for Cascade Investments, Bill Gates’ investment firm. Here’s what it was like I worked in recruitment in NYC. It was a crazy, party machine. I gave up my pension to move abroad it was/wasn’t worth it. I bought a house, and it’s quickly losing value/has been destroyed by climate-change-fueled natural disasters. I’m the breadwinner of my family. Here’s how it impacts my relationship with my partner. I worked with Bob Iger/ at Disney during the Iger/Chapak rivalry. This is what it was like. I’m a Gen Z/millennial and my parents still do TK things for me (pay bills, pay rent, buy big ticket items). It’s a big help/makes me feel like an adult kid. People who have built their dream house cheaply aboard (Thailand, the Philippines, Mexico) Someone who works at a data center or lives near one about the industry impacts their lives/community Wealth advisors or consultants with ultrawealthy clients (Golden visa advisors, property advisors) who can give insights into the money habits of their clients Someone who was offered a promotion at a corporate job and turned it down because they were happy with their role and didn't want to work more/be a manager A millennial who bought a business from its boomer owners to run themselves Someone who has successfully retired early or tried to retire early and struggled/failed A Gen Z running a successful Airbnb business I work on a luxury yacht/exclusive hotel/spa. Here’s what my job is like. Business success stories, business topics in the news, interesting business models, making money online",
-  "website": "https://www.businessinsider.com"
+  "website": "https://www.businessinsider.com",
+  "keywordFilter": "https, docs, google, com/document/d/, jhk, ucajnsrup, igcaguc, wpaoynewcv, qlglkl, w/edit, tab, ideas, stories, freelancers"
  },
  {
   "name": "American Forests",
@@ -917,7 +977,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.americanforests.org/magazine/writers-guidelines/",
   "website": "https://americanforests.org",
   "payMax": 2000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=americanforests.org"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=americanforests.org",
+  "keywordFilter": "Nature, nature, outdoors, articles, type, article"
  },
  {
   "name": "Babylist",
@@ -932,7 +993,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write helpful, unbiased baby product content that guides overwhelmed new parents through gear decisions with expert testing and real parent reviews. Use a friendly, supportive tone that acknowledges how overwhelming baby shopping can be, always providing clear recommendations based on testing and parent feedback. Focus on product guides, registry building, and practical advice that helps parents choose confidently.",
   "targetAudience": "Expecting and new parents building their baby registries and navigating the overwhelming world of baby products",
   "editorStyle": "BBC",
-  "editorLikes": "Global, educated, news-conscious readers across all demographics"
+  "editorLikes": "Global, educated, news-conscious readers across all demographics",
+  "keywordFilter": "Family and Finance, family, finance, expecting, new, parents, building, baby, registries, navigating, overwhelming, world, products"
  },
  {
   "name": "CNN",
@@ -946,7 +1008,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorName": "David Goldman",
   "suggestedTypes": "Virtual team success stories, high performance strategies",
   "topics": "Energy management High performance Personal development Inspiring stories Virtual teams Finance Wealth creation Online marketing Making money online",
-  "website": "https://www.cnn.com"
+  "website": "https://www.cnn.com",
+  "keywordFilter": "energy, management, high, performance, personal, development, inspiring, stories, virtual, teams, finance, wealth, creation, online"
  },
  {
   "name": "Longreads",
@@ -962,7 +1025,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write immersive, literary narrative journalism that rewards sustained attention with rich character development, scene-setting, and thematic depth. Craft sentences with care and rhythm, using novelistic techniques to draw readers into stories that unfold slowly and reveal complexity. Prioritize compelling human stories told with empathy, nuance, and prose that's both beautiful and purposeful.",
   "targetAudience": "Readers who love long-form narrative journalism and essays — people who set aside time for deep reading",
   "editorStyle": "Matador Network",
-  "editorLikes": "Millennial and Gen Z travelers seeking authentic, off-the-beaten-path travel experiences and cultural immersion"
+  "editorLikes": "Millennial and Gen Z travelers seeking authentic, off-the-beaten-path travel experiences and cultural immersion",
+  "keywordFilter": "All Topics, topics, type, article, long, it's, nonfiction, readers, love, long-form, narrative, journalism, essays, people, set"
  },
  {
   "name": "The Drive",
@@ -978,7 +1042,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write passionate automotive journalism that combines technical expertise, driving enthusiasm, and military/gear culture with authoritative depth. Use knowledgeable, enthusiast-level language that speaks to serious car lovers and military tech fans, always emphasizing performance, engineering, and the driving experience. Focus on vehicle reviews, automotive culture, and military technology with insider access and technical precision.",
   "targetAudience": "Car enthusiasts, gear lovers, military tech fans, and anyone passionate about automotive culture and technology",
   "editorStyle": "The Economist",
-  "editorLikes": "Global business leaders, policy makers, economists, and educated readers who want to understand the world's systems"
+  "editorLikes": "Global business leaders, policy makers, economists, and educated readers who want to understand the world's systems",
+  "keywordFilter": "Automotive, automotive, topics, style, article, relates, car, enthusiasts, gear, lovers, military, tech, fans, anyone, passionate"
  },
  {
   "name": "The Food Section",
@@ -994,7 +1059,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write insider food media journalism that explores the business, craft, and culture of food writing with professional depth and critical perspective. Use industry-specific language and references that speak to food writers and culinary professionals, analyzing trends, ethics, and economics of food media. Focus on the meta-conversation about how food stories get told and who gets to tell them.",
   "targetAudience": "Food writers, food media professionals, and culinary enthusiasts interested in the business and craft of food journalism",
   "editorStyle": "The Hustle",
-  "editorLikes": "Young professionals and entrepreneurs who want business news delivered with personality and wit — the 'business newsletter for people who hate business newsletters' crowd"
+  "editorLikes": "Young professionals and entrepreneurs who want business news delivered with personality and wit — the 'business newsletter for people who hate business newsletters' crowd",
+  "keywordFilter": "Lifestyle, lifestyle, topics, style, article, relates, food, writers, media, professionals, culinary, enthusiasts, interested, business, craft"
  },
  {
   "name": "Fuller",
@@ -1004,7 +1070,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "applicationForm": "Motherhood: https://form.asana.com/?k=lvkeBd9fzKVL5-Ey_OPQ8w&d=318624707713691",
   "website": "https://form.asana.com",
   "payMax": 1500,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=form.asana.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=form.asana.com",
+  "keywordFilter": "Family, family"
  },
  {
   "name": "Scary Mommy",
@@ -1015,7 +1082,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "website": "https://docs.google.com",
   "payMax": 1500,
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com",
-  "tier": "[\"Tier 1: Open Applications\"]"
+  "tier": "[\"Tier 1: Open Applications\"]",
+  "keywordFilter": "Parenting, parenting"
  },
  {
   "name": "The Sick Times",
@@ -1031,7 +1099,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write unflinchingly honest content about living with chronic illness and disability, centering patient voices and challenging medical establishment narratives. Use a direct, sometimes darkly humorous tone that validates the reality of chronic illness without toxic positivity or inspiration porn. Focus on lived experience, systemic healthcare failures, and authentic representation of disability with radical honesty.",
   "targetAudience": "People living with chronic illness, disability advocates, and healthcare professionals who want honest perspectives on life with illness",
   "editorStyle": "The Telegraph",
-  "editorLikes": "UK-based, center-right readers who value traditional journalism, business coverage, and British lifestyle content"
+  "editorLikes": "UK-based, center-right readers who value traditional journalism, business coverage, and British lifestyle content",
+  "keywordFilter": "Health, health, topics, style, article, relates, people, living, chronic, illness, disability, advocates, healthcare, professionals, want"
  },
  {
   "name": "Digiday.com",
@@ -1044,7 +1113,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "columnIdea": "Three pitch ideas that cover the types of marketing and content pieces. The pitches should be a personal story around content, a reported story about how to use AI in content or marketing, and a how-to article on anything related to business, content, and marketing. Digiday is flexible on contributor articles – you can do as many or as few as you’d like but need to pitch each story.",
   "frequency": "do two articles per month. aim for 4",
   "topics": "CMO Chief Marketing Office",
-  "website": "https://digiday.com"
+  "website": "https://digiday.com",
+  "keywordFilter": "cmo, chief, marketing, office"
  },
  {
   "name": "Intrepid Times",
@@ -1057,7 +1127,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write authentic, first-person travel narratives that capture real journeys and cultural encounters with literary sensibility and adventurous spirit. Use personal, reflective prose that goes beyond guidebook recommendations to explore the transformative power of travel and cross-cultural connection. Focus on independent travel experiences, cultural insights, and the personal growth that comes from venturing off the beaten path.",
   "targetAudience": "Independent travelers seeking authentic stories, cultural insights, and off-the-beaten-path inspiration from real journeys",
   "editorStyle": "Intrepid Travel",
-  "editorLikes": "Conscious travelers seeking small-group, sustainable, and culturally immersive travel experiences worldwide"
+  "editorLikes": "Conscious travelers seeking small-group, sustainable, and culturally immersive travel experiences worldwide",
+  "keywordFilter": "independent, travelers, seeking, authentic, stories, cultural, insights, off-the-beaten-path, inspiration, real, journeys"
  },
  {
   "name": "Romper",
@@ -1069,7 +1140,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.romper.com/p/how-to-pitch-romper-302",
   "website": "https://romper.com",
   "payMax": 1000,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=romper.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=romper.com",
+  "keywordFilter": "Parenting and Family, parenting, family, type, article, long, relates"
  },
  {
   "name": "Workforce Magazine",
@@ -1083,7 +1155,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorName": "Paul Temple",
   "suggestedTypes": "Finding a new job, balancing side hustles with full-time work",
   "topics": "Increasing salary, finding a new job, entrepreneurial mindset, side hustles while working a job",
-  "website": "https://workforce.com"
+  "website": "https://workforce.com",
+  "keywordFilter": "increasing, salary, finding, new, job, entrepreneurial, mindset, side, hustles, while, working, career, professionals, seekers"
  },
  {
   "name": "Yahoo News",
@@ -1099,7 +1172,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write straightforward, SEO-optimized news and lifestyle content for broad online audiences seeking quick, accessible information. Use clear, scannable prose with short paragraphs and descriptive headlines, always explaining context for readers who may be encountering the story for the first time. Focus on trending topics and evergreen content that serves diverse readers across demographics.",
   "targetAudience": "Broad online news consumers across all demographics seeking accessible, timely news and lifestyle content",
   "editorStyle": "Yale Review",
-  "editorLikes": "Academics, literary readers, intellectuals interested in rigorous argument and beautiful prose"
+  "editorLikes": "Academics, literary readers, intellectuals interested in rigorous argument and beautiful prose",
+  "keywordFilter": "All Topics, topics, type, article, topic, broad, online, news, consumers, demographics, seeking, accessible, timely, lifestyle, content"
  },
  {
   "name": "GameSpot’s",
@@ -1120,7 +1194,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "suggestedTypes": "How to achieve financial independence, success stories",
   "targetAudience": "Aspiring entrepreneurs, personal growth seekers",
   "topics": "Personal development, Inspiring stories, Financial literacy, Wealth creation, Marketing, Making money online, Side hustle, Online software (Go High Level, ClickFunnels)",
-  "website": "https://www.success.com"
+  "website": "https://www.success.com",
+  "keywordFilter": "personal, development, inspiring, stories, financial, literacy, wealth, creation, marketing, making, money, online, side, hustle"
  },
  {
   "name": "Motley Bloom",
@@ -1136,7 +1211,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write visually inspired, creatively minded content that celebrates artistic expression and design through lyrical, evocative prose. Use a feminine, aesthetically aware voice that explores the intersection of art, lifestyle, and personal expression with depth and beauty. Focus on creative process, visual storytelling, and cultural commentary that resonates with women who see life through an artistic lens.",
   "targetAudience": "Creative-minded women interested in art, design, lifestyle, and cultural expression",
   "editorStyle": "MyHealthTeam",
-  "editorLikes": "People living with specific health conditions seeking community, practical advice, and evidence-based information from peers and experts"
+  "editorLikes": "People living with specific health conditions seeking community, practical advice, and evidence-based information from peers and experts",
+  "keywordFilter": "Neurodivergence, neurodivergence, type, article, long, relates, creative-minded, women, interested, art, design, lifestyle, cultural, expression"
  },
  {
   "name": "The American Scholar",
@@ -1150,7 +1226,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write literary, intellectually ambitious essays that explore ideas across disciplines with elegant prose and scholarly depth. Use a contemplative, erudite voice that assumes highly educated readers who value beautiful writing and rigorous thinking equally. Focus on big questions about culture, science, politics, and the human condition with nuance, originality, and literary craft.",
   "targetAudience": "Educated general readers who value thoughtful, literary essays on culture, science, politics, and the arts",
   "editorStyle": "The Atlantic",
-  "editorLikes": "Educated, civically engaged readers who seek nuanced understanding of politics, culture, technology, and society"
+  "editorLikes": "Educated, civically engaged readers who seek nuanced understanding of politics, culture, technology, and society",
+  "keywordFilter": "Science, science, educated, general, readers, value, thoughtful, literary, essays, culture, politics, arts"
  },
  {
   "name": "Fast Company",
@@ -1169,7 +1246,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "suggestedTypes": "\"Lessons learned\" style framing for buzzy/major companies - a feeling of an insider look at a well-known company and how things work there. Examples of past FC stories like this: - What Airbnb learned after a year of letting employees work from anywhere - How Shopify's anti-meeting, anti-mandatory-office experiment is going - What Zoom learned from bringing employees back to the office Deeply reported workplace trend pieces Examples of past FC stories: - The Slack generation can't communicate with the email generation. Why more platforms are dividing the workplace - The mass exodus of tech's DEI leaders is now underway - Gen Z workers are changing what it means to network Freelancers: Do you have ideas about workplace culture, leadership and hiring trends, careers, or equity and inclusion efforts? Pitch me! I'm always looking for new writers fo @FastCoWorkLife. Rates start at $400+ for reported articles. jherbst@fastcompany.com.",
   "columnIdea": "Leadership Stories and funnel to my coaching leadership business",
   "classification": "Freelance - Pay Per Article",
-  "niche": "[\"Business\",\"Entrepreneur\",\"Finance\"]"
+  "niche": "[\"Business\",\"Entrepreneur\",\"Finance\"]",
+  "keywordFilter": "All Topics, topics, career, business, topic, that's, how-to, based, reported, articles"
  },
  {
   "name": "Matador Network",
@@ -1188,7 +1266,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "applicationForm": "Form: https://www.moretoherstory.com/pitch",
   "website": "https://moretoherstory.com",
   "payMax": 300,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=moretoherstory.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=moretoherstory.com",
+  "keywordFilter": "Women's Topics, women's, topics"
  },
  {
   "name": "MyHealthTeam",
@@ -1198,7 +1277,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "applicationForm": "Medical: https://docs.google.com/forms/d/e/1FAIpQLScBYjxkhrG8u0na7xAbJvDH9k9gPxp39QQGpNlpvHirCzpthQ/viewform",
   "website": "https://docs.google.com",
   "payMax": 300,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com",
+  "keywordFilter": "Health, health"
  },
  {
   "name": "National Wildlife",
@@ -1210,7 +1290,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.nwf.org/Magazines/National-Wildlife/Pitch-Guide",
   "website": "https://nwf.org",
   "payMax": 250,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=nwf.org"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=nwf.org",
+  "keywordFilter": "Nature, nature, type, article, long, relates"
  },
  {
   "name": "Business Insider Lifestyle & EntertainmentDeep sea",
@@ -1229,7 +1310,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "frequency": "weekly",
   "targetAudience": "Business professionals, entrepreneurs",
   "topics": "https://docs.google.com/document/d/1JhK6-UCAjNSrup6iGCagUc4WpAoynewCv96qlGlkl1w/edit?tab=t.0 Sample Ideas for stories freelancers to source: Big Ideas/Personal Essay topics: People sharing their salary journeys Lottery winners or people who come in big sums of money suddenly People who invested their way out of the 9-to-5 Parenting and workaholics — how long hours impacts relationships and kids Comparision stories: I worked at TK Big Tech companies, TK consulting firms, VC firms, I lived in Tk big cities/countries here’s how they compare As told to 600-800 words, please send potential sources/interviewees for these ideas to kfields@insider.com Sources should be comfortable presenting their stories in the “as-told-to” format. Top Priority: I worked for Cascade Investments, Bill Gates’ investment firm. Here’s what it was like I worked in recruitment in NYC. It was a crazy, party machine. I gave up my pension to move abroad it was/wasn’t worth it. I bought a house, and it’s quickly losing value/has been destroyed by climate-change-fueled natural disasters. I’m the breadwinner of my family. Here’s how it impacts my relationship with my partner. I worked with Bob Iger/ at Disney during the Iger/Chapak rivalry. This is what it was like. I’m a Gen Z/millennial and my parents still do TK things for me (pay bills, pay rent, buy big ticket items). It’s a big help/makes me feel like an adult kid. People who have built their dream house cheaply aboard (Thailand, the Philippines, Mexico) Someone who works at a data center or lives near one about the industry impacts their lives/community Wealth advisors or consultants with ultrawealthy clients (Golden visa advisors, property advisors) who can give insights into the money habits of their clients Someone who was offered a promotion at a corporate job and turned it down because they were happy with their role and didn't want to work more/be a manager A millennial who bought a business from its boomer owners to run themselves Someone who has successfully retired early or tried to retire early and struggled/failed A Gen Z running a successful Airbnb business I work on a luxury yacht/exclusive hotel/spa. Here’s what my job is like. Business success stories, business topics in the news, interesting business models, making money online",
-  "website": "https://www.businessinsider.com"
+  "website": "https://www.businessinsider.com",
+  "keywordFilter": "https, docs, google, com/document/d/, jhk, ucajnsrup, igcaguc, wpaoynewcv, qlglkl, w/edit, tab, sample, ideas, stories"
  },
  {
   "name": "East End Taste",
@@ -1243,7 +1325,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write with sophisticated localism that celebrates Hamptons dining and culture through insider knowledge and seasonal awareness. Adopt an elegant, lifestyle-focused tone that appeals to affluent readers seeking authentic local experiences beyond tourist traps, emphasizing chef profiles, seasonal ingredients, and cultural events. Balance aspiration with accessibility, writing for both full-time residents and discerning visitors.",
   "targetAudience": "Food and lifestyle enthusiasts in the Hamptons and East End of Long Island seeking local dining, events, and cultural experiences",
   "editorStyle": "Eating Well",
-  "editorLikes": "Health-conscious eaters who want delicious food that also supports wellbeing — not dieters, but people who love food and health equally"
+  "editorLikes": "Health-conscious eaters who want delicious food that also supports wellbeing — not dieters, but people who love food and health equally",
+  "keywordFilter": "Lifestyle, lifestyle, food, enthusiasts, hamptons, east, end, long, island, seeking, local, dining, events, cultural, experiences"
  },
  {
   "name": "Late Checkout",
@@ -1255,7 +1338,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://docs.google.com/document/d/1VkBxIpyYkFrs6TyVkdIenmOpuwZy1wLhjW5qEaxZJhk/edit?tab=t.0",
   "website": "https://docs.google.com",
   "payMax": 150,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com",
+  "keywordFilter": "Lifestyle, lifestyle, type, article, long, relates"
  },
  {
   "name": "The Kitchn",
@@ -1268,7 +1352,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write warm, encouraging cooking content that makes home cooking feel achievable and joyful for cooks at all skill levels. Use a friendly, kitchen-table conversational tone with clear, tested instructions and practical tips that solve real cooking challenges. Focus on approachable recipes, kitchen organization, and food culture that celebrates the everyday pleasure of cooking at home.",
   "targetAudience": "Home cooks of all skill levels who want practical, approachable cooking and kitchen content",
   "editorStyle": "The Nation",
-  "editorLikes": "Progressive readers, activists, and politically engaged citizens interested in social justice, labor, civil rights, and holding power accountable"
+  "editorLikes": "Progressive readers, activists, and politically engaged citizens interested in social justice, labor, civil rights, and holding power accountable",
+  "keywordFilter": "home, cooks, skill, levels, want, practical, approachable, cooking, kitchen, content"
  },
  {
   "name": "SUCCESS",
@@ -1278,7 +1363,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "applicationForm": "Form (News Writers): https://docs.google.com/forms/d/e/1FAIpQLSe2LLmxp7YelF03XCGlLiQHwxsc6KfJPTnYGLuHqPDY5RsKGg/viewform",
   "website": "https://docs.google.com",
   "payMax": 100,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com",
+  "keywordFilter": "All Topics, topics"
  },
  {
   "name": "Noema",
@@ -1301,7 +1387,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://static.usatoday.com/submitcolumn/ and https://www.usatoday.com/story/opinion/2016/09/29/submission-guidelines-usatoday-opinion-column-oped-howto-letters-editor/89964600/",
   "website": "https://static.usatoday.com",
   "payMax": 4,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=static.usatoday.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=static.usatoday.com",
+  "keywordFilter": "All Topics, topics, type, article, topic"
  },
  {
   "name": "Bon Appetit",
@@ -1314,7 +1401,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "website": "https://bonappetit.com",
   "applicationForm": "Lifestyle and food: https://docs.google.com/forms/d/e/1FAIpQLSeNMWfbQtLilewU3tK444WdaicO0l0JexR2yUEV6G84GBQwHw/viewform",
   "payMax": 3,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=bonappetit.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=bonappetit.com",
+  "keywordFilter": "Food, food, eating, resturants, reciepes, travel, type, article"
  },
  {
   "name": "MIT Technology Review",
@@ -1327,7 +1415,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "website": "https://technologyreview.com",
   "payMax": 3,
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=technologyreview.com",
-  "editorStyle": "How to pitch MIT Technology Review MIT Technology Review welcomes pitches from freelance writers across a broad range of topics. We encourage writers of all skill levels, and from all backgrounds, to pitch us. We are especially interested in hearing from writers with backgrounds that are traditionally under-represented in technology and science journalism, and from outside the United States. This guide will give you a brief overview of the kinds of stories we run, what we’re looking for in a pitch, and who to contact when you have an idea. Most of the stories that MIT Technology Review commissions come from pitches, but we do reach out to writers with assignments. We also issue a bi-monthly call for pitches for the print magazine. If you’d like to be considered for assignments and be informed of calls for pitches, you can fill out this form to be added to our database of freelance journalists. What is an MIT Technology Review story? MIT Technology Review publishes a wide range of stories, from breaking news to long-term investigations. We want stories about technology itself, but we’re particularly excited about those areas where technology and humans collide—where technology meets the real world. Our stories should feel like must-reads for people who want to stay up to date with how technology is changing our world. In general, we commission news stories (generally 800-1,000 words), analysis pieces (800-1,000 words), and features (2,500-4,000 words) from freelancers for the website. The print magazine offers other potential formats for stories in addition to news and features, including infographics and data spreads, essays, short profiles, and book reviews. If you are an expert interested in writing an op-ed for the magazine, you can find more information on the op-ed pitching and writing process here. What makes a good MIT Technology Review pitch? A pitch does not need to be long, but it should contain enough information to give the commissioning editor a good sense of what the end product would look like. A good pitch will tell us why our readers should care about your idea and why they should be reading about it now. It should also show how you (the writer) will make the story an enjoyable read. In general, there has to be a sense of urgency and a clear top line. Pitching to write about a topic isn’t enough: What is the story you’re going to tell us? What kind of take-away should readers have? One way to do this is to think about what the headline might be. You can look at our site to get a sense of how we write our headlines (for example, we generally avoid formulating headlines as questions). Please check to see if we have published similar stories recently. If it is an idea that hasn’t been covered by us but has been covered well by other outlets, explain how your story would stand apart. And if you have not written for MIT Technology Review before, be sure to introduce yourself and include links to a few relevant clips if you have them. News and analysis stories If you’re pitching a news story about a scientific or technological development, be sure to make clear why this advance (if it is an advance) is important and not just incremental. It can’t be significant only to researchers in the field: it has to be important to people in general. They should be able to read the story and instantly get a sense as to why it’s a big deal. In addition to straight news stories, we sometimes commission analysis pieces from freelance writers (examples here, here and here) that look at the news of the day through a new lens, adding context, insight, or new information to take the story forward. We’d want a quick pitch (and a quick turnaround) for such analysis pieces. Summing up what is already out there isn’t enough; you need to tell us what the new thing is you’re bringing to the story. What do people not know? What are the consequences of the event that many of our readers will be unaware of—but would be fascinated to learn about? Features and essays Features can take a wide range of possible approaches, including profiles, narrative features, and deep investigations. Ultimately, readers should enjoy reading them. So your pitch should not only explain what the story is and why it is important but show how you’d tell it in a compelling way. Feature pitches should have a specific story to tell—it is not enough to pitch an interesting topic. You must explain what kind of approach you’d take, what kind of ride you’ll take readers on. Who are the main characters? What obstacles or challenges will they meet on the way? How might your story resolve? What is the nut graf? We don’t expect you to have everything worked out in advance of reporting and writing the story, but the pitch should be able to give a sense of where the story will go. Similarly, pitches for essays need a clear argument. Explain what you want to say about the topic in hand, why you're qualified to write about it, what take-aways you hope to give readers, and the evidence you will marshal to make your case. Pitching for print MIT Technology Review publishes a bi-monthly print magazine. We run short news stories and profiles (500-800 words), op-eds, and data spreads in the front of the book and essays and book reviews in the back of the book (usually around 2000 words). The feature well of the magazine is devoted to narrative features, investigations, big profiles, and reported essays (generally between 2500-4000 words). Our features in each issue are centered around a theme. Here are the upcoming themes for 2025. Please note that specific pitch deadlines will be announced over e-mail. You can add yourself to the freelance database through the form linked at the top of this page to get the official call for pitches for each issue: • Jan/Feb: Breakthroughs [includes our annual round-up of high-impact innovations, pitches due late July/early August 2024] • March/April: Relationships [pitches due mid Sept 2024] • May/June: Creativity [pitches due mid-to-late November 2024] • July/August: Power [pitches due mid-to-late Jan 2025] • Sept/Oct: Security [pitches due mid-to-late March 2025] • Nov/Dec: The Body [pitches due mid-to-late May 2025] How much does MIT Technology Review pay? Rates range from $1 to $2 per word, depending on the experience level of the writer, the story, and the publication route. Deeply reported features pay more than shorter news pieces. Who do I pitch to? If you have any questions or if you are ready to send a pitch, please reach out to commissioning editor Rachel Courtland (rachel.courtland@technologyreview.com). Please be sure to include “PITCH” in the subject line of your email. We prefer pitches to be within the body of an e-mail instead of as an attachment."
+  "editorStyle": "How to pitch MIT Technology Review MIT Technology Review welcomes pitches from freelance writers across a broad range of topics. We encourage writers of all skill levels, and from all backgrounds, to pitch us. We are especially interested in hearing from writers with backgrounds that are traditionally under-represented in technology and science journalism, and from outside the United States. This guide will give you a brief overview of the kinds of stories we run, what we’re looking for in a pitch, and who to contact when you have an idea. Most of the stories that MIT Technology Review commissions come from pitches, but we do reach out to writers with assignments. We also issue a bi-monthly call for pitches for the print magazine. If you’d like to be considered for assignments and be informed of calls for pitches, you can fill out this form to be added to our database of freelance journalists. What is an MIT Technology Review story? MIT Technology Review publishes a wide range of stories, from breaking news to long-term investigations. We want stories about technology itself, but we’re particularly excited about those areas where technology and humans collide—where technology meets the real world. Our stories should feel like must-reads for people who want to stay up to date with how technology is changing our world. In general, we commission news stories (generally 800-1,000 words), analysis pieces (800-1,000 words), and features (2,500-4,000 words) from freelancers for the website. The print magazine offers other potential formats for stories in addition to news and features, including infographics and data spreads, essays, short profiles, and book reviews. If you are an expert interested in writing an op-ed for the magazine, you can find more information on the op-ed pitching and writing process here. What makes a good MIT Technology Review pitch? A pitch does not need to be long, but it should contain enough information to give the commissioning editor a good sense of what the end product would look like. A good pitch will tell us why our readers should care about your idea and why they should be reading about it now. It should also show how you (the writer) will make the story an enjoyable read. In general, there has to be a sense of urgency and a clear top line. Pitching to write about a topic isn’t enough: What is the story you’re going to tell us? What kind of take-away should readers have? One way to do this is to think about what the headline might be. You can look at our site to get a sense of how we write our headlines (for example, we generally avoid formulating headlines as questions). Please check to see if we have published similar stories recently. If it is an idea that hasn’t been covered by us but has been covered well by other outlets, explain how your story would stand apart. And if you have not written for MIT Technology Review before, be sure to introduce yourself and include links to a few relevant clips if you have them. News and analysis stories If you’re pitching a news story about a scientific or technological development, be sure to make clear why this advance (if it is an advance) is important and not just incremental. It can’t be significant only to researchers in the field: it has to be important to people in general. They should be able to read the story and instantly get a sense as to why it’s a big deal. In addition to straight news stories, we sometimes commission analysis pieces from freelance writers (examples here, here and here) that look at the news of the day through a new lens, adding context, insight, or new information to take the story forward. We’d want a quick pitch (and a quick turnaround) for such analysis pieces. Summing up what is already out there isn’t enough; you need to tell us what the new thing is you’re bringing to the story. What do people not know? What are the consequences of the event that many of our readers will be unaware of—but would be fascinated to learn about? Features and essays Features can take a wide range of possible approaches, including profiles, narrative features, and deep investigations. Ultimately, readers should enjoy reading them. So your pitch should not only explain what the story is and why it is important but show how you’d tell it in a compelling way. Feature pitches should have a specific story to tell—it is not enough to pitch an interesting topic. You must explain what kind of approach you’d take, what kind of ride you’ll take readers on. Who are the main characters? What obstacles or challenges will they meet on the way? How might your story resolve? What is the nut graf? We don’t expect you to have everything worked out in advance of reporting and writing the story, but the pitch should be able to give a sense of where the story will go. Similarly, pitches for essays need a clear argument. Explain what you want to say about the topic in hand, why you're qualified to write about it, what take-aways you hope to give readers, and the evidence you will marshal to make your case. Pitching for print MIT Technology Review publishes a bi-monthly print magazine. We run short news stories and profiles (500-800 words), op-eds, and data spreads in the front of the book and essays and book reviews in the back of the book (usually around 2000 words). The feature well of the magazine is devoted to narrative features, investigations, big profiles, and reported essays (generally between 2500-4000 words). Our features in each issue are centered around a theme. Here are the upcoming themes for 2025. Please note that specific pitch deadlines will be announced over e-mail. You can add yourself to the freelance database through the form linked at the top of this page to get the official call for pitches for each issue: • Jan/Feb: Breakthroughs [includes our annual round-up of high-impact innovations, pitches due late July/early August 2024] • March/April: Relationships [pitches due mid Sept 2024] • May/June: Creativity [pitches due mid-to-late November 2024] • July/August: Power [pitches due mid-to-late Jan 2025] • Sept/Oct: Security [pitches due mid-to-late March 2025] • Nov/Dec: The Body [pitches due mid-to-late May 2025] How much does MIT Technology Review pay? Rates range from $1 to $2 per word, depending on the experience level of the writer, the story, and the publication route. Deeply reported features pay more than shorter news pieces. Who do I pitch to? If you have any questions or if you are ready to send a pitch, please reach out to commissioning editor Rachel Courtland (rachel.courtland@technologyreview.com). Please be sure to include “PITCH” in the subject line of your email. We prefer pitches to be within the body of an e-mail instead of as an attachment.",
+  "keywordFilter": "Tech, tech, topics, preferred, articles, reported, news-pegged, features, profiles, accepted"
  },
  {
   "name": "Strategy & Business Magazine",
@@ -1339,7 +1428,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.strategy-business.com/press/writers",
   "website": "https://strategy-business.com",
   "payMax": 3,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=strategy-business.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=strategy-business.com",
+  "keywordFilter": "Business, business, type, article, long, relates"
  },
  {
   "name": "AARP",
@@ -1355,7 +1445,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write empowering, practical content for adults 50+ that treats aging as an active, engaged phase of life full of possibility. Use a respectful, optimistic tone that never condescends, focusing on health, finance, work, and lifestyle strategies that help readers thrive in their later years. Emphasize agency, purpose, and continued growth while addressing real concerns about retirement, health, and financial security.",
   "targetAudience": "Retirees, seniors 50+, pre-retirees planning their next chapter",
   "editorStyle": "AFAR",
-  "editorLikes": "Culturally curious, experiential travelers who prioritize meaningful journeys over tourist checklists"
+  "editorLikes": "Culturally curious, experiential travelers who prioritize meaningful journeys over tourist checklists",
+  "keywordFilter": "All Topics, topics, work, money, investments, savings, retirement, job, issues, health, fitness, tips, trends, studies, food"
  },
  {
   "name": "Discover Magazine",
@@ -1371,7 +1462,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write engaging science journalism that makes complex research accessible and exciting for curious general readers without scientific backgrounds. Use narrative storytelling and vivid explanations that capture the wonder of scientific discovery while maintaining accuracy, always connecting research to everyday life and big questions. Focus on the 'wow factor' of science while respecting readers' intelligence.",
   "targetAudience": "Science-curious general readers who want to understand breakthroughs without needing a PhD",
   "editorStyle": "Douglas Business Magazine",
-  "editorLikes": "Business leaders and entrepreneurs on Vancouver Island and in British Columbia"
+  "editorLikes": "Business leaders and entrepreneurs on Vancouver Island and in British Columbia",
+  "keywordFilter": "Science and Tech, science, tech, type, article, long, relates, science-curious, general, readers, want, understand, breakthroughs, without, needing"
  },
  {
   "name": "FinanceBuzz",
@@ -1385,7 +1477,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write practical personal finance content that helps budget-conscious consumers save money, earn rewards, and make smart financial decisions. Use a friendly, accessible tone that demystifies finance without talking down, focusing on actionable tips, product comparisons, and money-saving strategies. Structure content with clear takeaways and specific recommendations that readers can implement immediately.",
   "targetAudience": "Budget-conscious consumers looking for smart money moves, credit card strategies, and ways to save and earn more",
   "editorStyle": "Fodor's Travel",
-  "editorLikes": "Trip planners and travelers seeking reliable, detailed, and trustworthy destination guidance"
+  "editorLikes": "Trip planners and travelers seeking reliable, detailed, and trustworthy destination guidance",
+  "keywordFilter": "Finance, finance, budget-conscious, consumers, looking, smart, money, moves, credit, card, strategies, ways, save, earn"
  },
  {
   "name": "Gizmodo",
@@ -1397,7 +1490,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://gizmodo.com/how-to-pitch-gizmodo-and-io9-1819155900",
   "website": "https://gizmodo.com",
   "payMax": 2,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=gizmodo.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=gizmodo.com",
+  "keywordFilter": "Tech and Science, tech, science, type, article, long, relates"
  },
  {
   "name": "New Scientist",
@@ -1410,7 +1504,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write accessible science journalism that explains cutting-edge research and discoveries for educated general readers without requiring specialized knowledge. Use clear, engaging prose that captures the excitement of scientific discovery while maintaining accuracy and nuance, always explaining methodology and limitations. Focus on the 'so what' of research, connecting findings to broader implications for understanding our world.",
   "targetAudience": "Science enthusiasts and professionals seeking in-depth coverage of scientific discoveries, technology, and the environment",
   "editorStyle": "New York Post",
-  "editorLikes": "New York-centric general audience that wants news fast, entertaining, and with attitude"
+  "editorLikes": "New York-centric general audience that wants news fast, entertaining, and with attitude",
+  "keywordFilter": "science, enthusiasts, professionals, seeking, in-depth, coverage, scientific, discoveries, technology, environment"
  },
  {
   "name": "Playboy",
@@ -1422,7 +1517,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "No official submissions page.",
   "website": "https://x.com",
   "payMax": 2,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=x.com",
+  "keywordFilter": "All Topics, topics, type, article, long, relates, men"
  },
  {
   "name": "Science dot org",
@@ -1434,7 +1530,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.science.org/content/page/freelancer-guidelines",
   "website": "https://science.org",
   "payMax": 2,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=science.org"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=science.org",
+  "keywordFilter": "Science and Tech, science, tech, type, article, long, relates"
  },
  {
   "name": "Scientific American",
@@ -1446,7 +1543,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.scientificamerican.com/page/submission-instructions/",
   "website": "https://scientificamerican.com",
   "payMax": 2,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=scientificamerican.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=scientificamerican.com",
+  "keywordFilter": "Science and Tech, science, tech, type, article, long, relates"
  },
  {
   "name": "The Economist",
@@ -1458,7 +1556,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.economist.com/1843/2021/08/15/pitching-guidelines",
   "website": "https://economist.com",
   "payMax": 2,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=economist.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=economist.com",
+  "keywordFilter": "Finance, finance, business, careers, preferred, articles, reported, news-pegged, features, profiles, accepted"
  },
  {
   "name": "The Washington Post",
@@ -1472,7 +1571,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write investigative, accountability journalism that holds power to account with rigorous reporting and democratic values. Use clear, authoritative prose that serves informed readers seeking depth and context, always emphasizing original reporting and source development. Focus on politics, policy, and investigations that reveal truth and serve democracy with journalistic excellence.",
   "targetAudience": "Politically informed, educated readers who value investigative journalism and accountability reporting",
   "editorStyle": "ThrillList",
-  "editorLikes": "Young, adventurous travelers and foodies interested in local culture, hidden gems, and pop culture"
+  "editorLikes": "Young, adventurous travelers and foodies interested in local culture, hidden gems, and pop culture",
+  "keywordFilter": "All Topics, topics, politically, informed, educated, readers, value, investigative, journalism, accountability, reporting"
  },
  {
   "name": "Wine Enthusiast",
@@ -1497,7 +1597,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write regionally focused business journalism for Atlantic Canada's business community, profiling local entrepreneurs and analyzing regional economic trends. Use straightforward, professional prose that serves business leaders seeking intelligence about their market, always emphasizing local success stories and challenges. Focus on the unique business landscape of Atlantic Canada with community connection and regional expertise.",
   "targetAudience": "Business leaders, entrepreneurs, and professionals in Atlantic Canada",
   "editorStyle": "Azure",
-  "editorLikes": "Architects, designers, and design-enthusiasts interested in cutting-edge architecture, interiors, and design culture"
+  "editorLikes": "Architects, designers, and design-enthusiasts interested in cutting-edge architecture, interiors, and design culture",
+  "keywordFilter": "Business, business, topics, focus, relevance, canada, leaders, entrepreneurs, professionals, atlantic"
  },
  {
   "name": "AzureRoad",
@@ -1536,7 +1637,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.pageonepublishing.ca/submission-guidelines/",
   "website": "https://pageonepublishing.ca",
   "payMax": 1,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=pageonepublishing.ca"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=pageonepublishing.ca",
+  "keywordFilter": "Business, business, topics, focus, relevance, canada"
  },
  {
   "name": "EDTECH",
@@ -1548,7 +1650,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://edtechdigest.blog/about-us/submissions/",
   "website": "https://edtechdigest.blog",
   "payMax": 1,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=edtechdigest.blog"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=edtechdigest.blog",
+  "keywordFilter": "Education, education, type, article, long, relates"
  },
  {
   "name": "Foreign Policy",
@@ -1558,7 +1661,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "applicationForm": "Politics: https://foreignpolicy.submittable.com/submit",
   "website": "https://foreignpolicy.submittable.com",
   "payMax": 1,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=foreignpolicy.submittable.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=foreignpolicy.submittable.com",
+  "keywordFilter": "Politics, politics"
  },
  {
   "name": "Hims & Hers",
@@ -1580,7 +1684,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write vulnerable, unfiltered content about mental health, relationships, and personal growth that breaks through social media facades. Use a raw, authentic tone that validates difficult emotions and experiences without toxic positivity, always prioritizing honesty over inspiration. Focus on real struggles, mental health challenges, and the messy reality of self-growth with radical authenticity.",
   "targetAudience": "Readers seeking authentic, unfiltered conversations about mental health, relationships, self-growth, and life's challenges",
   "editorStyle": "Huffington Post",
-  "editorLikes": "General readers interested in parenting, family, relationships, lifestyle, and commerce"
+  "editorLikes": "General readers interested in parenting, family, relationships, lifestyle, and commerce",
+  "keywordFilter": "readers, seeking, authentic, unfiltered, conversations, mental, health, relationships, self-growth, life's, challenges"
  },
  {
   "name": "International Living",
@@ -1620,7 +1725,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write sharp, media-savvy cultural criticism with an insider's perspective on the creator economy and digital culture, using a knowing, slightly cynical tone. Deliver hot takes and analysis that cuts through industry hype with wit and specificity, speaking to readers who are both participants in and critics of internet culture. Balance snark with substance, offering genuine insight beneath the clever observations.",
   "targetAudience": "Media-savvy readers interested in culture, media criticism, and sharp takes on the creator economy and digital life",
   "editorStyle": "Oprah Daily",
-  "editorLikes": "Personal growth seekers, business professionals, women focused on self-improvement and empowerment"
+  "editorLikes": "Personal growth seekers, business professionals, women focused on self-improvement and empowerment",
+  "keywordFilter": "media-savvy, readers, interested, culture, media, criticism, sharp, takes, creator, economy, digital, life"
  },
  {
   "name": "Questrade",
@@ -1645,7 +1751,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write wholesome, uplifting content that celebrates everyday heroes, practical wisdom, and heartwarming human interest stories for mainstream American families. Use clear, accessible prose with moral clarity and optimism, always emphasizing universal values of kindness, perseverance, and community. Focus on inspiring true stories, helpful tips, and gentle humor that appeals across generations.",
   "targetAudience": "Mainstream American families who enjoy heartwarming stories, practical advice, health tips, and humor",
   "editorStyle": "Real Simple",
-  "editorLikes": "Busy women seeking to simplify their lives — home, food, beauty, health, and time management"
+  "editorLikes": "Busy women seeking to simplify their lives — home, food, beauty, health, and time management",
+  "keywordFilter": "Lifestyle, lifestyle, type, article, long, relates, mainstream, american, families, enjoy, heartwarming, stories, practical, advice, health"
  },
  {
   "name": "Rest of the World",
@@ -1657,7 +1764,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://docs.google.com/document/d/19ZLDzw2II1RM_5fxD6dw658gJlggqHbtqrpYeMWqFgU/edit?tab=t.0",
   "website": "https://docs.google.com",
   "payMax": 1,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com",
+  "keywordFilter": "All Topics, topics, type, article, long, it's, feature"
  },
  {
   "name": "RUNHER",
@@ -1670,7 +1778,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write empowering running content specifically for women runners, addressing training, nutrition, and community with gender-specific expertise. Use an encouraging, knowledgeable tone that treats women as serious athletes while addressing their unique physiological and cultural experiences. Focus on running-specific advice, training plans, and the community aspects of women's running with authority and support.",
   "targetAudience": "Women runners of all levels — from beginners to competitive athletes — seeking running-specific fitness, nutrition, and community content",
   "editorStyle": "Scary Mommy",
-  "editorLikes": "Parents (especially moms) who are over the Pinterest-perfect parenting facade and want real, funny, honest content"
+  "editorLikes": "Parents (especially moms) who are over the Pinterest-perfect parenting facade and want real, funny, honest content",
+  "keywordFilter": "women, runners, levels, beginners, competitive, athletes, seeking, running-specific, fitness, nutrition, community, content"
  },
  {
   "name": "Senior Planet",
@@ -1686,7 +1795,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write empowering technology and lifestyle content for older adults that treats aging as an opportunity for continued growth and engagement. Use a respectful, encouraging tone that never condescends, focusing on practical tech tutorials, social connection, and active aging strategies. Emphasize digital literacy, community building, and the possibilities of later life with optimism and practical guidance.",
   "targetAudience": "Older adults 60+ who are tech-curious, active, and committed to aging well in the modern world",
   "editorStyle": "Slate",
-  "editorLikes": "Educated, progressive-leaning readers who enjoy sharp analysis, contrarian takes, and cultural commentary"
+  "editorLikes": "Educated, progressive-leaning readers who enjoy sharp analysis, contrarian takes, and cultural commentary",
+  "keywordFilter": "Seniors, seniors, type, article, long, relates, older, adults, tech-curious, active, committed, aging, well, modern, world"
  },
  {
   "name": "Spirituality and Health Magazine",
@@ -1702,7 +1812,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write contemplative, holistic content that explores the intersection of spiritual practice, mindfulness, and physical wellbeing with openness and depth. Use a gentle, inclusive tone that respects diverse spiritual traditions while providing practical guidance for mindful living and personal growth. Focus on practices, wisdom traditions, and the mind-body-spirit connection with reverence and accessibility.",
   "targetAudience": "Seekers exploring the intersection of spiritual practice, holistic health, and mindful living",
   "editorStyle": "Strategy & Business Magazine",
-  "editorLikes": "Senior executives, management consultants, and corporate strategists at major organizations"
+  "editorLikes": "Senior executives, management consultants, and corporate strategists at major organizations",
+  "keywordFilter": "Spiritual, spiritual, type, article, long, relates, spirituality, seekers, exploring, intersection, practice, holistic, health, mindful, living"
  },
  {
   "name": "Stylist",
@@ -1718,7 +1829,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write smart, empowering content for UK women that blends fashion, career, culture, and feminism with contemporary British sensibility. Use a confident, conversational tone that treats readers as intelligent peers navigating modern womanhood, always emphasizing agency and authenticity. Focus on style as self-expression, career advancement, and cultural engagement with distinctly British perspective and humor.",
   "targetAudience": "UK-based women interested in fashion, beauty, career, culture, and living their best lives",
   "editorStyle": "SUCCESS Magazine",
-  "editorLikes": "Aspiring entrepreneurs, personal growth seekers, people building toward financial independence"
+  "editorLikes": "Aspiring entrepreneurs, personal growth seekers, people building toward financial independence",
+  "keywordFilter": "Lifestyle, lifestyle, type, article, long, relates, style, women, uk-based, interested, fashion, beauty, career, culture, living"
  },
  {
   "name": "The Hustle",
@@ -1732,7 +1844,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "payMax": 1,
   "logo": "https://www.google.com/s2/favicons?sz=128&domain=docs.google.com",
   "classification": "NOT WRITING FOR THEM",
-  "tier": "[\"Tier 1: Open Applications\"]"
+  "tier": "[\"Tier 1: Open Applications\"]",
+  "keywordFilter": "Business and Finance, business, finance, topics, style, article, relates"
  },
  {
   "name": "The Nation",
@@ -1744,7 +1857,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.thenation.com/submission-guidelines/",
   "website": "https://thenation.com",
   "payMax": 1,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thenation.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=thenation.com",
+  "keywordFilter": "Politics, politics, type, article, long, relates"
  },
  {
   "name": "The Telegraph",
@@ -1764,7 +1878,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "suggestedTypes": "Retirement planning, wellness in business for seniors",
   "targetAudience": "Retirees, senior citizens",
   "topics": "Finances, retirement, wellness in business, mental wellness, spiritual topics, living a good life",
-  "website": "https://www.aarp.org"
+  "website": "https://www.aarp.org",
+  "keywordFilter": "finances, retirement, wellness, business, mental, spiritual, topics, living, good, life, retirees, senior, citizens"
  },
  {
   "name": "BankRate",
@@ -1776,7 +1891,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write relatable, identity-focused content for young women navigating modern life, using a conversational tone that feels like talking to a smart friend. Focus on relationships, career, culture, and self-discovery with honesty and humor, always centering millennial and Gen Z women's experiences and perspectives. Use personal narrative, expert quotes, and cultural analysis that validates readers' lives and challenges.",
   "targetAudience": "Young women across BDG's network (Bustle, Elite Daily, Romper, etc.) interested in culture, relationships, career, and entertainment",
   "editorStyle": "Black Enterprise",
-  "editorLikes": "Black professionals, entrepreneurs, executives, and investors building generational wealth"
+  "editorLikes": "Black professionals, entrepreneurs, executives, and investors building generational wealth",
+  "keywordFilter": "young, women, bdg's, network, bustle, elite, daily, romper, etc, interested, culture, relationships, career, entertainment"
  },
  {
   "name": "Black Enterprise",
@@ -1788,7 +1904,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "submission": "https://www.blackenterprise.com/how-to-get-into-black-enterprise-pitch-the-right-editor/",
   "website": "https://blackenterprise.com",
   "payMax": 0,
-  "logo": "https://www.google.com/s2/favicons?sz=128&domain=blackenterprise.com"
+  "logo": "https://www.google.com/s2/favicons?sz=128&domain=blackenterprise.com",
+  "keywordFilter": "All Topics, topics, style, article, long, ties, back, people, color"
  },
  {
   "name": "CEO World",
@@ -1812,7 +1929,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "columnIdea": "talk about the intersection of a topic and Tech for regular career professionals NOT business or entrepreneurs",
   "niche": "[\"Tech\",\"Health\"]",
   "targetAudience": "career employees NOT ENTREPRENEURS OR BUSINESS",
-  "website": "https://www.cnet.com cnet.com/cnet-voices/"
+  "website": "https://www.cnet.com cnet.com/cnet-voices/",
+  "keywordFilter": "career, employees, entrepreneurs, business"
  },
  {
   "name": "Conde Naste Travel",
@@ -1825,7 +1943,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write insider marketing and media industry journalism that analyzes trends, technology, and business models with professional depth. Use industry-specific language that serves marketing executives and media professionals, always providing data, case studies, and strategic insights. Focus on digital advertising, content strategy, and media business transformation with authority and insider access.",
   "targetAudience": "Marketing professionals, CMOs, content strategists, ad industry insiders",
   "editorStyle": "DiningOut Magazine",
-  "editorLikes": "Foodies, restaurant-goers, and hospitality professionals interested in restaurant culture, dining trends, and chef stories"
+  "editorLikes": "Foodies, restaurant-goers, and hospitality professionals interested in restaurant culture, dining trends, and chef stories",
+  "keywordFilter": "marketing, professionals, cmos, content, strategists, industry, insiders"
  },
  {
   "name": "Digital Frontier",
@@ -1833,7 +1952,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorName": "Rohan Banerjee",
   "editorEmail": "rohan@digitalfrontier.com",
   "topics": "Would love to hear some culture-tech stories! Looking for freelance pitches on subjects where tech (not just AI) is changing the way we engage with arts, politics, sport and society. Hit me up on rohan@digitalfrontier.com",
-  "website": "https://digitalfrontier.com/about"
+  "website": "https://digitalfrontier.com/about",
+  "keywordFilter": "love, hear, some, culture-tech, stories, looking, freelance, pitches, subjects, where, tech, just, changing, way"
  },
  {
   "name": "EDTECH Magazine",
@@ -1841,7 +1961,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write practical, solutions-focused content that helps IT leaders and administrators make informed technology purchasing and implementation decisions. Use clear, jargon-free language that explains technical concepts accessibly while providing concrete case studies, ROI data, and actionable implementation strategies. Focus on real-world applications in K-12 and higher education settings with emphasis on measurable outcomes.",
   "targetAudience": "IT leaders, administrators, and educators in K-12 and higher education implementing technology solutions",
   "editorStyle": "Elle",
-  "editorLikes": "Fashion-forward, culturally engaged women who want style with substance"
+  "editorLikes": "Fashion-forward, culturally engaged women who want style with substance",
+  "keywordFilter": "leaders, administrators, educators, higher, education, implementing, technology, solutions"
  },
  {
   "name": "Entrepreneur Magazine",
@@ -1851,7 +1972,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorStyle": "Esquire",
   "editorLikes": "Educated, culturally engaged men interested in style, politics, culture, and ideas",
   "payAV": "$0.50/ word",
-  "website": "https://www.entrepreneur.com"
+  "website": "https://www.entrepreneur.com",
+  "keywordFilter": "entrepreneurs, startup, founders, small, business, owners, aspiring, builders"
  },
  {
   "name": "FenderBender",
@@ -1876,7 +1998,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write authoritative gaming journalism with expert reviews, industry analysis, and entertainment coverage that serves serious gamers. Use knowledgeable, enthusiast-level language that assumes gaming literacy while remaining accessible, always providing detailed analysis of gameplay, graphics, and game design. Focus on comprehensive reviews, industry news, and gaming culture with professional expertise and passion.",
   "targetAudience": "Gamers, gaming industry followers, and entertainment enthusiasts who want expert reviews and gaming culture coverage",
   "editorStyle": "Gizmodo",
-  "editorLikes": "Tech-savvy readers who are as interested in critiquing the tech industry as celebrating it"
+  "editorLikes": "Tech-savvy readers who are as interested in critiquing the tech industry as celebrating it",
+  "keywordFilter": "gamers, gaming, industry, followers, entertainment, enthusiasts, want, expert, reviews, culture, coverage"
  },
  {
   "name": "High Times",
@@ -1884,7 +2007,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write with irreverent authenticity and counterculture credibility, celebrating cannabis culture while providing serious industry analysis and advocacy journalism. Blend humor, personal narrative, and expert knowledge with a tone that's both rebellious and informed, speaking directly to enthusiasts who view cannabis as lifestyle, medicine, and social justice issue. Balance entertainment with education, never talking down to readers who are deeply knowledgeable about the plant.",
   "targetAudience": "Cannabis enthusiasts, advocates, industry professionals, and counterculture readers",
   "editorStyle": "Hims & Hers",
-  "editorLikes": "Millennials and Gen Z adults seeking approachable, stigma-free health and wellness content (dermatology, mental health, sexual health)"
+  "editorLikes": "Millennials and Gen Z adults seeking approachable, stigma-free health and wellness content (dermatology, mental health, sexual health)",
+  "keywordFilter": "cannabis, enthusiasts, advocates, industry, professionals, counterculture, readers"
  },
  {
   "name": "http://motley-bloom.com/",
@@ -1925,7 +2049,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "niche": "[\"Parenting\",\"News\",\"Relationships\"]",
   "topics": "family and relationhsip and go deep. EOL app can be the scenario to build on",
   "formToSubmit": "https://docs.google.com/forms/d/e/1FAIpQLSdVVTTGdo9CfZN4FUujM5hODF1RVsfTRvnguCB9QiXYnod8jw/viewform?fbzx=4427941639059578228",
-  "website": "https://www.huffpost.com"
+  "website": "https://www.huffpost.com",
+  "keywordFilter": "family, relationhsip, deep, eol, app, scenario, build"
  },
  {
   "name": "Inc.com",
@@ -1945,7 +2070,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "classification": "Columnist",
   "tier": "[\"Tier 1: Open Applications\"]",
   "niche": "[\"Business\",\"Leadership\"]",
-  "website": "https://www.inc.com"
+  "website": "https://www.inc.com",
+  "keywordFilter": "startup, founders, venture-backed, companies, tech, business, leaders, internet, marketers, online, hustlers"
  },
  {
   "name": "Life Hacker",
@@ -1968,7 +2094,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorName": "Abby Kass",
   "editorEmail": "akass@mcclatchy.com",
   "editorStyle": "Commerce and Content Editor",
-  "topics": "We're looking to add some #freelance writers to our commerce team at McClatchy. Right now, we're looking for writers with expertise in the following categories/beats: - Babies/Kids - Pets - Beauty If this is something you're interested in and think you'd be a good fit for any (or all!) of these categories, send me a DM or email me at akass@mcclatchy.com, and we can talk. #freelancing #freelancewriting #freelanceopportunity #commerce #shopping #writers"
+  "topics": "We're looking to add some #freelance writers to our commerce team at McClatchy. Right now, we're looking for writers with expertise in the following categories/beats: - Babies/Kids - Pets - Beauty If this is something you're interested in and think you'd be a good fit for any (or all!) of these categories, send me a DM or email me at akass@mcclatchy.com, and we can talk. #freelancing #freelancewriting #freelanceopportunity #commerce #shopping #writers",
+  "keywordFilter": "we're, looking, add, some, freelance, writers, commerce, team, mcclatchy, right, now, expertise, following, categories/beats"
  },
  {
   "name": "Mens Health",
@@ -1986,7 +2113,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "name": "Parenting Magazine",
   "payMax": 0,
   "topics": "Heres what you need to know. not HOW TO. just give the data and facts",
-  "website": "https://www.parents.com"
+  "website": "https://www.parents.com",
+  "keywordFilter": "heres, need, know, how, just, give, data, facts"
  },
  {
   "name": "Parents.com",
@@ -1998,7 +2126,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write with visceral enthusiasm for driving experiences, capturing the sensory details of being behind the wheel and the emotional connection between driver and machine. Use evocative, first-person narrative that makes readers feel the road, combined with knowledgeable vehicle analysis that goes beyond specs to explore driving character and automotive culture. Celebrate the romance of the open road while providing substantive reviews and travel inspiration.",
   "targetAudience": "Car enthusiasts and road trip lovers interested in driving culture, vehicle reviews, and the open-road lifestyle",
   "editorStyle": "Romper",
-  "editorLikes": "Millennial parents (especially mothers) navigating modern parenthood with honesty and humor"
+  "editorLikes": "Millennial parents (especially mothers) navigating modern parenthood with honesty and humor",
+  "keywordFilter": "car, enthusiasts, road, trip, lovers, interested, driving, culture, vehicle, reviews, open-road, lifestyle"
  },
  {
   "name": "Science.org",
@@ -2006,7 +2135,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "writingStyle": "Write rigorous scientific journalism for working scientists and researchers, maintaining the highest standards of accuracy and technical precision. Use discipline-specific language appropriately while making research accessible across scientific fields, always emphasizing methodology, peer review, and scientific consensus. Focus on breakthrough research, policy implications, and the scientific process itself with scholarly authority.",
   "targetAudience": "Working scientists, researchers, academics, and science policy professionals",
   "editorStyle": "Scientific American",
-  "editorLikes": "Scientifically literate general readers, researchers, science enthusiasts, and policy makers"
+  "editorLikes": "Scientifically literate general readers, researchers, science enthusiasts, and policy makers",
+  "keywordFilter": "working, scientists, researchers, academics, science, policy, professionals"
  },
  {
   "name": "Slate.com",
@@ -2051,7 +2181,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "niche": "[\"Lifestyle\",\"Food\",\"Parenting\",\"Personality\"]",
   "targetAudience": "Intellectuals, culture enthusiasts",
   "topics": "AI, interesting stories, success lessons, leadership, personal finance, spirituality in business topics",
-  "website": "https://www.newyorker.com"
+  "website": "https://www.newyorker.com",
+  "keywordFilter": "interesting, stories, success, lessons, leadership, personal, finance, spirituality, business, topics, intellectuals, culture, enthusiasts"
  },
  {
   "name": "ThrillList.com",
@@ -2059,7 +2190,8 @@ export const PUBLICATIONS: PubSeed[] = [
   "editorName": "Joe Erbentraut",
   "editorStyle": "Travel and other topics: https://x.com/robojojo/status/1775999343134126417",
   "niche": "[\"Travel\"]",
-  "topics": "pop culture"
+  "topics": "pop culture",
+  "keywordFilter": "pop, culture"
  },
  {
   "name": "Today Show",

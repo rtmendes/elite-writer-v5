@@ -74,6 +74,7 @@ const PUB_FIELD_DEFS: Array<{ key: string; name: string; type: Field["type"]; wi
   { key: "pay", name: "Pay Range", type: "text", width: 170 },
   { key: "payMax", name: "Pay Max ($)", type: "currency", width: 120 },
   { key: "topics", name: "Preferred Topics", type: "longtext", width: 300 },
+  { key: "keywordFilter", name: "Keyword Filter", type: "longtext", width: 280 },
   { key: "editors", name: "Best Editors to Pitch", type: "longtext", width: 300 },
   { key: "writingStyle", name: "Writing Style", type: "longtext", width: 320 },
   { key: "editorStyle", name: "Editor's Style", type: "longtext", width: 320 },
@@ -137,7 +138,7 @@ async function ensurePublications() {
 
   // Fresh install: build the full rich database
   if (!existing) {
-    if (await db.kv.get("seed:publications:v4")) return;
+    if (await db.kv.get("seed:publications:v5")) return;
     const now = Date.now();
     const { fields, byKey } = buildPubFields();
     const database: Database = {
@@ -162,13 +163,13 @@ async function ensurePublications() {
       await db.rows.add(row);
       void enqueue("rows", row.id, "upsert");
     }
-    await db.kv.put({ key: "seed:publications:v4", value: true });
+    await db.kv.put({ key: "seed:publications:v5", value: true });
     return;
   }
 
   // Upgrade path: a thin Publications table already exists (the 4-field seed).
   // Add missing fields, backfill empty cells, add new outlets — non-destructive.
-  if (await db.kv.get("seed:publications:v4")) return;
+  if (await db.kv.get("seed:publications:v5")) return;
   const fresh = (await db.databases.get(existing.id))!;
   const fieldByName = new Map(fresh.fields.map((f) => [f.name.toLowerCase(), f]));
   const addedFields: Field[] = [];
@@ -209,7 +210,7 @@ async function ensurePublications() {
       order++;
     }
   }
-  await db.kv.put({ key: "seed:publications:v4", value: true });
+  await db.kv.put({ key: "seed:publications:v5", value: true });
 }
 
 async function ensureClaimLedger() {
