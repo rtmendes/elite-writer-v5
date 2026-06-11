@@ -30,6 +30,12 @@ export const ENV = {
   // Supabase (for KB vector search / legacy data)
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  // R2 object storage (cover images & media — keeps base64 out of the DB)
+  r2AccountId: process.env.R2_ACCOUNT_ID ?? "",
+  r2AccessKeyId: process.env.R2_ACCESS_KEY_ID ?? "",
+  r2SecretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? "",
+  r2Bucket: process.env.R2_BUCKET ?? "elite-writer-media",
+  r2PublicUrl: process.env.R2_PUBLIC_URL ?? "", // e.g. https://media.insightprofit.live or the r2.dev URL
   // App config
   braveApiKey: process.env.BRAVE_API_KEY ?? "",
   activepiecesWebhook: process.env.ACTIVEPIECES_WEBHOOK_URL ?? "",

@@ -13,6 +13,7 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { ENV } from "../_core/env";
 import { invokeLLM } from "../_core/llm";
+import { uploadDataUrl } from "../_core/storage";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { AGENT_PERSONAS } from "./agents";
@@ -578,6 +579,15 @@ ${input.research || "(use the outline; mark anything needing reporting as [TK: .
       if (!url.includes("base64,")) throw new Error("No image returned");
       const cost = 0.003; // OpenRouter Gemini flash image ~ pennies
       void recordCentralCost("cover_image", "google/gemini-2.5-flash-image", 0, 0, cost, input.context);
-      return { dataUrl: url, cost };
+      // Offload to R2 so the DB stores a URL, not megabytes of base64. Falls
+      // back to the data URL if R2 isn't configured or the upload fails.
+      let stored = url;
+      try {
+        const uploaded = await uploadDataUrl(url, "covers");
+        if (uploaded) stored = uploaded;
+      } catch (err) {
+        console.warn("[cover] R2 upload failed, keeping data URL:", err instanceof Error ? err.message : err);
+      }
+      return { dataUrl: stored, cost, storage: stored === url ? "inline" : "r2" };
     }),
 });
