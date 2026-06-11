@@ -9,6 +9,7 @@ import { enqueue } from "./sync";
 import { autoFillFeeFromPublication } from "./finance";
 import { PUBLICATIONS } from "./publications-data";
 import { PUBLICATION_ENRICHMENT } from "./publication-enrichment";
+import { NEW_PUBLICATIONS, type NewPub } from "./new-publications";
 import type { Database, Field, Row, SelectOption } from "./types";
 
 const opt = (name: string, color: string): SelectOption => ({ id: uid(), name, color });
@@ -23,6 +24,7 @@ export function ensureIntelligence(): Promise<void> {
 }
 async function doEnsureIntelligence() {
   await ensurePublications();
+  await ensureNewPublications();
   await ensurePublicationEnrichment();
   await ensureBrands();
   await ensureRelations();
@@ -559,6 +561,58 @@ async function ensurePublicationEnrichment() {
   }
   await db.kv.put({ key: VERSION, value: true });
   if (applied) console.log(`[enrich] applied deep style to ${applied} publications`);
+}
+
+/** Insert new outlets (aviation, homesteading, ADHD) into the live Publications
+ *  table if not already present — covers beats the original 184 lacked. */
+async function ensureNewPublications() {
+  if (await db.kv.get("seed:new-pubs:v1")) return;
+  const pubs = (await db.databases.toArray()).find((d) => d.name === "Publications");
+  if (!pubs) return;
+  const fId = (n: string) => pubs.fields.find((f) => f.name.toLowerCase() === n.toLowerCase());
+  const nameId = pubs.fields[0].id;
+  const existing = new Set(
+    (await db.rows.where("dbId").equals(pubs.id).toArray()).map((r) => String(r.values[nameId] ?? "").trim().toLowerCase()),
+  );
+  const KEY_TO_FIELD: Array<[keyof NewPub, string]> = [
+    ["website", "Website"], ["pay", "Pay Range"], ["payMax", "Pay Max ($)"], ["wordCount", "Word Count"],
+    ["topics", "Preferred Topics"], ["writingStyle", "Writing Style"], ["editorStyle", "Editor's Style"],
+    ["editorLikes", "What Editor Likes"], ["doNotWrite", "Do NOT Write"], ["targetAudience", "Target Audience"],
+    ["submission", "Submission Info"], ["classification", "Classification"], ["tier", "Tier"],
+  ];
+  const catField = fId("Category");
+  const statusField = fId("Status");
+  let added = 0;
+  let order = Date.now();
+  for (const p of NEW_PUBLICATIONS) {
+    if (existing.has(p.name.trim().toLowerCase())) continue;
+    const values: Record<string, unknown> = { [nameId]: p.name };
+    // Category: reuse the option or add it to the select field
+    if (p.category && catField) {
+      let opt = catField.options?.find((o) => o.name.toLowerCase() === p.category!.toLowerCase());
+      if (!opt) {
+        opt = { id: uid(), name: p.category, color: "teal" };
+        const fresh = (await db.databases.get(pubs.id))!;
+        const cf = fresh.fields.find((f) => f.id === catField.id)!;
+        cf.options = [...(cf.options ?? []), opt];
+        await updateDatabase(pubs.id, { fields: fresh.fields });
+        catField.options = cf.options;
+      }
+      values[catField.id] = opt.id;
+    }
+    if (statusField) values[statusField.id] = statusField.options?.[0]?.id ?? null;
+    for (const [key, fname] of KEY_TO_FIELD) {
+      const f = fId(fname);
+      const v = p[key];
+      if (f && v !== undefined && v !== null && v !== "") values[f.id] = v;
+    }
+    const row: Row = { id: uid(), dbId: pubs.id, values, sortOrder: order++, createdAt: Date.now(), updatedAt: Date.now() };
+    await db.rows.add(row);
+    void enqueue("rows", row.id, "upsert");
+    added++;
+  }
+  await db.kv.put({ key: "seed:new-pubs:v1", value: true });
+  if (added) console.log(`[pubs] added ${added} new outlets (aviation/homesteading/ADHD)`);
 }
 
 async function ensureBrands() {
