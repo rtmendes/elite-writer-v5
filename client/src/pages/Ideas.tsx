@@ -51,6 +51,23 @@ export default function Ideas() {
   }).length;
 
   const [sortBy, setSortBy] = useState<'newest' | 'score' | 'title'>('newest');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelected = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const bulkDelete = () => {
+    selectedIds.forEach(id => {
+      const dbId = idMap.get(id);
+      if (dbId) deleteIdeaDb.mutate({ id: dbId });
+      deleteIdea(id);
+    });
+    toast.success(`${selectedIds.size} ideas deleted`);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  };
   const filtered = useMemo(() => {
     const list = state.ideas.filter(idea => {
       const matchesSearch = !searchQuery ||
@@ -244,6 +261,15 @@ export default function Ideas() {
           <option value="score">Score high→low</option>
           <option value="title">Title A→Z</option>
         </select>
+        <Button variant={selectMode ? 'default' : 'outline'} size="sm" className="h-7 text-xs"
+          onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}>
+          {selectMode ? 'Done' : 'Select'}
+        </Button>
+        {selectMode && selectedIds.size > 0 && (
+          <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={bulkDelete}>
+            Delete {selectedIds.size}
+          </Button>
+        )}
         <div className="flex gap-1.5 text-xs text-muted-foreground">
           {STATUSES.map(s => (
             <span key={s} className="flex items-center gap-0.5" title={STATUS_CONFIG[s].label}>
@@ -301,6 +327,12 @@ export default function Ideas() {
                       }`}
                     >
                       <div className="flex items-start gap-1.5">
+                        {selectMode && (
+                          <input type="checkbox" className="mt-0.5 shrink-0 accent-primary"
+                            checked={selectedIds.has(idea.id)}
+                            onChange={() => toggleSelected(idea.id)}
+                            onClick={e => e.stopPropagation()} />
+                        )}
                         <GripVertical className="w-3 h-3 text-muted-foreground/30 mt-0.5 shrink-0 group-hover:text-muted-foreground" />
                         <div className="flex-1 min-w-0">
                           <h4 className="text-xs font-medium leading-snug line-clamp-2">{idea.title}</h4>

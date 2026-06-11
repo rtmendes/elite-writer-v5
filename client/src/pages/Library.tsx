@@ -94,7 +94,13 @@ export default function ContentLibrary() {
 
   const resetSaveForm = () => { setSaveTitle(""); setSaveContent(""); setSaveTags(""); };
 
-  const contentItems = contentQuery.data || [];
+  const [sortBy, setSortBy] = useState<'newest' | 'title' | 'type'>('newest');
+  const contentItems = useMemo(() => {
+    const list = contentQuery.data || [];
+    if (sortBy === 'title') return [...list].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    if (sortBy === 'type') return [...list].sort((a, b) => (a.type || '').localeCompare(b.type || ''));
+    return list;
+  }, [contentQuery.data, sortBy]);
   const images = imagesQuery.data || [];
   const presets = presetsQuery.data || [];
 
@@ -139,6 +145,12 @@ export default function ContentLibrary() {
                   {CONTENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                className="h-9 text-xs rounded-md border border-input bg-background px-2" title="Sort">
+                <option value="newest">Newest</option>
+                <option value="title">Title A→Z</option>
+                <option value="type">Type</option>
+              </select>
               <Button onClick={() => setShowSaveDialog(true)}><Plus className="w-4 h-4 mr-1" />Save New</Button>
             </div>
 
