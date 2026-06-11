@@ -1,5 +1,5 @@
 import {
-  int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, decimal, boolean, bigint
+  int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, decimal, boolean, bigint, uniqueIndex
 } from "drizzle-orm/mysql-core";
 
 // ─── Core User ────────────────────────────────────────────
@@ -207,6 +207,22 @@ export const publications = mysqlTable("publications", {
 
 export type Publication = typeof publications.$inferSelect;
 export type InsertPublication = typeof publications.$inferInsert;
+
+// ─── AI usage ledger (server-side, aggregated per day+model) ─────────────
+export const aiUsage = mysqlTable(
+  "ai_usage",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    day: varchar("day", { length: 10 }).notNull(),
+    model: varchar("model", { length: 200 }).notNull(),
+    promptTokens: int("promptTokens").default(0).notNull(),
+    completionTokens: int("completionTokens").default(0).notNull(),
+    costMicros: bigint("costMicros", { mode: "number" }).default(0).notNull(),
+    calls: int("calls").default(0).notNull(),
+  },
+  (t) => [uniqueIndex("day_model_idx").on(t.day, t.model)]
+);
+export type AiUsage = typeof aiUsage.$inferSelect;
 
 // ─── Feeds (RSS + Email) ─────────────────────────────────
 export const feeds = mysqlTable("feeds", {
