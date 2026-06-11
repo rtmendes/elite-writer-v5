@@ -447,6 +447,8 @@ export default function Writer() {
           expertise_depth: Math.round((d.depth?.score || 50) / 10),
           readability: Math.round((d.structure?.score || 50) / 10),
           conclusion_cta: Math.round((d.seo?.score || 50) / 10),
+          reader_resonance: Math.round((d.reader_resonance?.score || 50) / 10),
+          editor_alignment: Math.round((d.editor_alignment?.score || 50) / 10),
           overall: Math.round((result.data.overall || 50) / 10),
         };
         setScores(aiScores);

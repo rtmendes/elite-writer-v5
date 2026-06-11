@@ -9,7 +9,8 @@ import { getScoringWeights, checkContentFilters, getEnhancementPrompt } from './
 const DIMENSIONS = [
   'clarity_structure', 'hook_engagement', 'voice_tone', 'data_evidence',
   'originality_angle', 'publication_fit', 'timeliness', 'actionability',
-  'expertise_depth', 'readability', 'conclusion_cta'
+  'expertise_depth', 'readability', 'conclusion_cta',
+  'reader_resonance', 'editor_alignment'
 ] as const;
 
 const DIMENSION_LABELS: Record<string, string> = {
@@ -24,6 +25,8 @@ const DIMENSION_LABELS: Record<string, string> = {
   expertise_depth: 'Expertise & Depth',
   readability: 'Readability',
   conclusion_cta: 'Conclusion & CTA',
+  reader_resonance: 'Reader Resonance',
+  editor_alignment: 'Editor Alignment',
 };
 
 export { DIMENSIONS, DIMENSION_LABELS };
@@ -137,6 +140,10 @@ export function scoreArticleLocally(content: string, targetPublication?: string)
     expertise_depth: Math.round(expertise * 10) / 10,
     readability: Math.round(readability * 10) / 10,
     conclusion_cta: Math.round(conclusion * 10) / 10,
+    // Local heuristics cannot see the reader avatar or editor preferences —
+    // blend voice + publication fit as a neutral proxy until AI scoring runs.
+    reader_resonance: Math.round(((voice + pubFit) / 2) * 10) / 10,
+    editor_alignment: Math.round(pubFit * 10) / 10,
   };
 
   // Calculate overall as weighted average — now uses publication-specific weights
@@ -146,13 +153,14 @@ export function scoreArticleLocally(content: string, targetPublication?: string)
         clarity_structure: 1, hook_engagement: 1.2, voice_tone: 1, data_evidence: 1.3,
         originality_angle: 1.1, publication_fit: 1.2, timeliness: 0.8, actionability: 0.9,
         expertise_depth: 1.1, readability: 1, conclusion_cta: 0.8,
+        reader_resonance: 1.2, editor_alignment: 1.2,
       };
 
   let weightedSum = 0;
   let totalWeight = 0;
   for (const dim of DIMENSIONS) {
     const w = weights[dim] ?? 1;
-    weightedSum += scores[dim] * w;
+    weightedSum += (scores[dim] ?? 0) * w;
     totalWeight += w;
   }
   scores.overall = Math.round((weightedSum / totalWeight) * 10) / 10;

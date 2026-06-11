@@ -57,6 +57,8 @@ export interface ArticleScores {
   expertise_depth: number;
   readability: number;
   conclusion_cta: number;
+  reader_resonance?: number;
+  editor_alignment?: number;
   suggestions?: { category: string; title: string; impact: number; action_items: string[] }[];
 }
 

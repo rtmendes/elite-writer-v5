@@ -197,6 +197,8 @@ export const publications = mysqlTable("publications", {
   notes: text("notes"),
   topics: json("topics"),
   tier: int("tier").default(2),
+  audienceAvatar: text("audienceAvatar"),
+  editorPreferences: text("editorPreferences"),
   responseTime: varchar("responseTime", { length: 100 }),
   templateData: json("templateData"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
