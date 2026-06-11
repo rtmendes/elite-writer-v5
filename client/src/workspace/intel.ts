@@ -8,6 +8,7 @@ import { createRow, db, makeView, uid, updateDatabase, updateRow } from "./db";
 import { enqueue } from "./sync";
 import { autoFillFeeFromPublication } from "./finance";
 import { PUBLICATIONS } from "./publications-data";
+import { PUBLICATION_ENRICHMENT } from "./publication-enrichment";
 import type { Database, Field, Row, SelectOption } from "./types";
 
 const opt = (name: string, color: string): SelectOption => ({ id: uid(), name, color });
@@ -22,6 +23,7 @@ export function ensureIntelligence(): Promise<void> {
 }
 async function doEnsureIntelligence() {
   await ensurePublications();
+  await ensurePublicationEnrichment();
   await ensureBrands();
   await ensureRelations();
   await ensureBrandRelations();
@@ -516,6 +518,48 @@ const BRAND_FIELD_DEFS: Array<{ name: string; type: Field["type"]; width: number
   { name: "Website", type: "url", width: 180 },
   { name: "Notes", type: "longtext", width: 260 },
 ];
+
+/** Apply deep style enrichment to the live Publications rows. Bump the kv
+ *  version (seed:pub-enrich:vN) when PUBLICATION_ENRICHMENT changes so a new
+ *  batch re-applies. Overwrites the style fields because curated data > swipe. */
+async function ensurePublicationEnrichment() {
+  const VERSION = "seed:pub-enrich:v1";
+  if (await db.kv.get(VERSION)) return;
+  const pubs = (await db.databases.toArray()).find((d) => d.name === "Publications");
+  if (!pubs) return;
+  const fieldId = (n: string) => pubs.fields.find((f) => f.name.toLowerCase() === n.toLowerCase())?.id;
+  const map: Array<[keyof typeof PUBLICATION_ENRICHMENT[number], string]> = [
+    ["writingStyle", "Writing Style"],
+    ["editorLikes", "What Editor Likes"],
+    ["editorStyle", "Editor's Style"],
+    ["doNotWrite", "Do NOT Write"],
+    ["targetAudience", "Target Audience"],
+    ["submission", "Submission Info"],
+  ];
+  const nameId = pubs.fields[0].id;
+  const rows = await db.rows.where("dbId").equals(pubs.id).toArray();
+  const norm = (s: string) => s.trim().toLowerCase();
+  let applied = 0;
+  for (const e of PUBLICATION_ENRICHMENT) {
+    const row = rows.find((r) => {
+      const n = norm(String(r.values[nameId] ?? ""));
+      return n === e.match || n.includes(e.match) || e.match.includes(n);
+    });
+    if (!row) continue;
+    const patch: Record<string, unknown> = {};
+    for (const [key, fname] of map) {
+      const val = e[key];
+      const fid = fieldId(fname);
+      if (val && fid) patch[fid] = val;
+    }
+    if (Object.keys(patch).length) {
+      await updateRow(row.id, { values: { ...row.values, ...patch } });
+      applied++;
+    }
+  }
+  await db.kv.put({ key: VERSION, value: true });
+  if (applied) console.log(`[enrich] applied deep style to ${applied} publications`);
+}
 
 async function ensureBrands() {
   if (await db.kv.get("seed:brands:v1")) return;
