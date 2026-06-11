@@ -55,6 +55,8 @@ export const publicationsRouter = router({
       topics: z.array(z.string()).optional(),
       tier: z.number().min(1).max(3).default(2),
       responseTime: z.string().optional(),
+      audienceAvatar: z.string().optional(),
+      editorPreferences: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -93,6 +95,8 @@ export const publicationsRouter = router({
           topics: input.topics || [],
           tier: input.tier,
           responseTime: input.responseTime ?? null,
+          audienceAvatar: input.audienceAvatar ?? null,
+          editorPreferences: input.editorPreferences ?? null,
         }).$returningId();
         return { success: true, action: "created", id: result.id };
       }

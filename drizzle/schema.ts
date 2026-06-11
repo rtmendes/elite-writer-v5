@@ -53,6 +53,8 @@ export const articles = mysqlTable("articles", {
   productId: varchar("productId", { length: 100 }),
   // Style analysis data from old app
   styleProfile: json("styleProfile"),
+  // Source registry: [{title, url, note, addedAt}] — research provenance per article
+  sources: json("sources"),
   importedFrom: varchar("importedFrom", { length: 500 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

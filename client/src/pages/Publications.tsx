@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,9 @@ import {
   Users, TrendingUp, Filter, ChevronDown, Download, Send
 } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { trpc } from '@/lib/trpc';
 import { PUBLICATIONS, CATEGORIES, getPublicationTier, type Publication } from '@/lib/publications-data';
 
 export default function Publications() {
@@ -18,6 +21,35 @@ export default function Publications() {
   const [sortBy, setSortBy] = useState<'name' | 'pay' | 'acceptance'>('name');
   const [selectedPub, setSelectedPub] = useState<Publication | null>(null);
   const [, navigate] = useLocation();
+
+  // Audience & editor intelligence — feeds the 13-dimension scorecard
+  // (reader_resonance + editor_alignment) and AI drafting context
+  const [intelAvatar, setIntelAvatar] = useState('');
+  const [intelEditorPrefs, setIntelEditorPrefs] = useState('');
+  const intelQuery = trpc.publications.list.useQuery(
+    { search: selectedPub?.name ?? '', limit: 1 },
+    { enabled: !!selectedPub }
+  );
+  useEffect(() => {
+    const row = intelQuery.data?.[0] as { audienceAvatar?: string | null; editorPreferences?: string | null } | undefined;
+    setIntelAvatar(row?.audienceAvatar ?? '');
+    setIntelEditorPrefs(row?.editorPreferences ?? '');
+  }, [intelQuery.data, selectedPub?.id]);
+  const intelUpsert = trpc.publications.upsert.useMutation();
+  const saveIntel = async () => {
+    if (!selectedPub) return;
+    try {
+      await intelUpsert.mutateAsync({
+        slug: selectedPub.id,
+        name: selectedPub.name,
+        audienceAvatar: intelAvatar.trim(),
+        editorPreferences: intelEditorPrefs.trim(),
+      });
+      toast.success('Audience & editor intelligence saved — scoring uses it immediately');
+    } catch (e: any) {
+      toast.error('Save failed: ' + (e?.message ?? 'unknown error'));
+    }
+  };
 
   function exportCSV() {
     const headers = ['Name','Category','Tier','Pay Min','Pay Max','Pay Structure','Acceptance Rate','Avg Response Days','Topics','Article Styles','Editors','Emails','Submission URL','Traffic','Notes'];
@@ -180,6 +212,22 @@ export default function Publications() {
                   <p className="text-sm">{selectedPub.notes}</p>
                 </div>
               )}
+              <div className="rounded-md border border-purple-500/20 bg-purple-500/5 p-3 space-y-2">
+                <span className="text-xs font-semibold text-purple-400 block">Audience &amp; editor intelligence</span>
+                <div>
+                  <span className="text-muted-foreground text-xs block mb-1">Reader avatar — who reads this publication</span>
+                  <Textarea rows={3} value={intelAvatar} onChange={(e) => setIntelAvatar(e.target.value)}
+                    placeholder="Role, seniority, sophistication, what they're trying to get done, their vocabulary..." />
+                </div>
+                <div>
+                  <span className="text-muted-foreground text-xs block mb-1">Editor preferences — what the gatekeeper buys and rejects</span>
+                  <Textarea rows={3} value={intelEditorPrefs} onChange={(e) => setIntelEditorPrefs(e.target.value)}
+                    placeholder="Likes (structures, angles, data style), pet peeves, pitch format, past feedback..." />
+                </div>
+                <Button size="sm" className="text-xs" onClick={saveIntel} disabled={intelUpsert.isPending}>
+                  {intelUpsert.isPending ? 'Saving…' : 'Save intelligence'}
+                </Button>
+              </div>
               <div>
                 <span className="text-muted-foreground text-xs block mb-2">Editors</span>
                 {selectedPub.editors.map((ed, i) => (
