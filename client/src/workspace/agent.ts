@@ -15,7 +15,8 @@ export type AgentTask =
   | "tighten"
   | "expand"
   | "headlines"
-  | "continue";
+  | "continue"
+  | "proofread";
 
 export interface RouteConfig {
   model: string;
@@ -33,6 +34,7 @@ export const DEFAULT_ROUTES: Record<AgentTask, RouteConfig> = {
   expand: { model: "anthropic/claude-opus-4.8", label: "Expand" },
   headlines: { model: "anthropic/claude-opus-4.8", label: "Headlines" },
   continue: { model: "anthropic/claude-opus-4.8", label: "Continue draft" },
+  proofread: { model: "anthropic/claude-sonnet-4.6", label: "Proofread" },
 };
 
 export const MODEL_CHOICES = [

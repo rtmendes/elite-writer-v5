@@ -35,11 +35,21 @@ async function ensureTables() {
       INDEX idx_${table}_updated (updatedAt)
     )`));
   }
+  // Scale fix: promote rows.dbId to an indexed generated column so per-database
+  // queries filter in SQL (O(log n)) instead of scanning + filtering in JS.
+  // Idempotent — ignore "duplicate column/key" once applied.
+  try {
+    await db.execute(sql.raw(
+      "ALTER TABLE `wsRows` ADD COLUMN `dbId` VARCHAR(40) " +
+      "GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.dbId'))) STORED, " +
+      "ADD INDEX `idx_wsRows_dbId` (`dbId`)",
+    ));
+  } catch { /* already migrated */ }
   tablesEnsured = true;
 }
 
 // ── Agent task definitions ──────────────────────────────────────────────────
-const TASKS = ["score_idea", "research_brief", "match_publications", "create_offer", "humanize", "tighten", "expand", "headlines", "continue"] as const;
+const TASKS = ["score_idea", "research_brief", "match_publications", "create_offer", "humanize", "tighten", "expand", "headlines", "continue", "proofread"] as const;
 type AgentTask = (typeof TASKS)[number];
 
 // Cheapest capable model per task (OpenRouter slugs; invokeLLM routes them).
@@ -53,6 +63,7 @@ const TASK_MODELS: Record<AgentTask, { model: string; maxTokens: number; persona
   expand: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "drafter" },
   headlines: { model: "anthropic/claude-opus-4.8", maxTokens: 4000, persona: "outliner" },
   continue: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "continuator" },
+  proofread: { model: "anthropic/claude-sonnet-4.6", maxTokens: 6000, persona: "proofreader" },
 };
 
 
@@ -530,7 +541,22 @@ ${input.research || "(use the outline; mark anything needing reporting as [TK: .
     .input(z.object({ title: z.string().min(1).max(400), styleHint: z.string().max(2000).default(""), context: z.string().max(200).default("") }))
     .mutation(async ({ input }) => {
       if (!ENV.openrouterApiKey) throw new Error("OPENROUTER_API_KEY not configured");
-      const prompt = `Hyperrealistic editorial hero photograph for a premium magazine feature titled "${input.title}". ${input.styleHint ? `Match this publication's visual identity and mood: ${input.styleHint}.` : "Sophisticated, Condé Nast-caliber editorial aesthetic."} Wide 16:9 cinematic composition, natural light, shallow depth of field, film-grain realism. No text, no words, no logos, no watermarks. Leave the upper third calm for a headline overlay.`;
+      // Art Director (David Osei) composes the image prompt from the title + the
+      // publication/brand visual cues — real art direction, not a template.
+      let prompt = `Hyperrealistic editorial hero photograph for a premium magazine feature titled "${input.title}". ${input.styleHint ? `Match this visual identity and mood: ${input.styleHint}.` : "Sophisticated, Condé Nast-caliber editorial aesthetic."} Wide 16:9 cinematic composition, natural light, shallow depth of field, film-grain realism. No text, no words, no logos, no watermarks. Leave the upper third calm for a headline overlay.`;
+      try {
+        const ad = AGENT_PERSONAS.artdirector;
+        const refined = await invokeLLM({
+          messages: [
+            { role: "system", content: ad.systemPrompt + "\nReturn ONLY the final image-generation prompt — one vivid paragraph, no preamble. Always end with: 16:9, no text, no logos, upper third calm for a headline overlay." },
+            { role: "user", content: `Art-direct the hero image for: "${input.title}".${input.styleHint ? `\nVisual identity to honor: ${input.styleHint}` : ""}` },
+          ],
+          model: "anthropic/claude-haiku-4.5",
+          maxTokens: 600,
+        });
+        const text = refined.choices?.[0]?.message?.content?.trim();
+        if (text && text.length > 40) prompt = text;
+      } catch { /* fall back to the template prompt */ }
       const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {

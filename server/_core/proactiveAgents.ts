@@ -45,8 +45,16 @@ async function loadDatabases(): Promise<WsDatabase[]> {
 }
 
 async function loadRows(dbId: string): Promise<WsRow[]> {
-  const rows = await dbExec("SELECT data FROM `wsRows` WHERE deleted = FALSE");
-  return rows.map((r) => parseData<WsRow>(r.data)).filter((r) => r.dbId === dbId);
+  // Uses the indexed generated `dbId` column (see ensureTables migration) so
+  // this is an index lookup, not a full-table scan + JS filter. Falls back to
+  // a scan only if the column hasn't been added yet (first boot before migrate).
+  try {
+    const rows = await dbExec(`SELECT data FROM \`wsRows\` WHERE deleted = FALSE AND dbId = ${JSON.stringify(dbId)}`);
+    return rows.map((r) => parseData<WsRow>(r.data));
+  } catch {
+    const rows = await dbExec("SELECT data FROM `wsRows` WHERE deleted = FALSE");
+    return rows.map((r) => parseData<WsRow>(r.data)).filter((r) => r.dbId === dbId);
+  }
 }
 
 async function saveDatabase(database: WsDatabase) {

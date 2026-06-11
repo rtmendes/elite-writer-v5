@@ -2,7 +2,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { FilePlus2, DatabaseZap } from "lucide-react";
 import React from "react";
 import { createDatabase, createPage, db } from "../db";
-import { computeRevenue, getRevenueGoal, setRevenueGoal } from "../finance";
+import { computeBrandPnL, computeRevenue, getRevenueGoal, setRevenueGoal } from "../finance";
 import { formatCurrency } from "../ui";
 import { useState } from "react";
 
@@ -38,8 +38,38 @@ function RevenueTracker({ navigate }: { navigate: (hash: string) => void }) {
             <span style={{ cursor: "pointer", color: "var(--accent)", marginLeft: 8 }} onClick={() => { const p = databases.find((d) => d.name === "Article Pipeline"); if (p) navigate(`#/db/${p.id}`); }}>open pipeline →</span>
           </div>
         )}
+        <BrandPnLRows navigate={navigate} />
       </div>
     </>
+  );
+}
+
+function BrandPnLRows({ navigate }: { navigate: (hash: string) => void }) {
+  const databases = useLiveQuery(() => db.databases.toArray(), []) ?? [];
+  const rows = useLiveQuery(() => db.rows.toArray(), []) ?? [];
+  const pnl = computeBrandPnL(databases, rows).filter((b) => b.goal > 0 || b.earned > 0 || b.inflight > 0);
+  if (pnl.length === 0) return null;
+  const brandsDb = databases.find((d) => d.name === "Brands");
+  return (
+    <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-faint)", marginBottom: 6, display: "flex", justifyContent: "space-between" }}>
+        <span>By brand</span>
+        {brandsDb && <span style={{ cursor: "pointer", color: "var(--accent)", textTransform: "none", letterSpacing: 0 }} onClick={() => navigate(`#/db/${brandsDb.id}`)}>manage brands →</span>}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {pnl.map((b, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+            <span style={{ width: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text)" }}>{b.brand}</span>
+            <div style={{ flex: 1, height: 7, borderRadius: 99, background: "var(--bg-active)", overflow: "hidden" }}>
+              <div style={{ width: `${b.pct}%`, height: "100%", background: b.pct >= 100 ? "var(--tag-green-fg)" : "var(--accent)" }} />
+            </div>
+            <span style={{ width: 150, textAlign: "right", color: "var(--text-soft)" }}>
+              {formatCurrency(b.earned) || "$0"} earned · {formatCurrency(b.inflight) || "$0"} in flight
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

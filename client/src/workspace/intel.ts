@@ -22,7 +22,9 @@ export function ensureIntelligence(): Promise<void> {
 }
 async function doEnsureIntelligence() {
   await ensurePublications();
+  await ensureBrands();
   await ensureRelations();
+  await ensureBrandRelations();
   if (await db.kv.get("seed:ledger")) {
     await ensureClaimLedger();
     return;
@@ -498,6 +500,94 @@ function sectionText(row: Row, heading: RegExp): string {
   return out.trim();
 }
 
+// ── Brands: the 10 internal brands the agent workforce writes for ──────────
+// Each article belongs to a Brand; agents match BOTH the brand's voice/offer
+// AND the target publication's style guide. Seeded with 10 editable slots —
+// fill in voice, audience, offer, and monthly goal as brand details arrive.
+const BRAND_FIELD_DEFS: Array<{ name: string; type: Field["type"]; width: number }> = [
+  { name: "Brand", type: "text", width: 200 },
+  { name: "Logo", type: "image", width: 90 },
+  { name: "Voice", type: "longtext", width: 320 },
+  { name: "Target Audience", type: "longtext", width: 280 },
+  { name: "Niche", type: "text", width: 180 },
+  { name: "Backend Offer", type: "longtext", width: 300 },
+  { name: "Offer URL", type: "url", width: 180 },
+  { name: "Monthly Goal ($)", type: "currency", width: 130 },
+  { name: "Website", type: "url", width: 180 },
+  { name: "Notes", type: "longtext", width: 260 },
+];
+
+async function ensureBrands() {
+  if (await db.kv.get("seed:brands:v1")) return;
+  if ((await db.databases.toArray()).some((d) => d.name === "Brands")) {
+    await db.kv.put({ key: "seed:brands:v1", value: true });
+    return;
+  }
+  const now = Date.now();
+  const byName = new Map<string, Field>();
+  const fields = BRAND_FIELD_DEFS.map((def) => {
+    const f: Field = { id: uid(), name: def.name, type: def.type, width: def.width };
+    byName.set(def.name, f);
+    return f;
+  });
+  const database: Database = {
+    id: uid(),
+    name: "Brands",
+    icon: "🏷️",
+    description: "Your 10 internal brands. Each carries a voice, audience, backend offer, and monthly revenue goal. Agents match every article to its brand's voice AND the target publication's style guide. Fully editable — fill in details as they arrive.",
+    fields,
+    views: [
+      makeView("table", "All Brands"),
+      { ...makeView("gallery", "Cards"), thumbnailField: byName.get("Logo")!.id },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.databases.add(database);
+  void enqueue("databases", database.id, "upsert");
+  // 10 editable placeholder slots, $10k goal each → $100k/mo target across brands
+  for (let i = 1; i <= 10; i++) {
+    const row: Row = {
+      id: uid(),
+      dbId: database.id,
+      values: { [fields[0].id]: `Brand ${i}`, [byName.get("Monthly Goal ($)")!.id]: 10000 },
+      sortOrder: now + i,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.rows.add(row);
+    void enqueue("rows", row.id, "upsert");
+  }
+  await db.kv.put({ key: "seed:brands:v1", value: true });
+}
+
+/** Link the Article Pipeline to Brands: a Brand relation + Brand Voice/Offer
+ *  lookups, so every article carries its brand context for the agents. */
+async function ensureBrandRelations() {
+  if (await db.kv.get("seed:relations:brands:v1")) return;
+  const dbs = await db.databases.toArray();
+  const pipeline = dbs.find((d) => d.name === "Article Pipeline");
+  const brands = dbs.find((d) => d.name === "Brands");
+  if (!pipeline || !brands) return;
+  const fresh = (await db.databases.get(pipeline.id))!;
+  const fields = [...fresh.fields];
+  let brandField = fields.find((f) => f.type === "relation" && /brand/i.test(f.name));
+  if (!brandField) {
+    brandField = { id: uid(), name: "Brand", type: "relation", relationDbId: brands.id, width: 160 };
+    fields.push(brandField);
+  }
+  const bf = (n: string) => brands.fields.find((f) => f.name === n);
+  const voice = bf("Voice"), offer = bf("Backend Offer");
+  if (voice && !fields.some((f) => f.name === "Brand Voice")) {
+    fields.push({ id: uid(), name: "Brand Voice", type: "lookup", lookupRelationId: brandField.id, lookupFieldId: voice.id, width: 220 });
+  }
+  if (offer && !fields.some((f) => f.name === "Brand Offer")) {
+    fields.push({ id: uid(), name: "Brand Offer", type: "lookup", lookupRelationId: brandField.id, lookupFieldId: offer.id, width: 220 });
+  }
+  await updateDatabase(pipeline.id, { fields });
+  await db.kv.put({ key: "seed:relations:brands:v1", value: true });
+}
+
 /** One-time migration: turn the Article Pipeline's "Publication" text field into
  *  a real relation to Publications, map existing names → linked records, and add
  *  Pay Rate + Editor lookups that pull live from the linked outlet. */
@@ -628,11 +718,35 @@ async function publicationStyleBrief(pubName: string): Promise<string> {
   return parts.length ? `\n\nMATCH THIS PUBLICATION'S HOUSE STYLE (do not re-research — use this):\n${parts.join("\n")}` : "";
 }
 
+/** The article's brand context — voice, audience, and backend offer — so every
+ *  draft serves the brand's funnel AND the publication's style simultaneously. */
+async function brandBrief(database: Database, row: Row): Promise<string> {
+  const relField = database.fields.find((f) => f.type === "relation" && /brand/i.test(f.name));
+  if (!relField?.relationDbId) return "";
+  const ids = Array.isArray(row.values[relField.id]) ? (row.values[relField.id] as string[]) : [];
+  if (!ids[0]) return "";
+  const brand = await db.rows.get(ids[0]);
+  const brandsDb = await db.databases.get(relField.relationDbId);
+  if (!brand || !brandsDb) return "";
+  const get = (n: string) => {
+    const f = brandsDb.fields.find((x) => x.name.toLowerCase() === n.toLowerCase());
+    return f ? String(brand.values[f.id] ?? "").trim() : "";
+  };
+  const parts: string[] = [];
+  const name = get("Brand"); if (name) parts.push(`BRAND: ${name}`);
+  const voice = get("Voice"); if (voice) parts.push(`BRAND VOICE: ${voice}`);
+  const aud = get("Target Audience"); if (aud) parts.push(`BRAND AUDIENCE: ${aud}`);
+  const offer = get("Backend Offer"); if (offer) parts.push(`BACKEND OFFER (weave a soft, value-first tie-in to this): ${offer}`);
+  const offerUrl = get("Offer URL"); if (offerUrl) parts.push(`OFFER URL: ${offerUrl}`);
+  return parts.length ? `\n\nSERVE THIS BRAND (the author's own brand — match its voice AND tie to its offer, while still fitting the publication's style):\n${parts.join("\n")}` : "";
+}
+
 export async function buildOutline(database: Database, row: Row): Promise<string> {
   const fresh = (await db.rows.get(row.id))!;
   const pubName = await targetPublication(database, fresh);
   const styleBrief = await publicationStyleBrief(pubName);
-  const brief = rowSummary(database, fresh) + "\n\nRESEARCH:\n" + notesText(fresh).slice(0, 8000) + styleBrief;
+  const brandCtx = await brandBrief(database, fresh);
+  const brief = rowSummary(database, fresh) + "\n\nRESEARCH:\n" + notesText(fresh).slice(0, 8000) + styleBrief + brandCtx;
   const { wsTrpc } = await import("./trpcClient");
   const res = await wsTrpc.workspace.buildOutline.mutate({ brief: brief.slice(0, 38000), publication: pubName, context: String(fresh.values[database.fields[0].id] ?? "") });
   await appendToNotes(fresh, "Outline", res.text);
@@ -655,7 +769,8 @@ export async function writeFullArticle(database: Database, row: Row, accepted: s
   if (!outline) throw new Error("Build and approve an outline first.");
   const pubName = await targetPublication(database, fresh);
   const styleBrief = await publicationStyleBrief(pubName);
-  const research = (sectionText(fresh, /research brief/i) || notesText(fresh).slice(0, 8000)) + styleBrief;
+  const brandCtx = await brandBrief(database, fresh);
+  const research = (sectionText(fresh, /research brief/i) || notesText(fresh).slice(0, 8000)) + styleBrief + brandCtx;
   const { wsTrpc } = await import("./trpcClient");
   const res = await wsTrpc.workspace.writeFullDraft.mutate({
     outline, research: research.slice(0, 38000), publication: pubName, accepted, context: String(fresh.values[database.fields[0].id] ?? ""),
@@ -701,4 +816,26 @@ export async function generateCover(database: Database, row: Row): Promise<strin
     await updateRow(row.id, { values: { ...fresh.values, [newField.id]: res.dataUrl } });
   }
   return `Cover image generated ($${res.cost.toFixed(3)}) — set as the article thumbnail.`;
+}
+
+// ── Proofreader (Diana Okonkwo) — final polish gate before submission ──────
+export async function proofread(database: Database, row: Row): Promise<string> {
+  const fresh = (await db.rows.get(row.id))!;
+  const title = String(fresh.values[database.fields[0].id] ?? "article");
+  const draft = sectionText(fresh, /^draft$/i) || notesText(fresh);
+  if (draft.trim().length < 80) throw new Error("No draft to proofread yet — write the full draft first.");
+  const out = await runTask(
+    "proofread",
+    `Proofread this draft for a premium publication. Fix grammar, punctuation, US-English consistency, and AI-tell phrasing. Return EXACTLY:
+VERDICT: CLEAN or NEEDS-WORK
+Then "- " bullets: each issue you'd fix (quote the phrase + the fix). If CLEAN, list the few final nits only.
+
+TITLE: ${title}
+
+DRAFT:
+${draft.slice(0, 24000)}`,
+    title,
+  );
+  await appendToNotes(fresh, "Proofread (Diana Okonkwo)", out);
+  return out;
 }

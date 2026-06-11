@@ -63,6 +63,40 @@ export function computeRevenue(databases: Database[], rows: Row[], goal: number)
   };
 }
 
+export interface BrandPnL { brand: string; goal: number; earned: number; inflight: number; pct: number }
+
+/** Per-brand profit-and-loss: earned (published) + in-flight pipeline fees,
+ *  grouped by the article's linked Brand, each toward its monthly goal. */
+export function computeBrandPnL(databases: Database[], rows: Row[]): BrandPnL[] {
+  const pipeline = findPipeline(databases);
+  const brandsDb = databases.find((d) => d.name === "Brands");
+  if (!pipeline || !brandsDb) return [];
+  const feeField = pipeline.fields.find((f) => f.type === "currency");
+  const statusField = pipeline.fields.find((f) => f.name.toLowerCase() === "status" && f.type === "select");
+  const brandRel = pipeline.fields.find((f) => f.type === "relation" && /brand/i.test(f.name));
+  if (!feeField || !brandRel) return [];
+
+  const goalField = brandsDb.fields.find((f) => f.name.toLowerCase().includes("goal"));
+  const brandRows = rows.filter((r) => r.dbId === brandsDb.id);
+  const pipeRows = rows.filter((r) => r.dbId === pipeline.id);
+  const optName = (id: unknown) => statusField?.options?.find((o) => o.id === id)?.name ?? "";
+
+  return brandRows.map((b) => {
+    const name = String(b.values[brandsDb.fields[0].id] ?? "Brand");
+    const goal = goalField ? Number(b.values[goalField.id]) || 0 : 0;
+    let earned = 0, inflight = 0;
+    for (const r of pipeRows) {
+      const ids = Array.isArray(r.values[brandRel.id]) ? (r.values[brandRel.id] as string[]) : [];
+      if (!ids.includes(b.id)) continue;
+      const fee = Number(r.values[feeField.id]) || 0;
+      const status = statusField ? optName(r.values[statusField.id]).toLowerCase() : "";
+      if (/kill|dead|archive/.test(status)) continue;
+      if (/publish/.test(status)) earned += fee; else inflight += fee;
+    }
+    return { brand: name, goal, earned, inflight, pct: goal ? Math.min(100, (earned / goal) * 100) : 0 };
+  });
+}
+
 /** Highest $ figure found in a pay-rate string, e.g. "$1,000 to $3,000" → 3000. */
 function payFromText(s: string): number {
   const nums = [...String(s || "").matchAll(/\$\s?([\d,]{2,})/g)].map((m) => Number(m[1].replace(/,/g, "")));
