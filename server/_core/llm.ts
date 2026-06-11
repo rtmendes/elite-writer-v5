@@ -4,6 +4,7 @@
  * Falls back to OpenAI if configured and Anthropic unavailable.
  */
 import { ENV } from "./env";
+import { assertBudget, recordUsage } from "./budget";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -85,6 +86,9 @@ export function resolveModelSlug(model?: string): string {
 }
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  // Budget gate (ported from elite-writer-app gateway): refuses the call when
+  // AI_DAILY_BUDGET_USD is exhausted. Metering happens on every return below.
+  await assertBudget();
   const maxTokens = params.maxTokens ?? params.max_tokens ?? 4096;
   const format = params.response_format ?? params.responseFormat;
   const wantsJson = format?.type === "json_object" || format?.type === "json_schema";
@@ -99,7 +103,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     try {
       // Normalize bare aliases to valid OpenRouter slugs (right model family)
       const orModel = resolveModelSlug(params.model ?? model);
-      return await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: orModel });
+      const orRes = await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: orModel });
+      recordUsage(orRes.model || orModel, orRes.usage);
+      return orRes;
     } catch (err: any) {
       console.warn(`[LLM] OpenRouter failed (${err?.message?.slice(0, 100)}), falling back...`);
     }
@@ -108,7 +114,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // Step 2: OpenAI direct
   if (ENV.openaiApiKey) {
     try {
-      return await invokeOpenAI(params.messages, { maxTokens, format, temperature });
+      const oaRes = await invokeOpenAI(params.messages, { maxTokens, format, temperature });
+      recordUsage(oaRes.model || "gpt-4o", oaRes.usage);
+      return oaRes;
     } catch (err: any) {
       console.warn(`[LLM] OpenAI failed (${err?.message?.slice(0, 100)}), falling back...`);
     }
@@ -124,7 +132,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
         // Non-Anthropic model requested but OpenRouter/OpenAI failed — use default Claude
         anthropicModel = "claude-sonnet-4";
       }
-      return await invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model: anthropicModel });
+      const anRes = await invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model: anthropicModel });
+      recordUsage(anRes.model || anthropicModel, anRes.usage);
+      return anRes;
     } catch (err: any) {
       console.warn(`[LLM] Anthropic failed (${err?.message?.slice(0, 100)}), falling back...`);
     }
