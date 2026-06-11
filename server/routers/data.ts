@@ -80,10 +80,12 @@ const articlesRouter = router({
     targetPublication: z.string().optional(),
     brandId: z.string().optional(),
     productId: z.string().optional(),
+    sources: z.array(z.object({ title: z.string(), url: z.string().optional(), note: z.string().optional(), addedAt: z.string().optional() }).passthrough()).optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database unavailable");
     const vals: InsertArticle = {
+      sources: input.sources ?? null,
       userId: ctx.user.id, title: input.title, content: input.content ?? null,
       template: input.template ?? null, brandVoice: input.brandVoice ?? null,
       wordCount: input.wordCount ?? null, status: input.status ?? "draft",
@@ -112,6 +114,7 @@ const articlesRouter = router({
     targetPublication: z.string().optional(),
     brandId: z.string().optional(),
     productId: z.string().optional(),
+    sources: z.array(z.object({ title: z.string(), url: z.string().optional(), note: z.string().optional(), addedAt: z.string().optional() }).passthrough()).optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database unavailable");
@@ -130,6 +133,41 @@ const articlesRouter = router({
     }
     return { success: true };
   }),
+  // Pitch → article → payment funnel: one row per pitch with article state and
+  // earnings matched by publication source name. Joined in JS — the links are
+  // soft (articleTitle string, earnings.source) by schema design.
+  funnel: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const [allPitches, allArticles, allEarnings] = await Promise.all([
+      db.select().from(pitches).where(eq(pitches.userId, ctx.user.id)),
+      db.select().from(articles).where(eq(articles.userId, ctx.user.id)),
+      db.select().from(earnings).where(eq(earnings.userId, ctx.user.id)),
+    ]);
+    const articleByTitle = new Map(allArticles.map((a) => [a.title.toLowerCase(), a]));
+    const earningsBySource = new Map<string, number>();
+    for (const e of allEarnings) {
+      if (e.type !== "content") continue;
+      const k = e.source.toLowerCase();
+      earningsBySource.set(k, (earningsBySource.get(k) ?? 0) + Number(e.amount));
+    }
+    return allPitches.map((p) => {
+      const article = p.articleTitle ? articleByTitle.get(p.articleTitle.toLowerCase()) : undefined;
+      const paid = p.publicationName ? (earningsBySource.get(p.publicationName.toLowerCase()) ?? 0) : 0;
+      return {
+        pitchId: p.id,
+        subject: p.subject,
+        publicationName: p.publicationName,
+        pitchStatus: p.status,
+        sentAt: p.sentAt,
+        articleTitle: p.articleTitle,
+        articleStatus: article?.status ?? null,
+        articleScore: article?.overallScore ?? null,
+        earningsFromPublication: paid,
+      };
+    });
+  }),
+
   delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database unavailable");

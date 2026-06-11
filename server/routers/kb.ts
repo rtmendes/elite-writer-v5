@@ -376,6 +376,46 @@ export const kbRouter = router({
     }),
 
   // List all KB items
+  // Index-first recall (ported from elite-writer-app kb-index): a compact map
+  // of the knowledge base — title + hook + token size — cheap enough to put in
+  // any prompt. Agents read the index, then fetch exactly ONE item via get().
+  index: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const rows = await db
+      .select({
+        id: kbItems.id,
+        title: kbItems.title,
+        category: kbItems.category,
+        tokenCount: kbItems.tokenCount,
+        hook: sql<string>`LEFT(COALESCE(${kbItems.content}, ''), 140)`,
+        contentLength: sql<number>`CHAR_LENGTH(COALESCE(${kbItems.content}, ''))`,
+      })
+      .from(kbItems)
+      .where(eq(kbItems.userId, ctx.user.id))
+      .orderBy(desc(kbItems.createdAt))
+      .limit(300);
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      category: r.category,
+      hook: (r.hook || "").replace(/\s+/g, " "),
+      approxTokens: r.tokenCount ?? Math.ceil((r.contentLength ?? 0) / 4),
+    }));
+  }),
+
+  // Fetch exactly one item's full content — the only thing that enters a prompt.
+  get: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const rows = await db.select().from(kbItems)
+        .where(and(eq(kbItems.id, input.id), eq(kbItems.userId, ctx.user.id)))
+        .limit(1);
+      return rows[0] ?? null;
+    }),
+
   list: protectedProcedure
     .input(z.object({
       category: z.string().optional(),

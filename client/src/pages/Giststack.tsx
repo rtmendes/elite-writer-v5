@@ -256,6 +256,27 @@ export default function Giststack() {
     toast.success(`${Math.min(hotUnsaved.length, 5)} hot items → Ideas pipeline (auto-scoring)`);
   };
 
+  // Multi-insight roundup (ported from elite-writer-app giststack): combine the
+  // current hot items into ONE roundup idea — what these stories mean together,
+  // every source preserved in the news peg.
+  const handleCreateRoundup = () => {
+    if (hotItems.length < 2) {
+      toast.info('Need at least 2 hot items for a roundup');
+      return;
+    }
+    const picks = hotItems.slice(0, 8);
+    const topic = picks[0].category || 'this week';
+    addIdea({
+      title: `[Roundup] ${topic}: ${picks.length} signals, one story`,
+      angle: `Multi-insight roundup — what these ${picks.length} stories mean together, not separately:\n` +
+        picks.map(i => `• ${i.title} (${i.source})`).join('\n'),
+      category: picks[0].category,
+      news_peg: `Roundup sources: ` + picks.map(i => `${i.source}${i.url ? ` — ${i.url}` : ''}`).join(' | '),
+      status: 'idea',
+    });
+    toast.success(`Roundup idea created from ${picks.length} hot items`);
+  };
+
   const addTopic = () => {
     if (customTopic.trim() && !topics.includes(customTopic.trim())) {
       setTopics([...topics, customTopic.trim()]);
@@ -377,6 +398,13 @@ export default function Giststack() {
               <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
                 onClick={handleAutoGenerateFromHot}>
                 <Flame className="w-3 h-3" /> Auto {Math.min(hotItems.length, 5)} Hot → Ideas
+              </Button>
+            )}
+            {hotItems.length > 1 && (
+              <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                onClick={handleCreateRoundup}
+                title="Combine the hot items into one multi-insight roundup idea — every source preserved">
+                <Flame className="w-3 h-3" /> Roundup {Math.min(hotItems.length, 8)} → 1 Idea
               </Button>
             )}
           </div>

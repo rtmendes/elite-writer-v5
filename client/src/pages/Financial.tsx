@@ -39,6 +39,8 @@ export default function Financial() {
   const { state, addEarning, deleteEarning } = useApp();
   const createEarningDb = trpc.data.earnings.create.useMutation();
   const deleteEarningDb = trpc.data.earnings.delete.useMutation();
+  // Pitch → article → payment funnel (ported from elite-writer-app)
+  const funnelQuery = trpc.data.articles.funnel.useQuery();
   const [earningIdMap] = useState<Map<string, number>>(() => new Map());
   const [showNew, setShowNew] = useState(false);
   const [amount, setAmount] = useState('');
@@ -448,6 +450,49 @@ export default function Financial() {
           </div>
         </div>
       )}
+
+      {/* Pitch → article → payment funnel: the money loop in one table */}
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle className="text-sm">Pitch → Article → Payment funnel</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!funnelQuery.data?.length ? (
+            <p className="text-xs text-muted-foreground">No pitches yet — the funnel fills as pitches go out.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-muted-foreground text-left">
+                    <th className="py-1.5 pr-3 font-medium">Pitch</th>
+                    <th className="py-1.5 pr-3 font-medium">Publication</th>
+                    <th className="py-1.5 pr-3 font-medium">Pitch status</th>
+                    <th className="py-1.5 pr-3 font-medium">Article</th>
+                    <th className="py-1.5 pr-3 font-medium">Score</th>
+                    <th className="py-1.5 text-right font-medium">Paid (pub total)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funnelQuery.data.map((row) => (
+                    <tr key={row.pitchId} className="border-t border-border/40">
+                      <td className="py-1.5 pr-3 max-w-[220px] truncate">{row.subject}</td>
+                      <td className="py-1.5 pr-3">{row.publicationName ?? '—'}</td>
+                      <td className="py-1.5 pr-3">
+                        <Badge variant="outline" className="text-[10px]">{row.pitchStatus}</Badge>
+                      </td>
+                      <td className="py-1.5 pr-3">{row.articleStatus ?? '—'}</td>
+                      <td className="py-1.5 pr-3">{row.articleScore ?? '—'}</td>
+                      <td className="py-1.5 text-right font-mono">
+                        {row.earningsFromPublication ? `$${row.earningsFromPublication.toLocaleString()}` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
