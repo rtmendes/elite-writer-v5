@@ -51,9 +51,20 @@ async function startServer() {
     next();
   });
 
-  // Simple health endpoint for Docker/Traefik
+  // Health + integration status (booleans only — no secrets) so config can be
+  // verified from outside the container (did R2/Redis env actually land?).
   app.get("/api/health", (_req, res) => {
-    res.json({ ok: true, ts: Date.now() });
+    res.json({
+      ok: true,
+      ts: Date.now(),
+      integrations: {
+        openrouter: Boolean(process.env.OPENROUTER_API_KEY),
+        r2: Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY),
+        redis: Boolean(process.env.REDIS_URL),
+        newsapi: Boolean(process.env.NEWSAPI_KEY || process.env.GNEWS_KEY),
+        slack: Boolean(process.env.SLACK_WEBHOOK_URL),
+      },
+    });
   });
 
   // Auth routes (login, check, hash)

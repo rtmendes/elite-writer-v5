@@ -523,6 +523,15 @@ async function safely(name: string, job: () => Promise<void>) {
   }
 }
 
+// Dispatch map so the durable queue worker (queue.ts) can run the same jobs.
+export type ProactiveJobName = "scout" | "scorer" | "guardian" | "followup";
+export const PROACTIVE_JOBS: Record<ProactiveJobName, () => Promise<void>> = {
+  scout: () => safely("scout", scoutJob),
+  scorer: () => safely("scorer", scorerJob),
+  guardian: () => safely("guardian", guardianJob),
+  followup: () => safely("followup", followupJob),
+};
+
 export function initProactiveAgents() {
   if (process.env.WORKSPACE_PROACTIVE === "0") {
     console.log("[proactive] disabled via WORKSPACE_PROACTIVE=0");
@@ -530,6 +539,25 @@ export function initProactiveAgents() {
   }
   if (!process.env.DATABASE_URL) return;
 
+  // Durable path: if Redis is configured, run jobs through the BullMQ queue
+  // (retries, repeatable schedules, survives restarts). Falls back below.
+  if (process.env.REDIS_URL) {
+    void import("./queue").then(async ({ startQueue }) => {
+      const ok = await startQueue();
+      if (ok) {
+        // kick off an immediate first pass via the queue
+        void PROACTIVE_JOBS.scorer();
+        void PROACTIVE_JOBS.guardian();
+        return;
+      }
+      armInProcessLoop();
+    });
+    return;
+  }
+  armInProcessLoop();
+}
+
+function armInProcessLoop() {
   // First pass shortly after boot, then steady cadence
   setTimeout(() => {
     void safely("scorer", scorerJob);
@@ -550,5 +578,5 @@ export function initProactiveAgents() {
     void safely("followup", followupJob);
   }, 12 * 3600_000);
 
-  console.log("[proactive] agent loop armed: scout (≤1/20h), scorer + guardian (every 10m), budget $" + budgetLimit() + "/mo");
+  console.log("[proactive] in-process loop armed: scout (≤1/20h), scorer + guardian (every 10m), budget $" + budgetLimit() + "/mo");
 }
