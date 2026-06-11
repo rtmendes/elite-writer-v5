@@ -50,14 +50,18 @@ export default function Ideas() {
     return d.toDateString() === new Date().toDateString();
   }).length;
 
+  const [sortBy, setSortBy] = useState<'newest' | 'score' | 'title'>('newest');
   const filtered = useMemo(() => {
-    return state.ideas.filter(idea => {
+    const list = state.ideas.filter(idea => {
       const matchesSearch = !searchQuery ||
         idea.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         idea.angle.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
     });
-  }, [state.ideas, searchQuery]);
+    if (sortBy === 'score') return [...list].sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
+    if (sortBy === 'title') return [...list].sort((a, b) => a.title.localeCompare(b.title));
+    return list;
+  }, [state.ideas, searchQuery, sortBy]);
 
   const groupedByStatus = useMemo(() => {
     const groups: Record<string, typeof filtered> = {};
@@ -233,6 +237,13 @@ export default function Ideas() {
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-7 h-7 text-xs" />
         </div>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+          className="h-7 text-xs rounded-md border border-input bg-background px-2"
+          title="Sort ideas">
+          <option value="newest">Newest</option>
+          <option value="score">Score high→low</option>
+          <option value="title">Title A→Z</option>
+        </select>
         <div className="flex gap-1.5 text-xs text-muted-foreground">
           {STATUSES.map(s => (
             <span key={s} className="flex items-center gap-0.5" title={STATUS_CONFIG[s].label}>
