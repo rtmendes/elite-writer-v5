@@ -104,12 +104,18 @@ export const agenticRouter = router({
       wordCount: z.number().min(300).max(10000).default(2000),
       model: z.string().default("claude-sonnet"),
       depth: z.enum(["quick", "standard", "deep"]).default("standard"),
+      // Index-first KB recall: caller picks ONE knowledge item; its content
+      // rides along as grounding context (never the whole knowledge base)
+      kbContext: z.string().max(24000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const steps: Array<{ step: string; status: string; data?: any }> = [];
 
       // Step 1: Research (Academic APIs + LLM in parallel)
-      const researchPrompt = `You are an elite research analyst. Conduct comprehensive research on this topic and return actionable intelligence for a journalist.
+      const kbBlock = input.kbContext
+        ? `\n\nKNOWLEDGE CONTEXT (from the writer's own knowledge base — treat as trusted grounding, cite it where used):\n${input.kbContext}`
+        : "";
+      const researchPrompt = `You are an elite research analyst. Conduct comprehensive research on this topic and return actionable intelligence for a journalist.${kbBlock}
 
 Topic: ${input.topic}
 ${input.targetPublication ? `Target Publication: ${input.targetPublication}` : ""}
@@ -276,6 +282,7 @@ REQUIREMENTS:
       fullArticleContext: z.string().optional(),
       model: z.string().default("claude-sonnet"),
       targetPublication: z.string().optional(),
+      kbContext: z.string().max(24000).optional(),
     }))
     .mutation(async ({ input }) => {
       const result = await invokeWithModel(input.model, [
@@ -291,6 +298,7 @@ SECTION TO ENHANCE:
 ${input.content}
 
 ${input.fullArticleContext ? `FULL ARTICLE CONTEXT (for coherence):\n${input.fullArticleContext.slice(0, 3000)}` : ""}
+${input.kbContext ? `\nKNOWLEDGE CONTEXT (trusted grounding from the writer's knowledge base):\n${input.kbContext}` : ""}
 
 Return the enhanced section. If you add data points, cite sources. If you restructure, explain why in a brief editorial note at the end wrapped in <!-- --> comments.`,
         },

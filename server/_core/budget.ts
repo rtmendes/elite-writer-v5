@@ -68,6 +68,26 @@ export async function assertBudget(): Promise<void> {
   }
 }
 
+/**
+ * Downgrade ladder (ported from elite-writer-app gateway): past the soft
+ * threshold (default 80% of the cap) requests keep working — on a cheaper
+ * model. Returns the model to actually use.
+ */
+export async function applyBudgetLadder(requestedModel: string): Promise<{ model: string; downgraded: boolean }> {
+  const capUsd = Number(process.env.AI_DAILY_BUDGET_USD || 0);
+  if (!capUsd || Number.isNaN(capUsd)) return { model: requestedModel, downgraded: false };
+  const softPct = Number(process.env.AI_BUDGET_SOFT_PCT || 0.8);
+  const spent = await spentTodayMicros();
+  if (spent < capUsd * 1e6 * softPct) return { model: requestedModel, downgraded: false };
+  const m = requestedModel.toLowerCase();
+  const cheap = process.env.AI_BUDGET_FALLBACK_MODEL || "claude-haiku";
+  // already cheap → leave it
+  if (m.includes("haiku") || m.includes("mini") || m.includes("flash")) {
+    return { model: requestedModel, downgraded: false };
+  }
+  return { model: cheap, downgraded: true };
+}
+
 /** Fire-and-forget usage recording — one aggregated row per (day, model). */
 export function recordUsage(
   model: string,

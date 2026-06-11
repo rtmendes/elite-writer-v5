@@ -4,7 +4,7 @@
  * Falls back to OpenAI if configured and Anthropic unavailable.
  */
 import { ENV } from "./env";
-import { assertBudget, recordUsage } from "./budget";
+import { assertBudget, applyBudgetLadder, recordUsage } from "./budget";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -87,8 +87,14 @@ export function resolveModelSlug(model?: string): string {
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // Budget gate (ported from elite-writer-app gateway): refuses the call when
-  // AI_DAILY_BUDGET_USD is exhausted. Metering happens on every return below.
+  // AI_DAILY_BUDGET_USD is exhausted; past the soft threshold (80% by default)
+  // requests continue on the fallback model instead of failing.
   await assertBudget();
+  const ladder = await applyBudgetLadder(params.model ?? "claude-sonnet");
+  if (ladder.downgraded) {
+    console.warn(`[LLM] budget soft threshold reached — downgrading ${params.model ?? "claude-sonnet"} → ${ladder.model}`);
+    params = { ...params, model: ladder.model };
+  }
   const maxTokens = params.maxTokens ?? params.max_tokens ?? 4096;
   const format = params.response_format ?? params.responseFormat;
   const wantsJson = format?.type === "json_object" || format?.type === "json_schema";

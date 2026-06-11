@@ -160,7 +160,13 @@ export default function Pitches() {
     toast.success('Marked as sent');
   };
 
-  const filtered = state.pitches.filter(p => filterStatus === 'all' || p.status === filterStatus);
+  const [sortBy, setSortBy] = useState<'newest' | 'publication' | 'status'>('newest');
+  const filtered = useMemo(() => {
+    const list = state.pitches.filter(p => filterStatus === 'all' || p.status === filterStatus);
+    if (sortBy === 'publication') return [...list].sort((a, b) => (a.publication_name || '').localeCompare(b.publication_name || ''));
+    if (sortBy === 'status') return [...list].sort((a, b) => (a.status || '').localeCompare(b.status || ''));
+    return list;
+  }, [state.pitches, filterStatus, sortBy]);
   const viewingPitch = state.pitches.find(p => p.id === viewPitch);
 
   const stats = useMemo(() => ({
@@ -289,13 +295,20 @@ export default function Pitches() {
       </div>
 
       {/* Filter */}
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 items-center flex-wrap">
         {['all', 'draft', 'sent', 'accepted', 'rejected', 'no_response'].map(status => (
           <Button key={status} variant={filterStatus === status ? 'default' : 'outline'} size="sm"
             onClick={() => setFilterStatus(status)} className="text-xs capitalize">
             {status === 'all' ? 'All' : status.replace('_', ' ')}
           </Button>
         ))}
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+          className="h-8 text-xs rounded-md border border-input bg-background px-2 ml-auto"
+          title="Sort pitches">
+          <option value="newest">Newest</option>
+          <option value="publication">Publication A→Z</option>
+          <option value="status">Status</option>
+        </select>
       </div>
 
       {/* Pitches List */}

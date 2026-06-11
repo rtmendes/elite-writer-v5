@@ -60,6 +60,19 @@ export function AgenticPanel({
   const [lastResult, setLastResult] = useState<any>(null);
 
   const modelsQuery = trpc.agentic.models.useQuery();
+  // Index-first KB recall: the compact index is cheap; only the ONE picked
+  // item's full content is fetched and sent with the agent call.
+  const [kbItemId, setKbItemId] = useState<number | null>(null);
+  const kbIndexQuery = trpc.kb.index.useQuery();
+  const trpcUtils = trpc.useUtils();
+  const getKbContext = async (): Promise<string | undefined> => {
+    if (!kbItemId) return undefined;
+    try {
+      const item = await trpcUtils.kb.get.fetch({ id: kbItemId });
+      if (!item?.content) return undefined;
+      return `[${item.title}]\n${item.content.slice(0, 12000)}`;
+    } catch { return undefined; }
+  };
   const autonomousDraft = trpc.agentic.autonomousDraft.useMutation();
   const enhanceSection = trpc.agentic.enhanceSection.useMutation();
   const rewrite = trpc.agentic.rewrite.useMutation();
@@ -83,6 +96,7 @@ export function AgenticPanel({
         model: selectedModel,
         wordCount: 2000,
         depth: 'standard',
+        kbContext: await getKbContext(),
       });
       if (result.success && result.content) {
         onContentUpdate(result.content);
@@ -104,6 +118,7 @@ export function AgenticPanel({
         instruction: enhanceInstruction,
         model: selectedModel,
         targetPublication,
+        kbContext: await getKbContext(),
       });
       if (result.success) {
         onContentUpdate(result.enhancedContent);
@@ -197,6 +212,25 @@ export function AgenticPanel({
             {models.length === 0 && (
               <SelectItem value="claude-sonnet">Claude Sonnet 4</SelectItem>
             )}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Knowledge recall — index-first: pick ONE item, only it enters the prompt */}
+      <div>
+        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Knowledge context</label>
+        <Select value={kbItemId ? String(kbItemId) : 'none'} onValueChange={(v) => setKbItemId(v === 'none' ? null : Number(v))}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="None" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            {(kbIndexQuery.data ?? []).map(e => (
+              <SelectItem key={e.id} value={String(e.id)}>
+                <span className="font-medium">{e.title.slice(0, 42)}</span>
+                <span className="text-muted-foreground ml-2 text-[10px]">~{e.approxTokens} tok</span>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
