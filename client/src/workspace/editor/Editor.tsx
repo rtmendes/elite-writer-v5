@@ -14,7 +14,7 @@ import {
   useCreateBlockNote,
 } from "@blocknote/react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { BarChart3, Lightbulb, Table2 } from "lucide-react";
+import { BarChart3, ChevronRight, Lightbulb, Table2 } from "lucide-react";
 import { useMemo } from "react";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
@@ -265,8 +265,38 @@ const CalloutBlock = createReactBlockSpec(
   },
 );
 
+// ── Toggle block (collapsible summary + inline body) ───────────────────────
+const ToggleBlock = createReactBlockSpec(
+  { type: "toggle", propSchema: { open: { default: "true" } }, content: "inline" },
+  {
+    render: ({ block, editor, contentRef }) => {
+      const open = block.props.open !== "false";
+      return (
+        <div style={{ width: "100%", margin: "2px 0" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+            <button
+              contentEditable={false}
+              onClick={() => editor.isEditable && editor.updateBlock(block, { props: { ...block.props, open: open ? "false" : "true" } })}
+              style={{ border: "none", background: "none", cursor: "pointer", padding: 0, color: "var(--text-soft)", transform: open ? "rotate(90deg)" : "none", transition: "transform .12s", lineHeight: 1.4 }}
+              title={open ? "Collapse" : "Expand"}
+            >
+              ▶
+            </button>
+            <div ref={contentRef} style={{ flex: 1, fontWeight: 600 }} />
+          </div>
+          {open && (
+            <div style={{ marginLeft: 20, paddingLeft: 8, borderLeft: "1px solid var(--border)", color: "var(--text-soft)", fontSize: 13, marginTop: 2 }}>
+              Type below this toggle to nest content. (Collapse hides it.)
+            </div>
+          )}
+        </div>
+      );
+    },
+  },
+);
+
 export const schema = BlockNoteSchema.create({
-  blockSpecs: { ...defaultBlockSpecs, chart: ChartBlock, dbview: DbViewBlock, callout: CalloutBlock },
+  blockSpecs: { ...defaultBlockSpecs, chart: ChartBlock, dbview: DbViewBlock, callout: CalloutBlock, toggle: ToggleBlock },
 });
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -336,6 +366,14 @@ export function RichEditor({
                 group: "Basic blocks",
                 icon: <Lightbulb size={18} />,
                 onItemClick: () => insertOrUpdateBlock(editor, { type: "callout" }),
+              },
+              {
+                title: "Toggle",
+                subtext: "Collapsible section",
+                aliases: ["toggle", "collapse", "accordion", "details"],
+                group: "Basic blocks",
+                icon: <ChevronRight size={18} />,
+                onItemClick: () => insertOrUpdateBlock(editor, { type: "toggle" }),
               },
             ],
             query,

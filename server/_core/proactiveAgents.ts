@@ -276,11 +276,11 @@ async function buildPublicationIndex(): Promise<string> {
   const pubs = databases.find((d) => d.name === "Publications");
   if (!pubs) return "";
   const f = (n: string) => pubs.fields.find((x) => x.name.toLowerCase() === n.toLowerCase());
-  const nameF = pubs.fields[0], topicsF = f("Preferred Topics") ?? f("Topics"), catF = f("Category"), payF = f("Pay Max ($)");
+  const nameF = pubs.fields[0], topicsF = f("Preferred Topics") ?? f("Topics"), kwF = f("Keyword Filter"), catF = f("Category"), payF = f("Pay Max ($)");
   const rows = await loadRows(pubs.id);
   return rows.slice(0, 200).map((r) => {
     const name = String(r.values[nameF.id] ?? "").trim();
-    const topics = topicsF ? String(r.values[topicsF.id] ?? "").slice(0, 120) : "";
+    const topics = (topicsF ? String(r.values[topicsF.id] ?? "") : "") || (kwF ? String(r.values[kwF.id] ?? "") : "");
     const cat = catF ? String((catF.options?.find((o) => o.id === r.values[catF.id])?.name) ?? "") : "";
     const pay = payF ? Number(r.values[payF.id]) || 0 : 0;
     return name ? `${name}${cat ? ` [${cat}]` : ""}${pay ? ` ($${pay})` : ""}: ${topics}` : "";
@@ -311,7 +311,7 @@ async function scoutJob() {
   if (news.length === 0) { console.warn("[proactive] scout: no US news fetched (check NEWSAPI_KEY/GNEWS_KEY)"); return; }
   const pubIndex = await buildPublicationIndex();
   const nicheField = pipeline.fields.find((f) => f.name === "Niche" && f.type === "multiselect");
-  const niches = process.env.SCOUT_NICHES || nicheField?.options?.map((o) => o.name).join(", ") || "Finance, Tech, Health, Business";
+  const niches = process.env.SCOUT_NICHES || "chief marketing officer (CMO), small business, AI automation, online growth, women's health, perimenopause and menopause, parenting, executive functioning and ADHD/ADD, homesteading, pilot training, commercial pilot training, women in aviation, business access to capital, ecommerce strategy, entrepreneurship";
   const minRel = Number(process.env.SCOUT_MIN_RELEVANCE ?? 6);
 
   const out = await agentCall(
