@@ -3,7 +3,8 @@ import { like } from "drizzle-orm";
 import { publicProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { getDb } from "../db";
-import { publications } from "../../drizzle/schema";
+import { publications, aiUsage } from "../../drizzle/schema";
+import { sql } from "drizzle-orm";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GAP #2 + #3: Publication SOP data for server-side AI scoring & drafting
@@ -82,6 +83,39 @@ function getPublicationInstructions(pubId: string): string {
 
 export const aiRouter = router({
   // Score an article against publication standards
+  // Server-side AI spend (last 7 days, per day + per model) — feeds dashboards
+  usage: publicProcedure.query(async () => {
+    try {
+      const db = await getDb();
+      if (!db) return { days: [], models: [] };
+      const since = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+      const days = await db
+        .select({
+          day: aiUsage.day,
+          usd: sql<number>`ROUND(SUM(${aiUsage.costMicros}) / 1e6, 4)`,
+          promptTokens: sql<number>`SUM(${aiUsage.promptTokens})`,
+          completionTokens: sql<number>`SUM(${aiUsage.completionTokens})`,
+          calls: sql<number>`SUM(${aiUsage.calls})`,
+        })
+        .from(aiUsage)
+        .where(sql`${aiUsage.day} >= ${since}`)
+        .groupBy(aiUsage.day)
+        .orderBy(aiUsage.day);
+      const models = await db
+        .select({
+          model: aiUsage.model,
+          usd: sql<number>`ROUND(SUM(${aiUsage.costMicros}) / 1e6, 4)`,
+          calls: sql<number>`SUM(${aiUsage.calls})`,
+        })
+        .from(aiUsage)
+        .where(sql`${aiUsage.day} >= ${since}`)
+        .groupBy(aiUsage.model);
+      return { days, models, budgetUsd: Number(process.env.AI_DAILY_BUDGET_USD || 0) || null };
+    } catch {
+      return { days: [], models: [] };
+    }
+  }),
+
   score: publicProcedure
     .input(
       z.object({
