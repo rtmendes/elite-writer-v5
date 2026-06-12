@@ -37,6 +37,32 @@ async function dbExec(query: string): Promise<Array<Record<string, unknown>>> {
   return ((result as unknown as [Array<Record<string, unknown>>])[0] ?? []);
 }
 
+/** The workspace sync tables are normally created lazily by the first client
+ *  sync — but the proactive agents must not depend on a client ever having
+ *  synced. Without this, every job fails on a fresh database (which is exactly
+ *  what happened in production: no wsDatabases table, all agents silently dead). */
+let wsTablesEnsured = false;
+async function ensureWsTables() {
+  if (wsTablesEnsured) return;
+  for (const table of ["wsPages", "wsDatabases", "wsRows"]) {
+    await dbExec(`CREATE TABLE IF NOT EXISTS \`${table}\` (
+      id VARCHAR(32) PRIMARY KEY,
+      data JSON NOT NULL,
+      updatedAt BIGINT NOT NULL DEFAULT 0,
+      deleted BOOLEAN NOT NULL DEFAULT FALSE,
+      INDEX idx_${table}_updated (updatedAt)
+    )`);
+  }
+  try {
+    await dbExec(
+      "ALTER TABLE `wsRows` ADD COLUMN `dbId` VARCHAR(40) " +
+      "GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.dbId'))) STORED, " +
+      "ADD INDEX `idx_wsRows_dbId` (`dbId`)",
+    );
+  } catch { /* already migrated */ }
+  wsTablesEnsured = true;
+}
+
 function parseData<T>(raw: unknown): T {
   return (typeof raw === "string" ? JSON.parse(raw) : raw) as T;
 }
@@ -761,6 +787,7 @@ ${sample}`,
 // ── Scheduler ───────────────────────────────────────────────────────────────
 async function safely(name: string, job: () => Promise<void>) {
   try {
+    await ensureWsTables();
     await job();
   } catch (err) {
     console.warn(`[proactive] ${name} failed:`, err instanceof Error ? err.message : err);
