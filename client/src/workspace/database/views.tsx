@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { ArrowDown, ArrowUp, GripVertical, Plus } from "lucide-react";
-import { createRow, setRowValue } from "../db";
+import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2, X } from "lucide-react";
+import { createRow, deleteRow, setRowValue } from "../db";
 import type { Database, Field, Row, View } from "../types";
-import { Tag, formatCurrency, formatDate } from "../ui";
+import { Menu, Tag, formatCurrency, formatDate } from "../ui";
 import { Cell, ValueChip } from "./cells";
 import { rowTitle, visibleFields } from "./query";
 
@@ -21,6 +21,16 @@ interface ViewProps {
 export function TableView(p: ViewProps) {
   const fields = visibleFields(p.database, p.view);
   const sort = p.view.sorts[0];
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [statusAnchor, setStatusAnchor] = useState<HTMLElement | null>(null);
+  const statusField = p.database.fields.find((f) => f.type === "select" && f.name.toLowerCase() === "status");
+
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  };
+  const allSelected = p.rows.length > 0 && p.rows.every((r) => selected.has(r.id));
 
   const toggleSort = (fieldId: string) => {
     const next: View["sorts"] =
@@ -34,9 +44,54 @@ export function TableView(p: ViewProps) {
 
   return (
     <div className="grid-wrap">
+      {selected.size > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "var(--accent-soft)", borderRadius: 8, margin: "0 0 8px", fontSize: 13 }}>
+          <b style={{ fontWeight: 600 }}>{selected.size} selected</b>
+          {statusField && (
+            <button className="btn sm" onClick={(e) => setStatusAnchor(e.currentTarget)}>Set status…</button>
+          )}
+          <button
+            className="btn sm"
+            onClick={async () => {
+              if (!confirm(`Delete ${selected.size} row${selected.size === 1 ? "" : "s"}?`)) return;
+              for (const id of selected) await deleteRow(id);
+              setSelected(new Set());
+            }}
+          >
+            <Trash2 size={13} /> Delete
+          </button>
+          <button className="btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => setSelected(new Set())}>
+            <X size={13} /> Clear
+          </button>
+          {statusAnchor && statusField && (
+            <Menu anchor={statusAnchor} onClose={() => setStatusAnchor(null)}>
+              {(statusField.options ?? []).map((o) => (
+                <button key={o.id} className="menu-item" onClick={async () => {
+                  for (const id of selected) await setRowValue(id, statusField.id, o.id);
+                  setStatusAnchor(null);
+                  setSelected(new Set());
+                }}>
+                  <Tag color={o.color}>{o.name}</Tag>
+                </button>
+              ))}
+            </Menu>
+          )}
+        </div>
+      )}
       <table className="grid">
         <thead>
           <tr>
+            <th style={{ width: 34 }}>
+              <div className="th-inner" style={{ minWidth: 0, justifyContent: "center" }}>
+                <input
+                  type="checkbox"
+                  className="checkbox-dot"
+                  checked={allSelected}
+                  onChange={() => setSelected(allSelected ? new Set() : new Set(p.rows.map((r) => r.id)))}
+                  title="Select all"
+                />
+              </div>
+            </th>
             {fields.map((f) => (
               <th key={f.id} style={{ minWidth: f.width ?? 150, maxWidth: 420 }}>
                 <div
@@ -64,7 +119,10 @@ export function TableView(p: ViewProps) {
         </thead>
         <tbody>
           {p.rows.map((row) => (
-            <tr key={row.id}>
+            <tr key={row.id} style={selected.has(row.id) ? { background: "var(--accent-soft)" } : undefined}>
+              <td style={{ textAlign: "center" }}>
+                <input type="checkbox" className="checkbox-dot" checked={selected.has(row.id)} onChange={() => toggle(row.id)} />
+              </td>
               {fields.map((f, i) => (
                 <td key={f.id}>
                   {i === 0 ? (
@@ -85,7 +143,7 @@ export function TableView(p: ViewProps) {
             </tr>
           ))}
           <tr>
-            <td colSpan={fields.length + 1} style={{ borderRight: "none" }}>
+            <td colSpan={fields.length + 2} style={{ borderRight: "none" }}>
               <button
                 className="nav-item"
                 style={{ color: "var(--text-faint)" }}

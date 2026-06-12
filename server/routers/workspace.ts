@@ -590,4 +590,61 @@ ${input.research || "(use the outline; mark anything needing reporting as [TK: .
       }
       return { dataUrl: stored, cost, storage: stored === url ? "inline" : "r2" };
     }),
+  // ── Transfer a Google Doc into the workspace as a page ────────────────────
+  importGoogleDoc: protectedProcedure
+    .input(z.object({ docUrlOrId: z.string().min(10).max(400) }))
+    .mutation(async ({ ctx, input }) => {
+      const { getGoogleAccessToken } = await import("./google");
+      const token = await getGoogleAccessToken(ctx.user.id);
+      const idMatch = input.docUrlOrId.match(/[-\w]{25,}/);
+      if (!idMatch) throw new Error("Couldn't find a document ID in that URL.");
+      const docId = idMatch[0];
+      const resp = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) {
+        if (resp.status === 403 || resp.status === 401) {
+          throw new Error("Google denied access — reconnect Google in Settings (the new Docs permission needs a fresh authorization), and make sure this account can open the doc.");
+        }
+        throw new Error(`Google Docs fetch failed: ${resp.status}`);
+      }
+      const doc = await resp.json();
+      const title: string = doc.title ?? "Imported document";
+
+      // Flatten Docs JSON → blocks (headings + paragraphs + list items)
+      const blocks: unknown[] = [];
+      for (const el of doc.body?.content ?? []) {
+        const para = el.paragraph;
+        if (!para) continue;
+        const text = (para.elements ?? [])
+          .map((e: { textRun?: { content?: string } }) => e.textRun?.content ?? "")
+          .join("")
+          .replace(/\n$/, "")
+          .trim();
+        if (!text) continue;
+        const style: string = para.paragraphStyle?.namedStyleType ?? "";
+        if (style.startsWith("HEADING_")) {
+          const level = Math.min(3, Math.max(1, Number(style.replace("HEADING_", "")) || 2));
+          blocks.push({ type: "heading", props: { level }, content: [{ type: "text", text, styles: {} }] });
+        } else if (para.bullet) {
+          blocks.push({ type: "bulletListItem", content: [{ type: "text", text, styles: {} }] });
+        } else {
+          blocks.push({ type: "paragraph", content: [{ type: "text", text, styles: {} }] });
+        }
+      }
+      if (blocks.length === 0) throw new Error("The document appears to be empty (or uses only unsupported elements).");
+
+      // Create the workspace page directly in MySQL (syncs to all clients)
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const pageId = Math.random().toString(36).slice(2, 14);
+      const now = Date.now();
+      const page = { id: pageId, parentId: null, title, icon: "📄", doc: blocks, sortOrder: now, createdAt: now, updatedAt: now };
+      await db.execute(sql`
+        INSERT INTO wsPages (id, data, updatedAt, deleted)
+        VALUES (${pageId}, ${JSON.stringify(page)}, ${now}, FALSE)
+        ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = VALUES(updatedAt), deleted = FALSE
+      `);
+      return { pageId, title, blocks: blocks.length };
+    }),
 });
