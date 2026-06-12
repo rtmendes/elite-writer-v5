@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AppLayout } from "./components/AppLayout";
@@ -32,11 +32,16 @@ import Interviews from "./pages/Interviews";
 import BrandVoice from "./pages/BrandVoice";
 import NotFound from "@/pages/NotFound";
 function Router() {
+  // Page-scoped error boundary, keyed by route: one page's render crash shows
+  // an inline error with the nav still alive, and resets on navigation —
+  // instead of taking down the whole app.
+  const [location] = useLocation();
   return (
     <Switch>
       <Route path="/login" component={Login} />
       <Route>
         <AppLayout>
+          <ErrorBoundary key={location}>
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/giststack" component={Giststack} />
@@ -67,6 +72,7 @@ function Router() {
             <Route path="/404" component={NotFound} />
             <Route component={NotFound} />
           </Switch>
+          </ErrorBoundary>
         </AppLayout>
       </Route>
     </Switch>

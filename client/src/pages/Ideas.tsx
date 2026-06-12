@@ -124,7 +124,7 @@ export default function Ideas() {
           });
         });
         const tokens = result.usage?.total_tokens || 0;
-        toast.success(`${result.data.ideas.length} ideas generated (${tokens} tokens)`);
+        toast.success(`${result.data.ideas?.length ?? 0} ideas generated (${tokens} tokens)`);
         setShowNewIdea(false);
       }
     } catch (err: any) {
