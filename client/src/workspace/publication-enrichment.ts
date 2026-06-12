@@ -93,6 +93,21 @@ export const PUBLICATION_ENRICHMENT: PubEnrichment[] = [
     targetAudience: "Millennial moms and dads with children under age 10.",
   },
   {
+    match: "harvard business review",
+    writingStyle: "Evidence-based management insight written for practitioners. Every piece judged on five criteria: expertise (why you), evidence (data, research, examples), originality (a NEW idea — not a well-executed summary of existing thinking), usefulness (readers can apply it Monday morning), and persuasive, jargon-free writing. Counterintuitive findings backed by rigorous support perform best.",
+    editorLikes: "A 500–750-word narrative outline pitch that shows the argument's spine: the problem, why existing approaches fail, your evidence, and the practical payoff. Authors with proprietary research, original data, or deep field experience.",
+    doNotWrite: "Anything readers 'already know' — the most common rejection; recycled frameworks with new labels; promotion of your firm or product; opinion without evidence; academic writing that buries the takeaway.",
+    targetAudience: "Senior managers, executives, and ambitious professionals worldwide who apply management research to real decisions.",
+    submission: "Submit a 500–750-word narrative outline (not a finished draft) via hbr.org/guidelines-for-authors. Expect heavy editing and revision rounds.",
+  },
+  {
+    match: "digiday",
+    writingStyle: "Insider trade journalism on digital media and marketing. Honest, sharp, and specific — a real point of view earned from doing the work, supported by data and concrete examples from inside the industry.",
+    editorLikes: "A genuine POV from a practitioner, not a marketing pitch in disguise; data over opinion; specifics about how budgets, platforms, and teams actually work; fresh tension or contrarian takes on industry orthodoxy.",
+    doNotWrite: "Thinly veiled product or agency promotion; generic 'state of the industry' takes; opinion with no data; anything a PR team could have written.",
+    targetAudience: "Marketers, agency leaders, publishers, and platform operators who control real budgets and make media-spend decisions.",
+  },
+  {
     match: "black enterprise",
     writingStyle: "Thought-provoking commentary and actionable insight on personal finance, small business, and careers for Black professionals and entrepreneurs — deep dives plus practical steps.",
     editorLikes: "Personal finance, small business, and careers (plus tech, lifestyle, development); pitches sent to the SPECIFIC section editor; relationship-built, well-targeted ideas.",
