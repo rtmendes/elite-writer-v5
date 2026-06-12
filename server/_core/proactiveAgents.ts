@@ -67,12 +67,12 @@ function parseData<T>(raw: unknown): T {
   return (typeof raw === "string" ? JSON.parse(raw) : raw) as T;
 }
 
-async function loadDatabases(): Promise<WsDatabase[]> {
+export async function loadDatabases(): Promise<WsDatabase[]> {
   const rows = await dbExec("SELECT data FROM `wsDatabases` WHERE deleted = FALSE");
   return rows.map((r) => parseData<WsDatabase>(r.data));
 }
 
-async function loadRows(dbId: string): Promise<WsRow[]> {
+export async function loadRows(dbId: string): Promise<WsRow[]> {
   // Uses the indexed generated `dbId` column (see ensureTables migration) so
   // this is an index lookup, not a full-table scan + JS filter. Falls back to
   // a scan only if the column hasn't been added yet (first boot before migrate).
@@ -96,7 +96,7 @@ async function saveDatabase(database: WsDatabase) {
   `);
 }
 
-async function saveRow(row: WsRow) {
+export async function saveRow(row: WsRow) {
   const db = await getDb();
   if (!db) return;
   row.updatedAt = Date.now();
@@ -107,7 +107,7 @@ async function saveRow(row: WsRow) {
   `);
 }
 
-function fieldByName(database: WsDatabase, name: string): WsField | undefined {
+export function fieldByName(database: WsDatabase, name: string): WsField | undefined {
   return database.fields.find((f) => f.name.toLowerCase() === name.toLowerCase());
 }
 
