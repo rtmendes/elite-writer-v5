@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import { initProactiveAgents } from "./proactiveAgents";
+import { registerOpportunityRoutes } from "./opportunitiesApi";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
@@ -67,6 +68,9 @@ async function startServer() {
       },
     });
   });
+
+  // Public Opportunities API for Pipeline HQ (pipeline.insightprofit.live)
+  registerOpportunityRoutes(app);
 
   // Auth routes (login, check, hash)
   registerOAuthRoutes(app);
