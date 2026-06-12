@@ -14,6 +14,7 @@ const SCHEDULE: Record<ProactiveJobName, number> = {
   guardian: 10 * 60_000,
   scout: 60 * 60_000,
   followup: 12 * 3600_000,
+  opportunities: 60 * 60_000,
 };
 
 let started = false;

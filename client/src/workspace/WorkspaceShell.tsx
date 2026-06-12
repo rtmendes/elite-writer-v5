@@ -3,7 +3,7 @@
 // location.hash (#/page/:id, #/db/:id) so it never collides with wouter.
 import { useLiveQuery } from "dexie-react-hooks";
 import {
-  ChevronDown, ChevronRight, Cloud, CloudOff, Download, Home, Plus, RefreshCw, Settings, Upload,
+  ChevronDown, ChevronRight, Cloud, CloudOff, Download, FileDown, Home, Plus, RefreshCw, Settings, Upload,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { DEFAULT_ROUTES, MODEL_CHOICES, getBudget, getRoutes, monthSpend, setBudget, setRouteModel, type AgentTask } from "./agent";
@@ -280,6 +280,26 @@ export default function WorkspaceShell() {
             {roots.map((p) => (
               <PageNode key={p.id} page={p} allPages={pages} currentHash={hash} navigate={navigate} depth={0} />
             ))}
+            <button
+              className="nav-item"
+              style={{ color: "var(--text-faint)" }}
+              title="Transfer a Google Doc into the workspace as a page"
+              onClick={async () => {
+                const url = prompt("Paste the Google Doc URL (your Google account must be connected in Settings):");
+                if (!url?.trim()) return;
+                try {
+                  const { wsTrpc } = await import("./trpcClient");
+                  const res = await wsTrpc.workspace.importGoogleDoc.mutate({ docUrlOrId: url.trim() });
+                  await pullAll();
+                  navigate(`#/page/${res.pageId}`);
+                } catch (e) {
+                  alert(e instanceof Error ? e.message : String(e));
+                }
+              }}
+            >
+              <span className="nav-icon"><FileDown size={14} /></span>
+              <span className="nav-label">Import Google Doc…</span>
+            </button>
             <div className="sidebar-section-label" style={{ marginTop: 14 }}>
               Databases
               <button

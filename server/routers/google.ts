@@ -12,7 +12,7 @@ import { googleTokens, type InsertGoogleToken } from "../../drizzle/schema";
 
 // ─── Token Management ─────────────────────────────────────
 
-async function getGoogleAccessToken(userId: number): Promise<string> {
+export async function getGoogleAccessToken(userId: number): Promise<string> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
@@ -73,6 +73,7 @@ export const googleRouter = router({
     const scopes = [
       "https://www.googleapis.com/auth/spreadsheets",
       "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/documents.readonly",
       "https://www.googleapis.com/auth/gmail.send",
       "https://www.googleapis.com/auth/userinfo.email",
     ].join(" ");

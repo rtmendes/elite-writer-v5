@@ -18,6 +18,7 @@ import { nanoid } from "nanoid";
 import { getDb } from "../db";
 import { AGENT_PERSONAS } from "../routers/agents";
 import { ENV } from "./env";
+import { exaConfigured, exaSearch } from "./exa";
 import { invokeLLM } from "./llm";
 
 const uid = () => nanoid(12);
@@ -514,6 +515,119 @@ async function followupJob() {
   }
 }
 
+
+// ── Job 5: Opportunity scout (Exa) ──────────────────────────────────────────
+// Daily semantic-web sweep for fresh calls-for-pitches / paid writing
+// opportunities on the operator's beats, filed into an "Opportunities"
+// database (created on first run). Dedupes by URL. Relevance-gated.
+const OPP_FIELDS: Array<{ name: string; type: string; options?: WsSelectOption[] }> = [
+  { name: "Opportunity", type: "text" },
+  { name: "Outlet/Source", type: "text" },
+  { name: "URL", type: "url" },
+  { name: "Pay", type: "text" },
+  { name: "Deadline", type: "text" },
+  { name: "Beat", type: "text" },
+  { name: "Status", type: "select", options: [
+    { id: "opp-new", name: "New", color: "blue" },
+    { id: "opp-rev", name: "Reviewing", color: "purple" },
+    { id: "opp-pit", name: "Pitched", color: "green" },
+    { id: "opp-skip", name: "Skipped", color: "gray" },
+  ] },
+  { name: "Found", type: "date" },
+];
+
+async function ensureOpportunitiesDb(): Promise<WsDatabase | null> {
+  const databases = await loadDatabases();
+  let opps = databases.find((d) => d.name === "Opportunities");
+  if (opps) return opps;
+  const now = Date.now();
+  opps = {
+    id: uid(),
+    name: "Opportunities",
+    icon: "📣",
+    description: "Live writing opportunities — calls for pitches, contributor openings, paid assignments — found daily by the Exa opportunity scout. Review New items each morning; move to Pitched or Skipped.",
+    fields: OPP_FIELDS.map((f) => ({ id: uid(), name: f.name, type: f.type, options: f.options, width: f.name === "Opportunity" ? 320 : 160 })),
+    views: [{ id: uid(), name: "All", type: "table", filters: [], sorts: [] }],
+    createdAt: now,
+    updatedAt: now,
+  } as unknown as WsDatabase;
+  await saveDatabase(opps);
+  return opps;
+}
+
+async function opportunityJob() {
+  if (!exaConfigured()) return;
+  const databases = await loadDatabases();
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  if (ledger) {
+    const recent = (await loadRows(ledger.id)).some(
+      (r) => r.createdAt > Date.now() - 20 * 3600e3 && JSON.stringify(r.values).includes("Opportunity scout"),
+    );
+    if (recent) return; // ≤1 run per ~20h
+  }
+  const opps = await ensureOpportunitiesDb();
+  if (!opps) return;
+  const f = (n: string) => fieldByName(opps, n);
+  const urlField = f("URL"), titleField = f("Opportunity");
+  if (!urlField || !titleField) return;
+
+  const existing = new Set(
+    (await loadRows(opps.id)).map((r) => String(r.values[urlField.id] ?? "").trim().toLowerCase()).filter(Boolean),
+  );
+
+  const niches = process.env.SCOUT_NICHES || "small business, AI automation, women's health, menopause, parenting, ADHD, homesteading, aviation, ecommerce, entrepreneurship, marketing";
+  // Three cheap searches (= $0.015/day)
+  const queries = [
+    "call for pitches freelance writers paid submission this week",
+    `editor seeking pitches freelance ${niches.split(",").slice(0, 4).join(" ")}`,
+    "publication accepting contributor applications paid writing opportunity",
+  ];
+  const results = (await Promise.all(queries.map((q) => exaSearch(q, 10, { daysBack: 10, includeText: true })))).flat();
+  const fresh = results.filter((r) => r.url && !existing.has(r.url.trim().toLowerCase()));
+  if (fresh.length === 0) { console.log("[proactive] opportunity scout: nothing new"); return; }
+
+  // One haiku call structures + relevance-gates the batch
+  const out = await agentCall(
+    "Opportunity scout",
+    "scout",
+    "anthropic/claude-haiku-4.5",
+    `From these web results, extract REAL paid writing opportunities (calls for pitches, contributor openings, assignments) relevant to these beats: ${niches}.
+Discard: job boards aggregating stale listings, content mills, unpaid gigs, anything older than ~2 weeks, duplicates.
+Return STRICT JSON — an array (max 8) of:
+[{"title": "<one-line opportunity>", "source": "<outlet/site>", "url": "<url>", "pay": "<pay if stated, else ''>", "deadline": "<if stated, else ''>", "beat": "<matching beat>", "relevance": <1-10>}]
+
+WEB RESULTS:
+${fresh.slice(0, 24).map((r, i) => `${i + 1}. ${r.title} | ${r.url}${r.text ? ` | ${r.text.slice(0, 250)}` : ""}`).join("\n")}`,
+    "daily opportunity sweep",
+    3000,
+  );
+  if (!out) return;
+  let items: Array<{ title?: string; source?: string; url?: string; pay?: string; deadline?: string; beat?: string; relevance?: number }> = [];
+  try { items = JSON.parse(out.replace(/^```(json)?|```$/g, "").trim()); } catch { return; }
+  items = items.filter((i) => i.title && i.url && (Number(i.relevance) || 0) >= 6 && !existing.has(i.url!.trim().toLowerCase()));
+
+  const statusField = f("Status");
+  const newOpt = statusField?.options?.find((o) => o.name === "New");
+  let filed = 0;
+  for (const item of items.slice(0, 8)) {
+    const now = Date.now();
+    const values: Record<string, unknown> = {
+      [titleField.id]: item.title,
+      [urlField.id]: item.url,
+    };
+    const set = (name: string, v: unknown) => { const fl = f(name); if (fl && v) values[fl.id] = v; };
+    set("Outlet/Source", item.source);
+    set("Pay", item.pay);
+    set("Deadline", item.deadline);
+    set("Beat", item.beat);
+    if (statusField && newOpt) values[statusField.id] = newOpt.id;
+    set("Found", new Date().toISOString().slice(0, 10));
+    await saveRow({ id: uid(), dbId: opps.id, values, sortOrder: now, createdAt: now, updatedAt: now });
+    filed++;
+  }
+  console.log(`[proactive] opportunity scout filed ${filed} new opportunities`);
+}
+
 // ── Scheduler ───────────────────────────────────────────────────────────────
 async function safely(name: string, job: () => Promise<void>) {
   try {
@@ -524,12 +638,13 @@ async function safely(name: string, job: () => Promise<void>) {
 }
 
 // Dispatch map so the durable queue worker (queue.ts) can run the same jobs.
-export type ProactiveJobName = "scout" | "scorer" | "guardian" | "followup";
+export type ProactiveJobName = "scout" | "scorer" | "guardian" | "followup" | "opportunities";
 export const PROACTIVE_JOBS: Record<ProactiveJobName, () => Promise<void>> = {
   scout: () => safely("scout", scoutJob),
   scorer: () => safely("scorer", scorerJob),
   guardian: () => safely("guardian", guardianJob),
   followup: () => safely("followup", followupJob),
+  opportunities: () => safely("opportunities", opportunityJob),
 };
 
 export function initProactiveAgents() {
@@ -572,6 +687,7 @@ function armInProcessLoop() {
 
   setInterval(() => {
     void safely("scout", scoutJob);
+    void safely("opportunities", opportunityJob);
   }, 60 * 60_000);
 
   setInterval(() => {

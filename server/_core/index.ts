@@ -63,6 +63,7 @@ async function startServer() {
         redis: Boolean(process.env.REDIS_URL),
         newsapi: Boolean(process.env.NEWSAPI_KEY || process.env.GNEWS_KEY),
         slack: Boolean(process.env.SLACK_WEBHOOK_URL),
+        exa: Boolean(process.env.EXA_API_KEY),
       },
     });
   });
