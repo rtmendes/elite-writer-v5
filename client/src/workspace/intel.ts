@@ -523,7 +523,7 @@ const BRAND_FIELD_DEFS: Array<{ name: string; type: Field["type"]; width: number
  *  version (seed:pub-enrich:vN) when PUBLICATION_ENRICHMENT changes so a new
  *  batch re-applies. Overwrites the style fields because curated data > swipe. */
 async function ensurePublicationEnrichment() {
-  const VERSION = "seed:pub-enrich:v1";
+  const VERSION = "seed:pub-enrich:v2";
   if (await db.kv.get(VERSION)) return;
   const pubs = (await db.databases.toArray()).find((d) => d.name === "Publications");
   if (!pubs) return;
