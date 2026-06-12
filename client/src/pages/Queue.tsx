@@ -505,7 +505,7 @@ function QueueCard({ item, onOpenInWriter, onDelete, onUpdateStatus }: {
               <span className="flex items-center gap-1">
                 <Calendar className="w-2.5 h-2.5" /> {formatRelativeTime(item.createdAt)}
               </span>
-              {item.tags.length > 0 && (
+              {(item.tags?.length ?? 0) > 0 && (
                 <span className="flex items-center gap-1">
                   {item.tags.map(t => <Badge key={t} variant="outline" className="text-[8px] px-1 py-0">{t}</Badge>)}
                 </span>

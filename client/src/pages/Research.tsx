@@ -286,8 +286,8 @@ export default function Research() {
     r.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const totalDP = state.research.reduce((sum, r) => sum + r.data_points.length, 0);
-  const totalSources = state.research.reduce((sum, r) => sum + r.sources.length, 0);
+  const totalDP = state.research.reduce((sum, r) => sum + (r.data_points?.length ?? 0), 0);
+  const totalSources = state.research.reduce((sum, r) => sum + (r.sources?.length ?? 0), 0);
 
   // Ideas that could use research
   const unresearcedIdeas = state.ideas
@@ -542,7 +542,7 @@ export default function Research() {
                     <h3 className="text-sm font-medium leading-tight">{note.title}</h3>
                     <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => {
-                        navigator.clipboard.writeText(note.content);
+                        navigator.clipboard.writeText(note.content || '');
                         toast.success('Copied to clipboard');
                       }}>
                         <Copy className="w-3 h-3" />
@@ -562,11 +562,11 @@ export default function Research() {
                       <ResearchNoteContent content={note.content} />
                     </div>
                   )}
-                  {note.data_points.length > 0 && (
+                  {(note.data_points?.length ?? 0) > 0 && (
                     <div className="flex flex-wrap gap-1 mb-1.5">
                       {note.data_points.slice(0, 3).map((dp, i) => (
                         <span key={i} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/5 border border-primary/10 text-primary">
-                          <BarChart3 className="w-2.5 h-2.5" /> {dp.label}: {dp.value.slice(0, 40)}
+                          <BarChart3 className="w-2.5 h-2.5" /> {dp.label || 'Data'}: {String(dp.value ?? '').slice(0, 40)}
                         </span>
                       ))}
                       {note.data_points.length > 3 && (
@@ -577,10 +577,10 @@ export default function Research() {
                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                     <Clock className="w-2.5 h-2.5" />
                     {new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    {note.sources.length > 0 && (
+                    {(note.sources?.length ?? 0) > 0 && (
                       <>
                         <span>·</span>
-                        <span>{note.sources.length} sources</span>
+                        <span>{note.sources?.length} sources</span>
                       </>
                     )}
                   </div>
