@@ -77,7 +77,31 @@ const MODEL_ALIASES: Record<string, string> = {
   "gemini-flash": "google/gemini-2.5-flash",
   "gemini-pro": "google/gemini-2.5-pro",
   "deepseek-r1": "deepseek/deepseek-r1",
+  "free": "openai/gpt-oss-120b:free",
+  "free-big": "nvidia/nemotron-3-ultra-550b-a55b:free",
 };
+
+/**
+ * Cost tiers — the house routing policy. Routine agent work rides FREE
+ * OpenRouter models (the detailed personas/prompts carry the quality);
+ * paid Sonnet is reserved for publish-grade prose. Opus is never a default.
+ * With a paid balance on the account OpenRouter allows 1000 free requests/day.
+ */
+export const TIER = {
+  free: "openai/gpt-oss-120b:free",
+  freeBig: "nvidia/nemotron-3-ultra-550b-a55b:free",
+  cheap: "anthropic/claude-haiku-4.5",
+  standard: "anthropic/claude-sonnet-4.6",
+} as const;
+
+/** When a :free model is rate-limited or down, walk this ladder before
+ *  spending money — haiku last so a busy free pool never blocks a job. */
+const FREE_FALLBACKS = [
+  "openai/gpt-oss-120b:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "anthropic/claude-haiku-4.5",
+];
 
 export function resolveModelSlug(model?: string): string {
   const m = model ?? "claude-sonnet-4";
@@ -104,16 +128,23 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // Priority: OpenRouter (cheapest, multi-model) → OpenAI → Anthropic → Forge
   // OpenRouter handles all model prefixes (anthropic/, openai/, google/, etc.)
 
-  // Step 1: OpenRouter first — handles any model, cheapest routing
+  // Step 1: OpenRouter first — handles any model, cheapest routing.
+  // :free models get a fallback ladder (other free models, then haiku) so a
+  // rate-limited free pool degrades to cents instead of failing the job.
   if (ENV.openrouterApiKey) {
-    try {
-      // Normalize bare aliases to valid OpenRouter slugs (right model family)
-      const orModel = resolveModelSlug(params.model ?? model);
-      const orRes = await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: orModel });
-      recordUsage(orRes.model || orModel, orRes.usage);
-      return orRes;
-    } catch (err: any) {
-      console.warn(`[LLM] OpenRouter failed (${err?.message?.slice(0, 100)}), falling back...`);
+    // Normalize bare aliases to valid OpenRouter slugs (right model family)
+    const orModel = resolveModelSlug(params.model ?? model);
+    const candidates = orModel.endsWith(":free")
+      ? [orModel, ...FREE_FALLBACKS.filter((m) => m !== orModel)]
+      : [orModel];
+    for (const candidate of candidates) {
+      try {
+        const orRes = await invokeOpenRouter(params.messages, { maxTokens, format, temperature, model: candidate });
+        recordUsage(orRes.model || candidate, orRes.usage);
+        return orRes;
+      } catch (err: any) {
+        console.warn(`[LLM] OpenRouter ${candidate} failed (${err?.message?.slice(0, 100)})${candidates.length > 1 ? ", trying next" : ", falling back..."}`);
+      }
     }
   }
 

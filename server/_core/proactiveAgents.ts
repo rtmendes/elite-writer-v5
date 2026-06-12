@@ -19,7 +19,7 @@ import { getDb } from "../db";
 import { AGENT_PERSONAS } from "../routers/agents";
 import { ENV } from "./env";
 import { exaConfigured, exaSearch } from "./exa";
-import { invokeLLM } from "./llm";
+import { invokeLLM, TIER } from "./llm";
 
 const uid = () => nanoid(12);
 
@@ -326,7 +326,7 @@ async function scoutJob() {
   const out = await agentCall(
     "Scout ideas",
     "scout",
-    "anthropic/claude-sonnet-4.6",
+    TIER.freeBig,
     `From the US news headlines below, file the 3 strongest news-pegged article ideas worth $8,000+ at premium outlets.
 HARD FILTERS:
 - USA audience only. Discard anything not relevant to a US readership.
@@ -422,7 +422,7 @@ async function scorerJob() {
     const out = await agentCall(
       "Score idea",
       "scorer",
-      "anthropic/claude-haiku-4.5",
+      TIER.free,
       `Score this article idea for a premium-outlet pitch. Return EXACTLY:
 SCORE: <1-10 overall>
 NEWSWORTHINESS: <1-10> <one short reason>
@@ -476,7 +476,7 @@ async function guardianJob() {
     const out = await agentCall(
       "Guardian review",
       "quality",
-      "anthropic/claude-sonnet-4.6",
+      TIER.standard,
       `Review this article package before it goes to an editor. Return EXACTLY:
 VERDICT: APPROVED or BLOCKED
 Then 3-6 "- " bullets: if BLOCKED, the specific blockers (missing sourcing, weak peg, unverified claims, thin sections); if APPROVED, the remaining nice-to-haves.
@@ -590,7 +590,7 @@ async function opportunityJob() {
   const out = await agentCall(
     "Opportunity scout",
     "scout",
-    "anthropic/claude-haiku-4.5",
+    TIER.free,
     `From these web results, extract REAL paid writing opportunities (calls for pitches, contributor openings, assignments) relevant to these beats: ${niches}.
 Discard: job boards aggregating stale listings, content mills, unpaid gigs, anything older than ~2 weeks, duplicates.
 Return STRICT JSON — an array (max 8) of:

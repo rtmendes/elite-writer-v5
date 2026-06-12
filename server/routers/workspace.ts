@@ -12,7 +12,7 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { ENV } from "../_core/env";
-import { invokeLLM } from "../_core/llm";
+import { invokeLLM, TIER } from "../_core/llm";
 import { uploadDataUrl } from "../_core/storage";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -54,17 +54,19 @@ const TASKS = ["score_idea", "research_brief", "match_publications", "create_off
 type AgentTask = (typeof TASKS)[number];
 
 // Cheapest capable model per task (OpenRouter slugs; invokeLLM routes them).
+// House policy: routine tasks ride FREE models (the personas + playbook prompts
+// carry the quality); paid Sonnet only where the output ships to an editor.
 const TASK_MODELS: Record<AgentTask, { model: string; maxTokens: number; persona?: keyof typeof AGENT_PERSONAS }> = {
-  score_idea: { model: "anthropic/claude-haiku-4.5", maxTokens: 2000, persona: "scorer" },
-  match_publications: { model: "anthropic/claude-haiku-4.5", maxTokens: 3000, persona: "analyst" },
-  research_brief: { model: "anthropic/claude-sonnet-4.6", maxTokens: 8000, persona: "deepresearch" },
-  create_offer: { model: "anthropic/claude-opus-4.8", maxTokens: 8000, persona: "editor" },
-  humanize: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "rewriter" },
-  tighten: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "editor" },
-  expand: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "drafter" },
-  headlines: { model: "anthropic/claude-opus-4.8", maxTokens: 4000, persona: "outliner" },
-  continue: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "continuator" },
-  proofread: { model: "anthropic/claude-sonnet-4.6", maxTokens: 6000, persona: "proofreader" },
+  score_idea: { model: TIER.free, maxTokens: 2000, persona: "scorer" },
+  match_publications: { model: TIER.free, maxTokens: 3000, persona: "analyst" },
+  research_brief: { model: TIER.freeBig, maxTokens: 8000, persona: "deepresearch" },
+  create_offer: { model: TIER.standard, maxTokens: 8000, persona: "editor" },
+  humanize: { model: TIER.standard, maxTokens: 32000, persona: "rewriter" },
+  tighten: { model: TIER.standard, maxTokens: 32000, persona: "editor" },
+  expand: { model: TIER.standard, maxTokens: 32000, persona: "drafter" },
+  headlines: { model: TIER.free, maxTokens: 4000, persona: "outliner" },
+  continue: { model: TIER.standard, maxTokens: 32000, persona: "continuator" },
+  proofread: { model: TIER.free, maxTokens: 6000, persona: "proofreader" },
 };
 
 
@@ -308,7 +310,7 @@ export const workspaceRouter = router({
           { role: "system", content: persona.systemPrompt + HOUSE_RULES },
           { role: "user", content: `Extract every verifiable factual claim from this draft material (statistics, dates, named facts, attributions). Return STRICT JSON only: an array of strings, max 12 claims, each a single self-contained sentence.\n\nMATERIAL:\n${input.text}` },
         ],
-        model: "anthropic/claude-haiku-4.5",
+        model: TIER.free,
         maxTokens: 2000,
       });
       let claims: string[] = [];
@@ -339,7 +341,7 @@ ${claims.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 LIVE VERIFICATION RESEARCH:
 ${live || "(no live research available — mark all claims TK)"}` },
         ],
-        model: "anthropic/claude-sonnet-4.6",
+        model: TIER.freeBig,
         maxTokens: 4000,
       });
 
@@ -376,7 +378,7 @@ ${live || "(no live research available — mark all claims TK)"}` },
       const drafter = AGENT_PERSONAS.drafter;
       const angles = [
         { label: "A", model: "anthropic/claude-sonnet-4.6", instruction: "Lead with the strongest data point. Authoritative, analytical register." },
-        { label: "B", model: "anthropic/claude-opus-4.8", instruction: "Lead with a human scene or concrete moment. Narrative register, then widen to the stakes." },
+        { label: "B", model: TIER.standard, instruction: "Lead with a human scene or concrete moment. Narrative register, then widen to the stakes." },
       ];
       const drafts = await Promise.all(
         angles.map(async (a) => {
@@ -407,7 +409,7 @@ ${drafts[0].text}
 DRAFT B:
 ${drafts[1].text}` },
         ],
-        model: "anthropic/claude-haiku-4.5",
+        model: TIER.free,
         maxTokens: 1500,
       });
       const judgeText = judgeRes.choices?.[0]?.message?.content?.trim() ?? "";
@@ -474,7 +476,7 @@ OFFER TIE-IN: <where and how a backend offer is woven in, naturally>
 BRIEF AND RESEARCH:
 ${input.brief}` },
         ],
-        model: "anthropic/claude-sonnet-4.6",
+        model: TIER.freeBig,
         maxTokens: 6000,
       });
       const text = result.choices?.[0]?.message?.content?.trim() ?? "";
@@ -499,7 +501,7 @@ Push for more original observations, harder data, stronger reader payoff, and a 
 OUTLINE:
 ${input.outline}` },
         ],
-        model: "anthropic/claude-sonnet-4.6",
+        model: TIER.free,
         maxTokens: 2500,
       });
       let suggestions: Array<{ area: string; suggestion: string }> = [];
@@ -527,7 +529,7 @@ ${input.outline}
 RESEARCH:
 ${input.research || "(use the outline; mark anything needing reporting as [TK: ...])"}` },
         ],
-        model: "anthropic/claude-opus-4-8",
+        model: TIER.standard,
         maxTokens: 16000,
       });
       const text = result.choices?.[0]?.message?.content?.trim() ?? "";
@@ -552,7 +554,7 @@ ${input.research || "(use the outline; mark anything needing reporting as [TK: .
             { role: "system", content: ad.systemPrompt + "\nReturn ONLY the final image-generation prompt — one vivid paragraph, no preamble. Always end with: 16:9, no text, no logos, upper third calm for a headline overlay." },
             { role: "user", content: `Art-direct the hero image for: "${input.title}".${input.styleHint ? `\nVisual identity to honor: ${input.styleHint}` : ""}` },
           ],
-          model: "anthropic/claude-haiku-4.5",
+          model: TIER.free,
           maxTokens: 600,
         });
         const text = refined.choices?.[0]?.message?.content?.trim();
