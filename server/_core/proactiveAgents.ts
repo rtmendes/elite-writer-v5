@@ -629,6 +629,133 @@ ${fresh.slice(0, 24).map((r, i) => `${i + 1}. ${r.title} | ${r.url}${r.text ? ` 
   console.log(`[proactive] opportunity scout filed ${filed} new opportunities`);
 }
 
+// ── Model Quality Watch ─────────────────────────────────────────────────────
+// Daily benchmark proving the free fleet still performs at expert level.
+// Runs one fixed drafting probe on the free tiers AND a paid reference model,
+// has the (free) judge score each against the house calibration anchors, and
+// writes results to the "Model Quality Watch" workspace database. If a free
+// tier falls ≥1.5 points behind paid or below 7/10 absolute, the row is marked
+// UPGRADE and a Slack alert fires — the operator's signal that a paid model
+// would genuinely earn its cost on that stage.
+const WATCH_PROBE = `Write the opening 250 words of a Business Insider-style as-told-to essay: "I left a six-figure airline job to teach checkride prep — and tripled my income." Open in a concrete scene. Include at least one specific number in every paragraph. US English, AP style. Return only the prose.`;
+
+async function ensureModelWatchDb(): Promise<WsDatabase | null> {
+  const databases = await loadDatabases();
+  let watch = databases.find((d) => d.name === "Model Quality Watch");
+  if (watch) return watch;
+  const now = Date.now();
+  watch = {
+    id: uid(),
+    name: "Model Quality Watch",
+    icon: "🛰️",
+    description: "Daily free-vs-paid model benchmark. The judge scores a fixed drafting probe against the house calibration (5 = mid-tier blog, 7 = trade outlet, 9 = top-tier). UPGRADE rows mean a paid model is currently worth the money for that work — review before the next writing sprint.",
+    fields: [
+      { id: uid(), name: "Date", type: "text", width: 110 },
+      { id: uid(), name: "Model", type: "text", width: 280 },
+      { id: uid(), name: "Tier", type: "select", width: 110, options: [
+        { id: uid(), name: "Free", color: "#10b981" },
+        { id: uid(), name: "Free-Big", color: "#0ea5e9" },
+        { id: uid(), name: "Paid Ref", color: "#f59e0b" },
+      ] },
+      { id: uid(), name: "Score", type: "number", width: 90 },
+      { id: uid(), name: "Verdict", type: "select", width: 120, options: [
+        { id: uid(), name: "OK", color: "#10b981" },
+        { id: uid(), name: "WATCH", color: "#f59e0b" },
+        { id: uid(), name: "UPGRADE", color: "#ef4444" },
+        { id: uid(), name: "REF", color: "#a3a3a3" },
+      ] },
+      { id: uid(), name: "Notes", type: "longtext", width: 420 },
+    ],
+    views: [{ id: uid(), name: "All", type: "table", filters: [], sorts: [] }],
+    createdAt: now,
+    updatedAt: now,
+  } as unknown as WsDatabase;
+  await saveDatabase(watch);
+  return watch;
+}
+
+async function modelWatchJob() {
+  const databases = await loadDatabases();
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  if (ledger) {
+    const recent = (await loadRows(ledger.id)).some(
+      (r) => r.createdAt > Date.now() - 20 * 3600e3 && JSON.stringify(r.values).includes("Model watch"),
+    );
+    if (recent) return; // ≤1 run per ~20h
+  }
+  const watch = await ensureModelWatchDb();
+  if (!watch) return;
+  const f = (n: string) => fieldByName(watch, n);
+  const fDate = f("Date"), fModel = f("Model"), fTier = f("Tier"), fScore = f("Score"), fVerdict = f("Verdict"), fNotes = f("Notes");
+  if (!fDate || !fModel || !fScore) return;
+
+  const candidates = [
+    { tier: "Free", model: TIER.free },
+    { tier: "Free-Big", model: TIER.freeBig },
+    { tier: "Paid Ref", model: "anthropic/claude-sonnet-4.6" },
+  ];
+  const results: Array<{ tier: string; model: string; score: number; notes: string }> = [];
+  for (const c of candidates) {
+    const sample = await agentCall("Model watch probe", "drafter", c.model, WATCH_PROBE, `model-watch ${c.tier}`, 700);
+    if (!sample) { results.push({ tier: c.tier, model: c.model, score: 0, notes: "no output (model unavailable)" }); continue; }
+    const judged = await agentCall(
+      "Model watch judge",
+      "scorer",
+      TIER.freeBig,
+      `Score this draft opening against the calibration anchors (5 = publishable mid-tier blog, 7 = solid trade outlet, 9 = top-tier ready). Apply the mandatory penalties for AI-tell phrasing and unsupported vagueness. Return STRICT JSON only: {"score": <1-10, one decimal allowed>, "slop": ["<each AI-tell or weakness found, max 4>"]}
+
+DRAFT:
+${sample}`,
+      `model-watch judge ${c.tier}`,
+      400,
+    );
+    let score = 0; let slop: string[] = [];
+    try {
+      const parsed = JSON.parse((judged ?? "").replace(/^```(?:json)?|```$/gm, "").trim());
+      score = Number(parsed.score) || 0;
+      slop = Array.isArray(parsed.slop) ? parsed.slop.map(String).slice(0, 4) : [];
+    } catch {
+      const m = (judged ?? "").match(/"?score"?\s*[:=]\s*([\d.]+)/i);
+      score = m ? Number(m[1]) : 0;
+    }
+    results.push({ tier: c.tier, model: c.model, score, notes: slop.join(" | ") || "clean" });
+  }
+
+  const paid = results.find((r) => r.tier === "Paid Ref")?.score ?? 0;
+  const bestFree = Math.max(...results.filter((r) => r.tier !== "Paid Ref").map((r) => r.score), 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const now = Date.now();
+  for (const r of results) {
+    let verdict = "REF";
+    if (r.tier !== "Paid Ref") {
+      verdict = r.score >= 7 && paid - r.score < 1.5 ? "OK" : paid - r.score >= 1.5 ? "UPGRADE" : "WATCH";
+    }
+    const verdictOption = fVerdict?.options?.find((o) => o.name === verdict);
+    const tierOption = fTier?.options?.find((o) => o.name === r.tier);
+    await saveRow({
+      id: uid(),
+      dbId: watch.id,
+      values: {
+        [fDate.id]: today,
+        [fModel.id]: r.model,
+        ...(fTier && tierOption ? { [fTier.id]: tierOption.id } : {}),
+        [fScore.id]: r.score,
+        ...(fVerdict && verdictOption ? { [fVerdict.id]: verdictOption.id } : {}),
+        ...(fNotes ? { [fNotes.id]: r.notes } : {}),
+      },
+      sortOrder: now,
+      createdAt: now,
+      updatedAt: now,
+    } as WsRow);
+  }
+  if (bestFree < 7 || paid - bestFree >= 1.5) {
+    void slackAlert(`🛰️ Model Quality Watch: free fleet scored ${bestFree.toFixed(1)} vs paid ${paid.toFixed(1)}. A paid model is currently worth it for drafting — review "Model Quality Watch" in the workspace.`);
+    console.warn(`[proactive] model watch: UPGRADE signal (free ${bestFree} vs paid ${paid})`);
+  } else {
+    console.log(`[proactive] model watch: free fleet OK (free ${bestFree} vs paid ${paid})`);
+  }
+}
+
 // ── Scheduler ───────────────────────────────────────────────────────────────
 async function safely(name: string, job: () => Promise<void>) {
   try {
@@ -639,13 +766,14 @@ async function safely(name: string, job: () => Promise<void>) {
 }
 
 // Dispatch map so the durable queue worker (queue.ts) can run the same jobs.
-export type ProactiveJobName = "scout" | "scorer" | "guardian" | "followup" | "opportunities";
+export type ProactiveJobName = "scout" | "scorer" | "guardian" | "followup" | "opportunities" | "modelwatch";
 export const PROACTIVE_JOBS: Record<ProactiveJobName, () => Promise<void>> = {
   scout: () => safely("scout", scoutJob),
   scorer: () => safely("scorer", scorerJob),
   guardian: () => safely("guardian", guardianJob),
   followup: () => safely("followup", followupJob),
   opportunities: () => safely("opportunities", opportunityJob),
+  modelwatch: () => safely("modelwatch", modelWatchJob),
 };
 
 export function initProactiveAgents() {
@@ -689,6 +817,7 @@ function armInProcessLoop() {
   setInterval(() => {
     void safely("scout", scoutJob);
     void safely("opportunities", opportunityJob);
+    void safely("modelwatch", modelWatchJob);
   }, 60 * 60_000);
 
   setInterval(() => {

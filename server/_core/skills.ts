@@ -29,7 +29,7 @@ async function dbExec(query: string): Promise<Array<Record<string, unknown>>> {
 
 const parse = <T,>(raw: unknown): T => (typeof raw === "string" ? JSON.parse(raw) : raw) as T;
 
-const STAGES = ["Discover", "Research", "Plan", "Draft", "Edit", "Verify", "Optimize", "Visuals", "Govern"] as const;
+const STAGES = ["Discover", "Research", "Plan", "Draft", "Edit", "Verify", "Optimize", "Visuals", "Pitch & Sell", "Govern"] as const;
 type Stage = (typeof STAGES)[number];
 
 /** Shared anti-slop charter — referenced verbatim inside the prose-facing SOPs. */
@@ -103,6 +103,14 @@ Output: corrected text first, then a bulleted change list.`,
   {
     key: "infographic", agent: "Omar Hassan", stage: "Visuals", title: "Data Visualization Standards",
     sop: `Chart by claim type: comparison → bar, trend → line, part-of-whole → stacked bar (pie only ≤5 slices), distribution → histogram, relationship → scatter. One message per graphic, stated in the title as the takeaway: "Checkride pass rates doubled since 2024", never "Pass rates over time". Label data directly; kill the legend when there are ≤4 series. Source and year under every chart. Bar axes start at zero, always. Brand palette, color-blind safe. Round numbers honestly — 47%, not 47.3286%.`,
+  },
+  {
+    key: "pitchcraft", agent: "Editorial Desk", stage: "Pitch & Sell", title: "Pitch Writing — Editor-Response Standards",
+    sop: `Subject line exactly "Pitch: <a few words from the idea>" — lowercase after the colon, 10 words max, no period, never "I can help". Body shape: 1–2 line intro responding to something specific (the editor's call, their recent piece) → one-paragraph credibility (real outlets only) → 2–3 ideas, each = scroll-stopping headline + 2–4 sentence premise naming the hook, what it covers, and the sources → 3–5 relevant clips with outlet names. Every idea carries a success peg: a concrete metric, news peg, or big-name tie-in. Match the outlet's known editor preferences from the Publications enrichment. Total pitch under 250 words — editors skim. ${BAN_LIST}`,
+  },
+  {
+    key: "followup", agent: "Editorial Desk", stage: "Pitch & Sell", title: "Follow-Up Cadence Standards",
+    sop: `Four follow-ups maximum, seven business days apart, then stop. Each follow-up is 2–4 sentences, references the original subject line, and adds value: follow-up 1 = gentle bump with a one-line sharpened angle; follow-up 2 = a fresh news peg strengthening the idea; follow-up 3 = TWO new pitch ideas (headline + one-line premise each); follow-up 4 = gracious close leaving the door open. Never guilt-trip, never "just checking in" with nothing attached, never mention being ignored. Track every touch with date and outcome.`,
   },
   {
     key: "scorer", agent: "Priya Sharma", stage: "Govern", title: "Scoring Calibration Standards",

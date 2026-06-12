@@ -20,6 +20,13 @@ on the operator's machine; keep the two in sync.
 - Tags/pills use the token color ramps; no raw hex in components
 
 ## Platform
+- FREE-FIRST MODEL POLICY: every AI task defaults to free LLMs (OpenRouter :free);
+  paid models are never a default — explicit override or fallback-ladder last rung only.
+  Quality comes from injected expert Skills/SOPs, not bigger models.
+- Every AI-agent app ships: (a) operator-editable "Agent Skills & SOPs" database
+  (SOP per agent/stage, injected into every call, live edits); (b) "Model Quality
+  Watch" — recurring free-vs-paid benchmark; UPGRADE alert when paid beats free
+  by ≥1.5 points or free scores under 7/10 against calibration anchors.
 - Paid services cost-logged to record_cost_event (command center / CFO agent)
 - Every integration surfaced as a boolean in /api/health
 - AI calls server-side, budget-capped, recorded in the AI Ledger

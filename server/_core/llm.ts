@@ -104,7 +104,7 @@ const FREE_FALLBACKS = [
 ];
 
 export function resolveModelSlug(model?: string): string {
-  const m = model ?? "claude-sonnet-4";
+  const m = model ?? TIER.free; // house policy: unspecified = free
   if (m.includes("/")) return m;
   return MODEL_ALIASES[m] ?? `anthropic/${m}`;
 }
@@ -114,7 +114,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // AI_DAILY_BUDGET_USD is exhausted; past the soft threshold (80% by default)
   // requests continue on the fallback model instead of failing.
   await assertBudget();
-  const ladder = await applyBudgetLadder(params.model ?? "claude-sonnet");
+  const ladder = await applyBudgetLadder(params.model ?? TIER.free);
   if (ladder.downgraded) {
     console.warn(`[LLM] budget soft threshold reached — downgrading ${params.model ?? "claude-sonnet"} → ${ladder.model}`);
     params = { ...params, model: ladder.model };
@@ -123,7 +123,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const format = params.response_format ?? params.responseFormat;
   const wantsJson = format?.type === "json_object" || format?.type === "json_schema";
   const temperature = params.temperature ?? 0.7;
-  const model = params.model ?? "claude-sonnet-4";
+  const model = params.model ?? TIER.free; // house policy: unspecified = free
 
   // Priority: OpenRouter (cheapest, multi-model) → OpenAI → Anthropic → Forge
   // OpenRouter handles all model prefixes (anthropic/, openai/, google/, etc.)
@@ -163,10 +163,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   if (ENV.anthropicApiKey) {
     try {
       let anthropicModel = model;
-      if (params.model?.startsWith("anthropic/")) {
-        anthropicModel = params.model.replace("anthropic/", "");
-      } else if (params.model?.includes("/")) {
-        // Non-Anthropic model requested but OpenRouter/OpenAI failed — use default Claude
+      if (model.startsWith("anthropic/")) {
+        anthropicModel = model.replace("anthropic/", "");
+      } else if (model.includes("/")) {
+        // Non-Anthropic model (incl. the free default) but OpenRouter/OpenAI failed — use default Claude
         anthropicModel = "claude-sonnet-4";
       }
       const anRes = await invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model: anthropicModel });

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { like } from "drizzle-orm";
 import { publicProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
+import { skillBlockFor } from "../_core/skills";
 import { getDb } from "../db";
 import { publications, aiUsage } from "../../drizzle/schema";
 import { sql } from "drizzle-orm";
@@ -164,7 +165,7 @@ export const aiRouter = router({
         messages: [
           {
             role: "system",
-            content: `You are a Bloomberg-caliber editorial scoring engine. Score articles on 13 dimensions used by top-tier publications. Apply publication-specific standards when a target publication is specified. Return ONLY valid JSON with no markdown formatting.${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ''}${readerBlock}${editorBlock}`,
+            content: `You are a Bloomberg-caliber editorial scoring engine. Score articles on 13 dimensions used by top-tier publications. Apply publication-specific standards when a target publication is specified. Return ONLY valid JSON with no markdown formatting.${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ''}${readerBlock}${editorBlock}` + (await skillBlockFor("scorer")),
           },
           {
             role: "user",
@@ -237,7 +238,7 @@ Return JSON with this exact structure:
         messages: [
           {
             role: "system",
-            content: `You are an elite journalist and content strategist who writes for top-tier publications like Bloomberg, Forbes, Harvard Business Review, and The Atlantic. Write in a professional, authoritative voice with data-driven insights, compelling narratives, and expert-level analysis.${input.brandVoice ? ` Write in this brand voice: ${input.brandVoice}` : ""}${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ""}`,
+            content: `You are an elite journalist and content strategist who writes for top-tier publications like Bloomberg, Forbes, Harvard Business Review, and The Atlantic. Write in a professional, authoritative voice with data-driven insights, compelling narratives, and expert-level analysis.${input.brandVoice ? ` Write in this brand voice: ${input.brandVoice}` : ""}${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ""}` + (await skillBlockFor("drafter")),
           },
           {
             role: "user",
@@ -286,7 +287,7 @@ Return the full article in markdown format.`,
         messages: [
           {
             role: "system",
-            content: `You are an expert pitch writer who has successfully placed articles in top-tier publications. Write concise, compelling pitch emails that editors actually respond to. Return ONLY valid JSON with no markdown formatting.${input.publicationName ? getPublicationInstructions(input.publicationName) : ''}`,
+            content: `You are an expert pitch writer who has successfully placed articles in top-tier publications. Write concise, compelling pitch emails that editors actually respond to. Return ONLY valid JSON with no markdown formatting.${input.publicationName ? getPublicationInstructions(input.publicationName) : ''}` + (await skillBlockFor("pitchcraft")),
           },
           {
             role: "user",
@@ -334,7 +335,7 @@ Return JSON:
         messages: [
           {
             role: "system",
-            content: `You are a senior research analyst at a Bloomberg-caliber newsroom. Produce comprehensive research briefs with data points, expert sources, and trend analysis. Return ONLY valid JSON with no markdown formatting.`,
+            content: `You are a senior research analyst at a Bloomberg-caliber newsroom. Produce comprehensive research briefs with data points, expert sources, and trend analysis. Return ONLY valid JSON with no markdown formatting.` + (await skillBlockFor("researcher")),
           },
           {
             role: "user",
@@ -387,7 +388,7 @@ Return JSON:
         messages: [
           {
             role: "system",
-            content: `You are a senior editorial strategist at a top media company. Generate article ideas that are timely, data-driven, and aligned with what top publications are actively seeking. Return ONLY valid JSON with no markdown formatting.`,
+            content: `You are a senior editorial strategist at a top media company. Generate article ideas that are timely, data-driven, and aligned with what top publications are actively seeking. Return ONLY valid JSON with no markdown formatting.` + (await skillBlockFor("scout")),
           },
           {
             role: "user",
@@ -439,7 +440,7 @@ Return JSON:
         messages: [
           {
             role: "system",
-            content: `You are a senior intelligence analyst producing a daily editorial brief for a premium content team. Focus on trending stories, data releases, and emerging narratives that present article opportunities. Return ONLY valid JSON with no markdown formatting.`,
+            content: `You are a senior intelligence analyst producing a daily editorial brief for a premium content team. Focus on trending stories, data releases, and emerging narratives that present article opportunities. Return ONLY valid JSON with no markdown formatting.` + (await skillBlockFor("analyst")),
           },
           {
             role: "user",
@@ -490,7 +491,7 @@ Return JSON:
         messages: [
           {
             role: "system",
-            content: `You are a concise editorial summarizer. Produce ${input.style || "executive"} summaries that capture key insights and actionable takeaways.`,
+            content: `You are a concise editorial summarizer. Produce ${input.style || "executive"} summaries that capture key insights and actionable takeaways.` + (await skillBlockFor("editor")),
           },
           {
             role: "user",
