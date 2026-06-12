@@ -20,6 +20,7 @@ import { AGENT_PERSONAS } from "../routers/agents";
 import { ENV } from "./env";
 import { exaConfigured, exaSearch } from "./exa";
 import { invokeLLM, TIER } from "./llm";
+import { skillBlockFor } from "./skills";
 
 const uid = () => nanoid(12);
 
@@ -226,7 +227,7 @@ async function agentCall(taskLabel: string, personaKey: keyof typeof AGENT_PERSO
   const persona = AGENT_PERSONAS[personaKey];
   const result = await invokeLLM({
     messages: [
-      { role: "system", content: persona.systemPrompt + "\n" + HOUSE_RULES },
+      { role: "system", content: persona.systemPrompt + "\n" + HOUSE_RULES + (await skillBlockFor(personaKey)) },
       { role: "user", content: prompt },
     ],
     model,
@@ -476,7 +477,7 @@ async function guardianJob() {
     const out = await agentCall(
       "Guardian review",
       "quality",
-      TIER.standard,
+      TIER.freeBig,
       `Review this article package before it goes to an editor. Return EXACTLY:
 VERDICT: APPROVED or BLOCKED
 Then 3-6 "- " bullets: if BLOCKED, the specific blockers (missing sourcing, weak peg, unverified claims, thin sections); if APPROVED, the remaining nice-to-haves.
