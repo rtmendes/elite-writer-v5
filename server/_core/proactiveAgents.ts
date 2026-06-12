@@ -696,18 +696,18 @@ async function modelWatchJob() {
   ];
   const results: Array<{ tier: string; model: string; score: number; notes: string }> = [];
   for (const c of candidates) {
-    const sample = await agentCall("Model watch probe", "drafter", c.model, WATCH_PROBE, `model-watch ${c.tier}`, 700);
+    const sample = await agentCall("Model watch probe", "drafter", c.model, WATCH_PROBE, `model-watch ${c.tier}`, 2500);
     if (!sample) { results.push({ tier: c.tier, model: c.model, score: 0, notes: "no output (model unavailable)" }); continue; }
     const judged = await agentCall(
       "Model watch judge",
       "scorer",
-      TIER.freeBig,
+      TIER.free, // fast free tier: reasoning models burn max_tokens on thinking and truncate strict-JSON replies
       `Score this draft opening against the calibration anchors (5 = publishable mid-tier blog, 7 = solid trade outlet, 9 = top-tier ready). Apply the mandatory penalties for AI-tell phrasing and unsupported vagueness. Return STRICT JSON only: {"score": <1-10, one decimal allowed>, "slop": ["<each AI-tell or weakness found, max 4>"]}
 
 DRAFT:
 ${sample}`,
       `model-watch judge ${c.tier}`,
-      400,
+      1200,
     );
     let score = 0; let slop: string[] = [];
     try {
