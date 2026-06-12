@@ -33,8 +33,31 @@ on the operator's machine; keep the two in sync.
 
 ## Status (workspace module)
 - Table view: search ✓ filter ✓ sort ✓ multi-select+bulk ✓
-- Kanban/Gallery/List: search ✓ filter ✓ sort (via toolbar) ✓ — multi-select TODO
-- v5 core pages (Publications/Giststack/etc.): partial — audit tracked separately
+- Kanban/Gallery/List: search ✓ filter ✓ sort ✓ multi-select+bulk ✓ (PR #40)
+
+## Status (v5 core pages — marker audit June 12, 2026)
+Grep-marker audit (search/filter, sort, multi-select usage per page). Most list
+pages have search+filter; **multi-select with bulk actions is the systematic
+gap**. Tracked in the "UI-standards gaps" GitHub issue.
+
+| Page | Search/Filter | Sort | Multi-select | Notes |
+|---|---|---|---|---|
+| Agents | ✓ | ✓ | ✓ | compliant |
+| Pitches | ✓ | ✓ | partial | verify bulk actions |
+| Publications | ✓ | ✓ | partial | verify bulk actions |
+| PulsePipeline | ✓ | weak | partial | sort thin |
+| Ideas | ✓ | ✓ | partial | verify bulk actions |
+| Giststack | ✓ | ✓ | ✗ | needs multi-select |
+| Queue | ✓ | ✓ | ✗ | needs multi-select |
+| Research | ✓ | ✗ | ✗ | needs sort + multi-select |
+| ContentInsights | ✓ | ✓ | ✗ | needs multi-select |
+| ContentStudio | ✓ | ✗ | ✗ | needs sort + multi-select |
+| Library | ✓ | ✓ | ✗ | needs multi-select |
+| Interviews | ✓ | ✗ | ✗ | needs sort + multi-select |
+| Social | ✓ | ✗ | ✗ | needs sort + multi-select |
+| Brands / BrandVoice | weak | ✗ | ✗ | data entry first (brands empty) |
+| Pipeline / ContentCalendar / Geo / Financial | weak–partial | ✗ | ✗ | smaller views |
+| Dashboard / Home / Settings / Login / Writer | n/a | n/a | n/a | not list views |
 
 ## Imported from Manus (June 12, 2026 — deduped from ~95 knowledge entries)
 
