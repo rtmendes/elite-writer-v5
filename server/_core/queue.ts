@@ -15,6 +15,7 @@ const SCHEDULE: Record<ProactiveJobName, number> = {
   scout: 60 * 60_000,
   followup: 12 * 3600_000,
   opportunities: 60 * 60_000,
+  modelwatch: 60 * 60_000, // gap-guarded internally to ≤1 real run per ~20h
 };
 
 let started = false;

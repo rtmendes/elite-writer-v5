@@ -12,7 +12,8 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { ENV } from "../_core/env";
-import { invokeLLM } from "../_core/llm";
+import { invokeLLM, TIER } from "../_core/llm";
+import { skillBlockFor } from "../_core/skills";
 import { uploadDataUrl } from "../_core/storage";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -54,17 +55,21 @@ const TASKS = ["score_idea", "research_brief", "match_publications", "create_off
 type AgentTask = (typeof TASKS)[number];
 
 // Cheapest capable model per task (OpenRouter slugs; invokeLLM routes them).
+// House policy: ALL tasks ride FREE models — quality comes from the expert
+// SOPs ("Agent Skills & SOPs" database) injected into every system prompt.
+// Long-form prose rides freeBig (550B, 1M ctx); invokeLLM's free-fallback
+// ladder degrades to haiku cents only if the whole free pool is busy.
 const TASK_MODELS: Record<AgentTask, { model: string; maxTokens: number; persona?: keyof typeof AGENT_PERSONAS }> = {
-  score_idea: { model: "anthropic/claude-haiku-4.5", maxTokens: 2000, persona: "scorer" },
-  match_publications: { model: "anthropic/claude-haiku-4.5", maxTokens: 3000, persona: "analyst" },
-  research_brief: { model: "anthropic/claude-sonnet-4.6", maxTokens: 8000, persona: "deepresearch" },
-  create_offer: { model: "anthropic/claude-opus-4.8", maxTokens: 8000, persona: "editor" },
-  humanize: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "rewriter" },
-  tighten: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "editor" },
-  expand: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "drafter" },
-  headlines: { model: "anthropic/claude-opus-4.8", maxTokens: 4000, persona: "outliner" },
-  continue: { model: "anthropic/claude-opus-4.8", maxTokens: 32000, persona: "continuator" },
-  proofread: { model: "anthropic/claude-sonnet-4.6", maxTokens: 6000, persona: "proofreader" },
+  score_idea: { model: TIER.free, maxTokens: 2000, persona: "scorer" },
+  match_publications: { model: TIER.free, maxTokens: 3000, persona: "analyst" },
+  research_brief: { model: TIER.freeBig, maxTokens: 8000, persona: "deepresearch" },
+  create_offer: { model: TIER.freeBig, maxTokens: 8000, persona: "editor" },
+  humanize: { model: TIER.freeBig, maxTokens: 32000, persona: "rewriter" },
+  tighten: { model: TIER.freeBig, maxTokens: 32000, persona: "editor" },
+  expand: { model: TIER.freeBig, maxTokens: 32000, persona: "drafter" },
+  headlines: { model: TIER.free, maxTokens: 4000, persona: "outliner" },
+  continue: { model: TIER.freeBig, maxTokens: 32000, persona: "continuator" },
+  proofread: { model: TIER.free, maxTokens: 6000, persona: "proofreader" },
 };
 
 
@@ -252,7 +257,7 @@ export const workspaceRouter = router({
       const route = TASK_MODELS[input.task as AgentTask];
       const persona = route.persona ? AGENT_PERSONAS[route.persona] : undefined;
       const usePlaybook = ["create_offer", "headlines", "score_idea", "match_publications"].includes(input.task);
-      const system = (persona ? persona.systemPrompt + "\n" : "") + HOUSE_RULES + (usePlaybook ? PLAYBOOK : "") + (input.task === "create_offer" ? WINNING_PITCHES : "");
+      const system = (persona ? persona.systemPrompt + "\n" : "") + HOUSE_RULES + (usePlaybook ? PLAYBOOK : "") + (input.task === "create_offer" ? WINNING_PITCHES : "") + (route.persona ? await skillBlockFor(route.persona) : "");
 
       let prompt = input.prompt;
 
@@ -305,10 +310,10 @@ export const workspaceRouter = router({
       const persona = AGENT_PERSONAS.factchecker;
       const extract = await invokeLLM({
         messages: [
-          { role: "system", content: persona.systemPrompt + HOUSE_RULES },
+          { role: "system", content: persona.systemPrompt + HOUSE_RULES + (await skillBlockFor("factchecker")) },
           { role: "user", content: `Extract every verifiable factual claim from this draft material (statistics, dates, named facts, attributions). Return STRICT JSON only: an array of strings, max 12 claims, each a single self-contained sentence.\n\nMATERIAL:\n${input.text}` },
         ],
-        model: "anthropic/claude-haiku-4.5",
+        model: TIER.free,
         maxTokens: 2000,
       });
       let claims: string[] = [];
@@ -328,7 +333,7 @@ export const workspaceRouter = router({
 
       const judge = await invokeLLM({
         messages: [
-          { role: "system", content: persona.systemPrompt + HOUSE_RULES },
+          { role: "system", content: persona.systemPrompt + HOUSE_RULES + (await skillBlockFor("factchecker")) },
           { role: "user", content: `Given these claims and the live verification research below, return STRICT JSON only:
 [{"claim": "...", "status": "Verified" | "TK" | "Disputed", "source": "<url or source name, empty if none>", "note": "<one short sentence>"}]
 Status rules: Verified = confirmed with a source; Disputed = contradicted; TK = could not confirm (needs reporting).
@@ -339,7 +344,7 @@ ${claims.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 LIVE VERIFICATION RESEARCH:
 ${live || "(no live research available — mark all claims TK)"}` },
         ],
-        model: "anthropic/claude-sonnet-4.6",
+        model: TIER.freeBig,
         maxTokens: 4000,
       });
 
@@ -376,13 +381,13 @@ ${live || "(no live research available — mark all claims TK)"}` },
       const drafter = AGENT_PERSONAS.drafter;
       const angles = [
         { label: "A", model: "anthropic/claude-sonnet-4.6", instruction: "Lead with the strongest data point. Authoritative, analytical register." },
-        { label: "B", model: "anthropic/claude-opus-4.8", instruction: "Lead with a human scene or concrete moment. Narrative register, then widen to the stakes." },
+        { label: "B", model: TIER.freeBig, instruction: "Lead with a human scene or concrete moment. Narrative register, then widen to the stakes." },
       ];
       const drafts = await Promise.all(
         angles.map(async (a) => {
           const r = await invokeLLM({
             messages: [
-              { role: "system", content: drafter.systemPrompt + HOUSE_RULES },
+              { role: "system", content: drafter.systemPrompt + HOUSE_RULES + (await skillBlockFor("drafter")) },
               { role: "user", content: `Write the opening 4-6 paragraphs of this article. ${a.instruction} Insert [TK: ...] where reporting is needed — never invent facts.\n\nBRIEF AND MATERIAL:\n${input.brief}` },
             ],
             model: a.model,
@@ -395,7 +400,7 @@ ${live || "(no live research available — mark all claims TK)"}` },
       const scorer = AGENT_PERSONAS.scorer;
       const judgeRes = await invokeLLM({
         messages: [
-          { role: "system", content: scorer.systemPrompt + HOUSE_RULES },
+          { role: "system", content: scorer.systemPrompt + HOUSE_RULES + (await skillBlockFor("scorer")) },
           { role: "user", content: `Two drafts of the same article opening. Judge blind on hook strength, authority, voice, and momentum. Return EXACTLY:
 WINNER: A or B
 WHY: <3 short bullets starting with "- ">
@@ -407,7 +412,7 @@ ${drafts[0].text}
 DRAFT B:
 ${drafts[1].text}` },
         ],
-        model: "anthropic/claude-haiku-4.5",
+        model: TIER.free,
         maxTokens: 1500,
       });
       const judgeText = judgeRes.choices?.[0]?.message?.content?.trim() ?? "";
@@ -459,7 +464,7 @@ ${drafts[1].text}` },
       const persona = AGENT_PERSONAS.outliner;
       const result = await invokeLLM({
         messages: [
-          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + PLAYBOOK + HOUSE_RULES },
+          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + PLAYBOOK + HOUSE_RULES + (await skillBlockFor("outliner")) },
           { role: "user", content: `Build the outline for this article${input.publication ? ` targeted at ${input.publication}` : ""}. Return EXACTLY:
 THESIS: <one sharp sentence>
 UNIQUE ANGLE: <the non-obvious observation/contrarian read in one sentence>
@@ -474,7 +479,7 @@ OFFER TIE-IN: <where and how a backend offer is woven in, naturally>
 BRIEF AND RESEARCH:
 ${input.brief}` },
         ],
-        model: "anthropic/claude-sonnet-4.6",
+        model: TIER.freeBig,
         maxTokens: 6000,
       });
       const text = result.choices?.[0]?.message?.content?.trim() ?? "";
@@ -491,7 +496,7 @@ ${input.brief}` },
       const persona = AGENT_PERSONAS.analyst;
       const result = await invokeLLM({
         messages: [
-          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + PLAYBOOK + HOUSE_RULES },
+          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + PLAYBOOK + HOUSE_RULES + (await skillBlockFor("analyst")) },
           { role: "user", content: `Critique this outline for a premium publication. Return STRICT JSON only — an array of 3-5 objects, each a concrete upgrade:
 [{"area": "<angle|data|actionable|offer|structure>", "suggestion": "<one sharp, specific improvement>"}]
 Push for more original observations, harder data, stronger reader payoff, and a smarter offer tie-in.
@@ -499,7 +504,7 @@ Push for more original observations, harder data, stronger reader payoff, and a 
 OUTLINE:
 ${input.outline}` },
         ],
-        model: "anthropic/claude-sonnet-4.6",
+        model: TIER.free,
         maxTokens: 2500,
       });
       let suggestions: Array<{ area: string; suggestion: string }> = [];
@@ -518,7 +523,7 @@ ${input.outline}` },
       const accepted = input.accepted.length ? `\n\nFOLD IN THESE APPROVED IMPROVEMENTS:\n- ${input.accepted.join("\n- ")}` : "";
       const result = await invokeLLM({
         messages: [
-          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + PLAYBOOK + HOUSE_RULES },
+          { role: "system", content: persona.systemPrompt + AUTHORITY_FUNNEL + PLAYBOOK + HOUSE_RULES + (await skillBlockFor("drafter")) },
           { role: "user", content: `Write the COMPLETE article from this outline${input.publication ? ` for ${input.publication}` : ""} — every section, fully developed, 1500-2200 words. Markdown: ## for section headings, real paragraphs. Where a statistic or source is needed but unverified, insert [TK: what to verify]. Weave the offer tie-in naturally per the outline. Strong columnist-authority voice.${accepted}
 
 OUTLINE:
@@ -527,7 +532,7 @@ ${input.outline}
 RESEARCH:
 ${input.research || "(use the outline; mark anything needing reporting as [TK: ...])"}` },
         ],
-        model: "anthropic/claude-opus-4-8",
+        model: TIER.freeBig,
         maxTokens: 16000,
       });
       const text = result.choices?.[0]?.message?.content?.trim() ?? "";
@@ -549,10 +554,10 @@ ${input.research || "(use the outline; mark anything needing reporting as [TK: .
         const ad = AGENT_PERSONAS.artdirector;
         const refined = await invokeLLM({
           messages: [
-            { role: "system", content: ad.systemPrompt + "\nReturn ONLY the final image-generation prompt — one vivid paragraph, no preamble. Always end with: 16:9, no text, no logos, upper third calm for a headline overlay." },
+            { role: "system", content: ad.systemPrompt + (await skillBlockFor("artdirector")) + "\nReturn ONLY the final image-generation prompt — one vivid paragraph, no preamble. Always end with: 16:9, no text, no logos, upper third calm for a headline overlay." },
             { role: "user", content: `Art-direct the hero image for: "${input.title}".${input.styleHint ? `\nVisual identity to honor: ${input.styleHint}` : ""}` },
           ],
-          model: "anthropic/claude-haiku-4.5",
+          model: TIER.free,
           maxTokens: 600,
         });
         const text = refined.choices?.[0]?.message?.content?.trim();

@@ -29,8 +29,13 @@ describe('invokeLLM', () => {
   it('should fall back correctly if providers fail', async () => {
     // We will simulate OpenRouter failing, then OpenAI failing, then Anthropic succeeding
 
+    // Default model is the :free tier, so OpenRouter walks the 4-rung free
+    // ladder first, then OpenAI, then Anthropic succeeds.
     (global.fetch as any)
-      .mockRejectedValueOnce(new Error('OpenRouter network error'))
+      .mockRejectedValueOnce(new Error('OpenRouter free #1 down'))
+      .mockRejectedValueOnce(new Error('OpenRouter free #2 down'))
+      .mockRejectedValueOnce(new Error('OpenRouter free #3 down'))
+      .mockRejectedValueOnce(new Error('OpenRouter haiku rung down'))
       .mockRejectedValueOnce(new Error('OpenAI network error'))
       .mockResolvedValueOnce({
         ok: true,
@@ -41,11 +46,13 @@ describe('invokeLLM', () => {
 
     const result = await invokeLLM({ messages: [{ role: 'user', content: 'test' }] });
 
-    expect(global.fetch).toHaveBeenCalledTimes(3);
-    // Check URLs
-    expect((global.fetch as any).mock.calls[0][0]).toBe('https://openrouter.ai/api/v1/chat/completions');
-    expect((global.fetch as any).mock.calls[1][0]).toBe('https://api.openai.com/v1/chat/completions');
-    expect((global.fetch as any).mock.calls[2][0]).toBe('https://api.anthropic.com/v1/messages');
+    expect(global.fetch).toHaveBeenCalledTimes(6);
+    // Check URLs: 4 OpenRouter ladder attempts, then OpenAI, then Anthropic
+    for (let i = 0; i < 4; i++) {
+      expect((global.fetch as any).mock.calls[i][0]).toBe('https://openrouter.ai/api/v1/chat/completions');
+    }
+    expect((global.fetch as any).mock.calls[4][0]).toBe('https://api.openai.com/v1/chat/completions');
+    expect((global.fetch as any).mock.calls[5][0]).toBe('https://api.anthropic.com/v1/messages');
 
     expect(result.choices[0].message.content).toBe('Anthropic success');
   });
@@ -223,8 +230,11 @@ describe('invokeLLM Fallbacks and Errors', () => {
     let mockFetch = vi.fn();
     global.fetch = mockFetch;
 
-    // OpenRouter
-    mockFetch.mockRejectedValueOnce(new Error('OR Error'));
+    // OpenRouter — 4-rung free ladder (default model is :free)
+    mockFetch.mockRejectedValueOnce(new Error('OR Error 1'));
+    mockFetch.mockRejectedValueOnce(new Error('OR Error 2'));
+    mockFetch.mockRejectedValueOnce(new Error('OR Error 3'));
+    mockFetch.mockRejectedValueOnce(new Error('OR Error 4'));
     // OpenAI
     mockFetch.mockRejectedValueOnce(new Error('OAI Error'));
     // Anthropic
@@ -251,6 +261,7 @@ describe('resolveModelSlug', () => {
     const { resolveModelSlug } = await import('./llm');
     expect(resolveModelSlug('openai/gpt-4o-mini')).toBe('openai/gpt-4o-mini');
     expect(resolveModelSlug('claude-future-9')).toBe('anthropic/claude-future-9');
-    expect(resolveModelSlug(undefined)).toBe('anthropic/claude-sonnet-4');
+    // House policy: unspecified model = free tier
+    expect(resolveModelSlug(undefined)).toBe('openai/gpt-oss-120b:free');
   });
 });
