@@ -728,7 +728,9 @@ ${sample}`,
   for (const r of results) {
     let verdict = "REF";
     if (r.tier !== "Paid Ref") {
-      verdict = r.score >= 7 && paid - r.score < 1.5 ? "OK" : paid - r.score >= 1.5 ? "UPGRADE" : "WATCH";
+      // Relative-first: free matching/beating the paid reference is OK even when
+      // the judge scores everyone harshly; UPGRADE only when paid clearly wins.
+      verdict = paid - r.score >= 1.5 ? "UPGRADE" : r.score >= 7 || r.score >= paid ? "OK" : "WATCH";
     }
     const verdictOption = fVerdict?.options?.find((o) => o.name === verdict);
     const tierOption = fTier?.options?.find((o) => o.name === r.tier);
@@ -748,7 +750,7 @@ ${sample}`,
       updatedAt: now,
     } as WsRow);
   }
-  if (bestFree < 7 || paid - bestFree >= 1.5) {
+  if (paid - bestFree >= 1.5 || (bestFree < 7 && paid >= 7)) {
     void slackAlert(`🛰️ Model Quality Watch: free fleet scored ${bestFree.toFixed(1)} vs paid ${paid.toFixed(1)}. A paid model is currently worth it for drafting — review "Model Quality Watch" in the workspace.`);
     console.warn(`[proactive] model watch: UPGRADE signal (free ${bestFree} vs paid ${paid})`);
   } else {
