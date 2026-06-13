@@ -15,6 +15,7 @@ import {
   AlertTriangle, Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { trpc } from '@/lib/trpc';
 
 export default function Settings() {
   const { state, updateSettings } = useApp();
@@ -23,6 +24,15 @@ export default function Settings() {
 
   const providerStatus = useMemo(() => getProviderStatus(), [aiConfig]);
   const usageSummary = useMemo(() => getUsageSummary(), []);
+
+  // Surface the result of the Google OAuth redirect (?google=connected|error)
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const g = q.get('google');
+    if (g === 'connected') { toast.success('Google account connected'); setActiveTab('data'); }
+    else if (g === 'error') toast.error(`Google connection failed: ${q.get('reason') || 'unknown'}`);
+    if (g) window.history.replaceState({}, '', '/settings');
+  }, []);
 
   // Auto-sync API keys from server env vars on mount
   const [synced, setSynced] = useState(false);
@@ -385,6 +395,7 @@ export default function Settings() {
       {/* Data Management Tab */}
       {activeTab === 'data' && (
         <div className="space-y-4">
+          <GoogleAccountCard />
           <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
             <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2"><Shield className="w-4 h-4 text-violet-400" /> System Information</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -417,6 +428,49 @@ export default function Settings() {
               <Trash2 className="w-4 h-4" /> Clear All
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Google Account card (Data tab) ──────────────────────────────────────────
+// Connect/disconnect the operator's Google account. Powers the workspace
+// "Import Google Doc" feature (documents.readonly) plus Sheets/Gmail tools.
+export function GoogleAccountCard() {
+  const cfg = trpc.google.config.useQuery();
+  const status = trpc.google.status.useQuery(undefined, { retry: false });
+  const authUrl = trpc.google.getAuthUrl.useQuery(undefined, { enabled: false, retry: false });
+  const disconnect = trpc.google.disconnect.useMutation({ onSuccess: () => { toast.success('Google disconnected'); void status.refetch(); } });
+  const connected = Boolean((status.data as any)?.connected);
+
+  return (
+    <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+      <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-2"><Globe className="w-4 h-4 text-violet-400" /> Google Account</h3>
+      <p className="text-xs text-zinc-500 mb-4">Enables "Import Google Doc" in the Workspace, plus Sheets export and Gmail sending.</p>
+      {!cfg.data?.configured ? (
+        <div className="text-xs text-amber-400 flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> Server is missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET.</div>
+      ) : (
+        <div className="flex items-center gap-3">
+          {connected ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-zinc-600" />}
+          <span className="text-sm text-white">{connected ? `Connected${(status.data as any)?.email ? ` as ${(status.data as any).email}` : ''}` : 'Not connected'}</span>
+          <button
+            className="ml-auto px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium disabled:opacity-50"
+            disabled={authUrl.isFetching}
+            onClick={async () => {
+              const r = await authUrl.refetch();
+              const url = (r.data as any)?.url;
+              if (url) window.location.href = url;
+              else toast.error('Could not get Google sign-in URL');
+            }}
+          >
+            {connected ? 'Reconnect' : 'Connect Google'}
+          </button>
+          {connected && (
+            <button className="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-sm hover:bg-zinc-800" onClick={() => disconnect.mutate()}>
+              Disconnect
+            </button>
+          )}
         </div>
       )}
     </div>
