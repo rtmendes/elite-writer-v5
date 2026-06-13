@@ -98,6 +98,31 @@ export const researchNotes = mysqlTable("research_notes", {
 export type ResearchNote = typeof researchNotes.$inferSelect;
 export type InsertResearchNote = typeof researchNotes.$inferInsert;
 
+// ─── Research References (Reference Library / citation manager) ───
+// Structured citations gathered by the agentic research hub or imported
+// (DOI / BibTeX / RIS). Distinct from kb_items: a reference is queryable
+// metadata (authors, year, DOI, citation count), not a freeform note.
+export const researchReferences = mysqlTable("research_references", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: varchar("type", { length: 40 }).default("article").notNull(), // article | webpage | video | book | report
+  title: varchar("title", { length: 700 }).notNull(),
+  authors: json("authors"),           // string[]
+  year: int("year"),
+  doi: varchar("doi", { length: 200 }),
+  url: varchar("url", { length: 1000 }),
+  abstract: text("abstract"),
+  source: varchar("source", { length: 120 }), // openalex | crossref | brave | youtube | manual | …
+  citationCount: int("citationCount").default(0),
+  tags: json("tags"),                 // string[]
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ResearchReference = typeof researchReferences.$inferSelect;
+export type InsertResearchReference = typeof researchReferences.$inferInsert;
+
 // ─── Brands ───────────────────────────────────────────────
 export const brands = mysqlTable("brands", {
   id: int("id").autoincrement().primaryKey(),
