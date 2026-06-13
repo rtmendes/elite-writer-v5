@@ -34,6 +34,7 @@ import ContentInsights from "./pages/ContentInsights";
 import Interviews from "./pages/Interviews";
 import BrandVoice from "./pages/BrandVoice";
 import TaskCenter from "./pages/TaskCenter";
+import KnowledgeHub from "./pages/KnowledgeHub";
 import NotFound from "@/pages/NotFound";
 function Router() {
   // Page-scoped error boundary, keyed by route: one page's render crash shows
@@ -64,6 +65,7 @@ function Router() {
             <Route path="/video-scripts" component={VideoScripts} />
             <Route path="/social" component={Social} />
             <Route path="/library" component={ContentLibrary} />
+            <Route path="/knowledge-hub" component={KnowledgeHub} />
             <Route path="/geo" component={Geo} />
             <Route path="/strategy" component={Strategy} />
             <Route path="/pipeline" component={Pipeline} />
