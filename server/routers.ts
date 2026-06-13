@@ -33,6 +33,7 @@ import { calendarRouter } from "./routers/calendar";
 import { interviewsRouter } from "./routers/interviews";
 import { studioRouter } from "./routers/studio";
 import { workspaceRouter } from "./routers/workspace";
+import { acceleratorRouter } from "./routers/accelerator";
 
 export const appRouter = router({
   system: systemRouter,
@@ -95,6 +96,7 @@ export const appRouter = router({
   interviews: interviewsRouter,
   studio: studioRouter,
   workspace: workspaceRouter,
+  accelerator: acceleratorRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -9,7 +9,7 @@ import {
   Zap, Menu, Building2, Moon, Sun, Inbox, Loader2,
   MessageSquare, Library, Globe, Map, Users,
   Flame, Calendar, Mic, Palette, ChevronDown,
-  LayoutGrid, Rss,
+  LayoutGrid, Rss, Rocket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +59,7 @@ const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { path: '/pipeline', label: 'Pipeline', icon: Zap, description: 'One-click article production' },
       { path: '/brands', label: 'Brands', icon: Building2, description: 'Brand & product engine' },
       { path: '/financial', label: 'Financial', icon: DollarSign, description: 'Revenue tracking' },
+      { path: '/accelerator', label: 'Accelerator', icon: Rocket, description: '$100K–$200K/mo goal engine' },
       { path: '/settings', label: 'Settings', icon: Settings, description: 'API keys & preferences' },
     ],
   },
