@@ -35,6 +35,7 @@ import Interviews from "./pages/Interviews";
 import BrandVoice from "./pages/BrandVoice";
 import TaskCenter from "./pages/TaskCenter";
 import KnowledgeHub from "./pages/KnowledgeHub";
+import PlanningBoard from "./pages/PlanningBoard";
 import NotFound from "@/pages/NotFound";
 function Router() {
   // Page-scoped error boundary, keyed by route: one page's render crash shows
@@ -78,6 +79,7 @@ function Router() {
             <Route path="/brand-voice" component={BrandVoice} />
             <Route path="/documentation" component={Documentation} />
             <Route path="/brands" component={Brands} />
+            <Route path="/planning-board" component={PlanningBoard} />
             <Route path="/settings" component={Settings} />
             <Route path="/404" component={NotFound} />
             <Route component={NotFound} />
