@@ -9,7 +9,7 @@ import {
   Zap, Menu, Building2, Moon, Sun, Inbox, Loader2,
   MessageSquare, Library, Globe, Map, Users,
   Flame, Calendar, Mic, Palette, ChevronDown,
-  LayoutGrid, Rss, Clapperboard, FileText,
+  LayoutGrid, Rss, Clapperboard, FileText, ListChecks,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +34,7 @@ const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { path: '/workspace', label: 'Workspace', icon: LayoutGrid, description: 'Pages, databases & boards' },
       { path: '/queue', label: 'Queue', icon: Inbox, description: 'Pre-written article pipeline' },
       { path: '/agents', label: 'Agents', icon: Users, description: 'AI editorial team — chat & assign' },
+      { path: '/tasks', label: 'Task Center', icon: ListChecks, description: 'Run agent jobs & one-off tasks' },
     ],
   },
   {

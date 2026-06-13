@@ -33,6 +33,7 @@ import ContentCalendar from "./pages/ContentCalendar";
 import ContentInsights from "./pages/ContentInsights";
 import Interviews from "./pages/Interviews";
 import BrandVoice from "./pages/BrandVoice";
+import TaskCenter from "./pages/TaskCenter";
 import NotFound from "@/pages/NotFound";
 function Router() {
   // Page-scoped error boundary, keyed by route: one page's render crash shows
@@ -56,6 +57,7 @@ function Router() {
             <Route path="/writer/:id" component={Writer} />
             <Route path="/queue" component={Queue} />
             <Route path="/agents" component={Agents} />
+            <Route path="/tasks" component={TaskCenter} />
             <Route path="/publications" component={Publications} />
             <Route path="/pitches" component={Pitches} />
             <Route path="/financial" component={Financial} />
