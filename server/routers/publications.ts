@@ -244,6 +244,7 @@ Return JSON:
       articleTitle: z.string(),
       articleSummary: z.string().optional(),
       topics: z.array(z.string()).optional(),
+      wordCount: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -260,15 +261,19 @@ Return JSON:
         `- ${p.name} (${p.category}, Tier ${p.tier}, ${p.payRange || "pay unknown"}) Topics: ${(p.topics as string[] || []).join(", ")}`
       ).join("\n");
 
+      const lengthLine = input.wordCount
+        ? `This draft is ~${input.wordCount} words; use it with each publication's pay range to estimate concrete earnings.`
+        : `Assume a typical 1,500-word feature when estimating earnings.`;
+
       const result = await invokeLLM({
         messages: [
           {
             role: "system",
-            content: "You are a freelance writing market strategist. Match articles to the most suitable publications. Return ONLY valid JSON.",
+            content: "You are a freelance writing market strategist. Match articles to the most suitable publications, explain WHY each fits, and estimate the realistic pay for this specific piece. Return ONLY valid JSON.",
           },
           {
             role: "user",
-            content: `Match this article to the best publications from our database:\n\nTitle: ${input.articleTitle}\nSummary: ${input.articleSummary || "N/A"}\nTopics: ${(input.topics || []).join(", ")}\n\nAvailable publications:\n${pubList}\n\nReturn JSON:\n{\n  "matches": [\n    {\n      "publicationName": "<name>",\n      "fitScore": <0-100>,\n      "reasoning": "<why this is a good match>",\n      "pitchAngle": "<suggested pitch angle>"\n    }\n  ]\n}`,
+            content: `Match this article to the best publications from our database. Rank the top 6 by fit. For each, give a clear reason WHY it fits, a pitch angle, and a POTENTIAL PAY estimate for this piece derived from the publication's pay range (multiply per-word rates by the article length; for flat-rate pubs, state the flat figure).\n\nTitle: ${input.articleTitle}\nSummary: ${input.articleSummary || "N/A"}\nTopics: ${(input.topics || []).join(", ")}\n${lengthLine}\n\nAvailable publications:\n${pubList}\n\nReturn JSON:\n{\n  "matches": [\n    {\n      "publicationName": "<exact name from list>",\n      "fitScore": <0-100>,\n      "reasoning": "<why this is a good match>",\n      "pitchAngle": "<suggested pitch angle>",\n      "potentialPay": "<estimated pay for THIS piece, e.g. \\"$1,500–$3,000\\">"\n    }\n  ]\n}`,
           },
         ],
         response_format: { type: "json_object" },
