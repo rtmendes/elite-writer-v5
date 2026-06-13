@@ -12,6 +12,7 @@ import { publicationsRouter } from "./routers/publications";
 import { assetsRouter } from "./routers/assets";
 import { feedsRouter, funnelsRouter } from "./routers/feeds";
 import { researchRouter } from "./routers/research";
+import { researchHubRouter } from "./routers/researchHub";
 import { toolsRouter } from "./routers/tools";
 import { agenticRouter } from "./routers/agentic";
 import { productCreationRouter } from "./routers/products";
@@ -65,6 +66,7 @@ export const appRouter = router({
   feeds: feedsRouter,
   funnels: funnelsRouter,
   research: researchRouter,
+  researchHub: researchHubRouter,
   tools: toolsRouter,
 
   // Integration features — Agentic Editor, Product Creation, Creative Generation
