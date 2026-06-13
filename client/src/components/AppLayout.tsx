@@ -9,7 +9,7 @@ import {
   Zap, Menu, Building2, Moon, Sun, Inbox, Loader2,
   MessageSquare, Library, Globe, Map, Users,
   Flame, Calendar, Mic, Palette, ChevronDown,
-  LayoutGrid, Rss,
+  LayoutGrid, Rss, Clapperboard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +44,7 @@ const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { path: '/social', label: 'Social Engine', icon: MessageSquare, description: 'Multi-platform content' },
       { path: '/trending', label: 'Trending', icon: Flame, description: 'Trending topics discovery' },
       { path: '/content-studio', label: 'Content Studio', icon: PenTool, description: 'Multi-platform content creation' },
+      { path: '/video-scripts', label: 'Video Scripts', icon: Clapperboard, description: 'VSL, TikTok, YouTube, UGC scripts' },
       { path: '/content-calendar', label: 'Calendar', icon: Calendar, description: 'Content scheduling calendar' },
       { path: '/content-insights', label: 'Insights', icon: Lightbulb, description: 'Smart content curation' },
       { path: '/interviews', label: 'AI Interviews', icon: Mic, description: 'Guided Q&A expertise extraction' },
