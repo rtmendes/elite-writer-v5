@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ import {
   Bot, Image, Package, PanelRightClose, PanelRightOpen, Search,
   FileDown, FileType, FileCode, Globe,
   Microscope, FlaskConical, ShieldCheck, AlertTriangle, Ban, CheckCircle2, Info,
-  Timer, Focus, Check, X,
+  Timer, Focus, Check, X, Users, ExternalLink, DollarSign, Lightbulb,
 } from 'lucide-react';
 import { PUBLICATIONS, matchPublications, type Publication } from '@/lib/publications-data';
 import { scoreArticleLocally, DIMENSION_LABELS, getScoreColor, getScoreBgColor, getTierFromScore } from '@/lib/scoring';
@@ -263,6 +263,8 @@ export default function Writer() {
   const saveArticleMutation = trpc.data.articles.create.useMutation();
   const updateArticleMutation = trpc.data.articles.update.useMutation();
   const googleCreateDoc = trpc.google.createDoc.useMutation();
+  const matchToArticleMutation = trpc.publications.matchToArticle.useMutation();
+  const assignTeamMutation = trpc.agents.assignTeam.useMutation();
   const [dbArticleId, setDbArticleId] = useState<number | null>(null);
 
   // Editor state — BlockNote stores HTML; we derive plain text for scoring/AI
@@ -299,6 +301,12 @@ export default function Writer() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState<string[]>([]);
   const [suggestionFeedback, setSuggestionFeedback] = useState<Record<string, 'accepted' | 'rejected'>>({});
+
+  // AI publication recommendation (server LLM): reasoning + potential pay + pitch angle
+  type AiMatch = { publicationName: string; fitScore: number; reasoning: string; pitchAngle?: string; potentialPay?: string };
+  const [aiMatches, setAiMatches] = useState<AiMatch[] | null>(null);
+  // Track which (articleId, publicationSlug) pairs we've already assigned a team for, to avoid duplicate calls
+  const teamAssignedRef = useRef<Set<string>>(new Set());
 
   const activeBrandObj = useMemo(() => state.brands.find(b => b.id === selectedBrandId), [state.brands, selectedBrandId]);
   const wordCount = useMemo(() => content.trim().split(/\s+/).filter(Boolean).length, [content]);
@@ -484,6 +492,64 @@ export default function Writer() {
     }
   };
 
+  // Assign the 4-role editorial team (Researcher, Lead Writer, Line Editor, Proofreader)
+  // for an article + publication. Guarded against duplicate calls per (article, pub) pair.
+  const assignTeam = useCallback((articleId: number, publicationSlugOrName: string) => {
+    const key = `${articleId}:${publicationSlugOrName}`;
+    if (teamAssignedRef.current.has(key)) return;
+    teamAssignedRef.current.add(key);
+    assignTeamMutation.mutate(
+      { articleId, articleTitle: title || undefined, publicationSlug: publicationSlugOrName },
+      {
+        onSuccess: (res: any) => {
+          const names = (res?.team || []).map((m: any) => `${m.name} (${m.role})`).join(', ');
+          toast.success(names ? `Editorial team assigned: ${names}` : 'Editorial team assigned');
+        },
+        onError: (err: any) => {
+          teamAssignedRef.current.delete(key); // allow retry on failure
+          toast.error('Team assignment failed: ' + (err.message || 'Unknown error'));
+        },
+      },
+    );
+  }, [assignTeamMutation, title]);
+
+  // Select a publication and auto-assign its editorial team (when the article is already saved)
+  const selectPublication = useCallback((pub: Publication) => {
+    setSelectedPub(pub);
+    setPubSearch(pub.name);
+    setShowPubDropdown(false);
+    if (dbArticleId) assignTeam(dbArticleId, pub.id);
+    else toast.info('Editorial team will be assigned when you save the article');
+  }, [dbArticleId, assignTeam]);
+
+  // Pick a publication from an AI recommendation card (name → static Publication when possible)
+  const applyAiMatch = useCallback((m: AiMatch) => {
+    const found = PUBLICATIONS.find(p => p.name.toLowerCase() === m.publicationName.toLowerCase());
+    if (found) { selectPublication(found); return; }
+    setPubSearch(m.publicationName);
+    if (dbArticleId) assignTeam(dbArticleId, m.publicationName);
+    else toast.info(`Selected "${m.publicationName}". Team assigns on save.`);
+  }, [selectPublication, dbArticleId, assignTeam]);
+
+  // AI publication recommendation — server LLM analyzes the draft against the publications DB
+  const handleAiRecommend = async () => {
+    if (!title.trim() && wordCount < 50) { toast.error('Add a title or some content first'); return; }
+    try {
+      const res: any = await matchToArticleMutation.mutateAsync({
+        articleTitle: title.trim() || 'Untitled draft',
+        articleSummary: content.slice(0, 1200) || undefined,
+        topics: selectedPub ? [selectedPub.category] : undefined,
+        wordCount: wordCount || undefined,
+      });
+      const matches: AiMatch[] = res?.matches || [];
+      setAiMatches(matches);
+      if (matches.length === 0) toast.message(res?.message || 'No publication matches returned');
+      else toast.success(`AI recommended ${matches.length} publication${matches.length === 1 ? '' : 's'}`);
+    } catch (err: any) {
+      toast.error('AI recommendation failed: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   const handleSave = useCallback(() => {
     if (!title.trim()) { toast.error('Please add a title'); return; }
     const articleData = {
@@ -503,17 +569,24 @@ export default function Writer() {
       updateArticle(activeArticleId, articleData);
       if (dbArticleId) {
         updateArticleMutation.mutate({ id: dbArticleId, title: articleData.title, content: articleData.content, template: articleData.template, brandVoice: articleData.brand_voice, wordCount: articleData.word_count, targetPublication: articleData.target_publication, brandId: articleData.brand_id, productId: articleData.product_id, overallScore: scores?.overall });
+        if (selectedPub) assignTeam(dbArticleId, selectedPub.id);
       }
       toast.success('Article saved');
     } else {
       const newArticle = addArticle(articleData);
       setActiveArticleId(newArticle.id);
       saveArticleMutation.mutate({ title: articleData.title, content: articleData.content, template: articleData.template, brandVoice: articleData.brand_voice, wordCount: articleData.word_count, targetPublication: articleData.target_publication, brandId: articleData.brand_id, productId: articleData.product_id, overallScore: scores?.overall }, {
-        onSuccess: (result) => { if (result?.id) setDbArticleId(result.id); }
+        onSuccess: (result) => {
+          if (result?.id) {
+            setDbArticleId(result.id);
+            // Assign the editorial team now that the article has a DB id
+            if (selectedPub) assignTeam(result.id, selectedPub.id);
+          }
+        }
       });
       toast.success('Article created and saved');
     }
-  }, [title, editorHtml, content, wordCount, selectedPub, selectedVoice, selectedTemplate, scores, activeArticleId, selectedBrandId, selectedProductId, activeBrandObj, addArticle, updateArticle, dbArticleId, saveArticleMutation, updateArticleMutation]);
+  }, [title, editorHtml, content, wordCount, selectedPub, selectedVoice, selectedTemplate, scores, activeArticleId, selectedBrandId, selectedProductId, activeBrandObj, addArticle, updateArticle, dbArticleId, saveArticleMutation, updateArticleMutation, assignTeam]);
 
   // ─── Full Pipeline: Title → Research → Draft → Proof → Score → Save ────────
   const fullPipelineMutation = trpc.queue.generateArticle.useMutation();
@@ -916,7 +989,7 @@ ${editorHtml}
       {/* ═══ Publish Tab (Publication + Match + Products) ═══ */}
       <TabsContent value="publish" className="mt-0">
         <Tabs defaultValue="pub" className="w-full">
-          <TabsList className="w-full h-8 rounded-none bg-muted/30 grid grid-cols-3">
+          <TabsList className="w-full h-8 rounded-none bg-muted/30 grid grid-cols-4">
             <TabsTrigger value="pub" className="text-[10px] gap-1 h-7">
               <BookOpen className="w-3 h-3" /> Pub
             </TabsTrigger>
@@ -925,6 +998,9 @@ ${editorHtml}
             </TabsTrigger>
             <TabsTrigger value="products" className="text-[10px] gap-1 h-7">
               <Package className="w-3 h-3" /> Products
+            </TabsTrigger>
+            <TabsTrigger value="pageforge" className="text-[10px] gap-1 h-7">
+              <Globe className="w-3 h-3" /> Forge
             </TabsTrigger>
           </TabsList>
 
@@ -944,7 +1020,7 @@ ${editorHtml}
                   <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
                     {pubResults.map(pub => (
                       <button key={pub.id} className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors"
-                        onClick={() => { setSelectedPub(pub); setPubSearch(pub.name); setShowPubDropdown(false); }}>
+                        onClick={() => selectPublication(pub)}>
                         <span className="font-medium">{pub.name}</span>
                         <span className="text-muted-foreground ml-2">{pub.category}</span>
                         <span className="text-muted-foreground ml-2">{pub.pay_structure}</span>
@@ -1009,20 +1085,71 @@ ${editorHtml}
 
           {/* Match sub-tab */}
           <TabsContent value="match" className="p-4 space-y-3 mt-0">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="w-4 h-4 text-primary" />
-              <span className="text-xs font-medium">Publication Matches</span>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-primary" />
+                <span className="text-xs font-medium">Publication Matches</span>
+              </div>
+              <Button size="sm" variant="default" className="h-7 text-[11px] gap-1"
+                onClick={handleAiRecommend} disabled={matchToArticleMutation.isPending}>
+                {matchToArticleMutation.isPending
+                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Analyzing…</>
+                  : <><Sparkles className="w-3 h-3" /> AI Recommend</>}
+              </Button>
             </div>
+            <p className="text-[10px] text-muted-foreground">
+              The AI editor analyzes your draft, ranks the best-fit publications, explains why, and estimates your pay for this piece.
+            </p>
 
+            {/* AI recommendations (server LLM) */}
+            {aiMatches && aiMatches.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-primary">AI Recommendations</div>
+                {aiMatches.map((m, i) => (
+                  <Card key={`${m.publicationName}-${i}`} className="border-primary/30 bg-primary/[0.03]">
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold">{m.publicationName}</span>
+                        <Badge variant="outline" className="text-[10px] font-mono shrink-0">{m.fitScore}% fit</Badge>
+                      </div>
+                      <Progress value={m.fitScore} className="h-1" />
+                      {m.reasoning && (
+                        <p className="text-[11px] text-muted-foreground leading-snug">{m.reasoning}</p>
+                      )}
+                      {m.potentialPay && (
+                        <div className="flex items-center gap-1.5 text-[11px]">
+                          <DollarSign className="w-3 h-3 text-emerald-500 shrink-0" />
+                          <span className="text-muted-foreground">Potential pay:</span>
+                          <span className="font-semibold text-emerald-500">{m.potentialPay}</span>
+                        </div>
+                      )}
+                      {m.pitchAngle && (
+                        <div className="flex items-start gap-1.5 text-[11px]">
+                          <Lightbulb className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground"><span className="font-medium text-foreground">Pitch:</span> {m.pitchAngle}</span>
+                        </div>
+                      )}
+                      <Button size="sm" variant="secondary" className="w-full h-7 text-[11px] gap-1 mt-1"
+                        onClick={() => applyAiMatch(m)}>
+                        <Check className="w-3 h-3" /> Use this publication
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* Quick heuristic matches (instant, score-based) */}
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground pt-1">Quick Matches</div>
             {matchedPubs.length === 0 ? (
-              <div className="text-center py-6">
-                <BookOpen className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-40" />
-                <p className="text-xs text-muted-foreground">Write more content to see publication matches</p>
+              <div className="text-center py-4">
+                <BookOpen className="w-7 h-7 mx-auto mb-2 text-muted-foreground opacity-40" />
+                <p className="text-[11px] text-muted-foreground">Write more content (or run AI Recommend) to see matches</p>
               </div>
             ) : (
               matchedPubs.map(pub => (
                 <button key={pub.id} className="w-full text-left"
-                  onClick={() => { setSelectedPub(pub); setPubSearch(pub.name); setSidebarTab('publish'); }}>
+                  onClick={() => selectPublication(pub)}>
                   <Card className="border-border hover:border-primary/30 transition-colors">
                     <CardContent className="p-3">
                       <div className="flex items-center justify-between mb-1">
@@ -1049,6 +1176,34 @@ ${editorHtml}
               content={content}
               brandVoice={BRAND_VOICES.find(b => b.id === selectedVoice)?.name}
             />
+          </TabsContent>
+
+          {/* PageForge sub-tab — alternate publishing surface */}
+          <TabsContent value="pageforge" className="p-4 space-y-2 mt-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-primary" />
+                <span className="text-xs font-medium">PageForge</span>
+              </div>
+              <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1" asChild>
+                <a href="https://pageforge.vercel.app/?embed=1" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-3 h-3" /> Open
+                </a>
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Build and publish a standalone page for this article. If the embed below is blank, your draft may
+              still be opened in a new tab with the button above.
+            </p>
+            <div className="rounded-md border border-border overflow-hidden bg-muted/20" style={{ height: 'calc(100vh - 220px)', minHeight: 320 }}>
+              <iframe
+                src="https://pageforge.vercel.app/?embed=1"
+                title="PageForge"
+                className="w-full h-full"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                loading="lazy"
+              />
+            </div>
           </TabsContent>
         </Tabs>
       </TabsContent>
