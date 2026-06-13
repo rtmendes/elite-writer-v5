@@ -1,9 +1,17 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 
+// Demo credentials pre-filled for this single-operator tool. Values come from
+// Vite env (set VITE_DEMO_EMAIL / VITE_DEMO_PASSWORD in the deploy to match the
+// server's ADMIN_EMAIL / ADMIN_PASSWORD). Fallbacks match the server dev default
+// in server/_core/sdk.ts so local dev works out of the box. No secret is added to
+// source — real prod creds stay in env vars only.
+const DEMO_EMAIL = (import.meta.env.VITE_DEMO_EMAIL as string | undefined) ?? "admin@elitewriter.app";
+const DEMO_PASSWORD = (import.meta.env.VITE_DEMO_PASSWORD as string | undefined) ?? "admin";
+
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(DEMO_EMAIL);
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [, navigate] = useLocation();
