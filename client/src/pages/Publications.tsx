@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  BookOpen, Search, ExternalLink, Mail, DollarSign, TrendingUp, Download, Send,
+  BookOpen, Search, ExternalLink, Globe, Mail, DollarSign, TrendingUp, Download, Send,
   LayoutGrid, List as ListIcon, ArrowUp, ArrowDown, ArrowUpDown, Copy, X,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
@@ -38,6 +38,57 @@ function tierClasses(tier: string): string {
   return tier === 'Tier 1' ? 'text-emerald-400 border-emerald-500/30'
     : tier === 'Tier 2' ? 'text-amber-400 border-amber-500/30'
     : 'text-blue-400 border-blue-500/30';
+}
+
+// Derive the publication's root domain from its submission URL hostname
+// (e.g. "https://www.allure.com/info/about" → "allure.com"). This is the
+// identifying content that drives both the logo and the live homepage link,
+// so we never have to hand-maintain a separate logo/URL column.
+function pubDomain(p: Publication): string {
+  try {
+    return new URL(p.submission_url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+const pubHomepage = (p: Publication) => {
+  const d = pubDomain(p);
+  return d ? `https://${d}` : p.submission_url;
+};
+
+// Logo with a graceful fallback chain: Clearbit (crisp brand mark) →
+// Google favicon (always-on) → letter avatar. Each 404 advances `step`
+// via onError, so a missing logo silently degrades instead of breaking.
+function PubLogo({ pub, size = 32 }: { pub: Publication; size?: number }) {
+  const domain = pubDomain(pub);
+  const [step, setStep] = useState(0);
+  const letter = pub.name.charAt(0).toUpperCase();
+  if (!domain || step >= 2) {
+    return (
+      <span
+        className="flex items-center justify-center rounded bg-muted text-muted-foreground font-semibold shrink-0"
+        style={{ width: size, height: size, fontSize: size * 0.42 }}
+        aria-hidden
+      >
+        {letter}
+      </span>
+    );
+  }
+  const src = step === 0
+    ? `https://logo.clearbit.com/${domain}`
+    : `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+  return (
+    <img
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      loading="lazy"
+      className="rounded object-contain bg-white shrink-0"
+      style={{ width: size, height: size }}
+      onError={() => setStep(s => s + 1)}
+    />
+  );
 }
 
 // Single source of truth for the list view: every column carries how to display,
@@ -169,9 +220,9 @@ export default function Publications() {
 
   // ---- bulk actions (non-destructive: static reference DB has no delete/status) ----
   function exportCSV(rows: Publication[], suffix = '') {
-    const headers = ['Name','Category','Tier','Pay Min','Pay Max','Pay Structure','Acceptance Rate','Avg Response Days','Topics','Article Styles','Editors','Emails','Submission URL','Traffic','Notes'];
+    const headers = ['Name','Website','Category','Tier','Pay Min','Pay Max','Pay Structure','Acceptance Rate','Avg Response Days','Topics','Article Styles','Editors','Emails','Submission URL','Traffic','Notes'];
     const body = rows.map(p => [
-      p.name, p.category, getPublicationTier(p), p.pay_min ?? '', p.pay_max ?? '', p.pay_structure,
+      p.name, pubHomepage(p), p.category, getPublicationTier(p), p.pay_min ?? '', p.pay_max ?? '', p.pay_structure,
       p.acceptance_rate ?? '', p.avg_response_days ?? '', `"${p.topics}"`, `"${p.article_styles || ''}"`,
       `"${p.editors.map(e => e.name).join('; ')}"`, `"${p.editors.map(e => e.email || '').join('; ')}"`,
       p.submission_url, p.traffic_monthly, `"${(p.notes || '').replace(/"/g, '""')}"`,
@@ -319,11 +370,22 @@ export default function Publications() {
                 onClick={() => setSelectedPub(pub)}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2 gap-2">
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-start gap-2 min-w-0">
                       <span onClick={e => e.stopPropagation()} className="pt-0.5">
                         <Checkbox checked={isSel} onCheckedChange={() => toggleOne(pub.id)} aria-label={`Select ${pub.name}`} />
                       </span>
-                      <h3 className="font-semibold text-sm leading-tight">{pub.name}</h3>
+                      <PubLogo pub={pub} size={32} />
+                      <a
+                        href={pubHomepage(pub)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        title={`Visit ${pub.name}`}
+                        className="font-semibold text-sm leading-tight hover:text-primary hover:underline inline-flex items-center gap-1 min-w-0"
+                      >
+                        <span className="truncate">{pub.name}</span>
+                        <ExternalLink className="w-3 h-3 opacity-50 shrink-0" />
+                      </a>
                     </div>
                     <Badge variant="outline" className={`text-[10px] shrink-0 ${tierClasses(tier)}`}>{tier}</Badge>
                   </div>
@@ -392,7 +454,22 @@ export default function Publications() {
                     <TableCell onClick={e => e.stopPropagation()}>
                       <Checkbox checked={isSel} onCheckedChange={() => toggleOne(pub.id)} aria-label={`Select ${pub.name}`} />
                     </TableCell>
-                    <TableCell className="font-medium">{pub.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <PubLogo pub={pub} size={24} />
+                        <a
+                          href={pubHomepage(pub)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          title={`Visit ${pub.name}`}
+                          className="hover:text-primary hover:underline inline-flex items-center gap-1 min-w-0"
+                        >
+                          <span className="truncate">{pub.name}</span>
+                          <ExternalLink className="w-3 h-3 opacity-40 shrink-0" />
+                        </a>
+                      </div>
+                    </TableCell>
                     <TableCell><Badge variant="secondary" className="text-[10px]">{pub.category}</Badge></TableCell>
                     <TableCell><Badge variant="outline" className={`text-[10px] ${tierClasses(tier)}`}>{tier}</Badge></TableCell>
                     <TableCell className="whitespace-nowrap">{pub.pay_structure}</TableCell>
@@ -448,6 +525,7 @@ export default function Publications() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
+              {selectedPub && <PubLogo pub={selectedPub} size={28} />}
               {selectedPub?.name}
               <Badge variant="outline" className="text-xs">{selectedPub && getPublicationTier(selectedPub)}</Badge>
             </DialogTitle>
@@ -504,13 +582,18 @@ export default function Publications() {
                 ))}
               </div>
               <div className="flex gap-2">
+                <a href={pubHomepage(selectedPub)} target="_blank" rel="noopener noreferrer" className="flex-1">
+                  <Button variant="outline" className="w-full gap-2 text-xs">
+                    <Globe className="w-3.5 h-3.5" /> Visit Website
+                  </Button>
+                </a>
                 <a href={selectedPub.submission_url} target="_blank" rel="noopener noreferrer" className="flex-1">
                   <Button variant="outline" className="w-full gap-2 text-xs">
-                    <ExternalLink className="w-3.5 h-3.5" /> Submission Guidelines
+                    <ExternalLink className="w-3.5 h-3.5" /> Guidelines
                   </Button>
                 </a>
                 <Button className="flex-1 gap-2 text-xs" onClick={() => { setSelectedPub(null); navigate(`/pitches?pub=${selectedPub.id}`); }}>
-                  <Send className="w-3.5 h-3.5" /> Create Pitch
+                  <Send className="w-3.5 h-3.5" /> Pitch
                 </Button>
               </div>
             </div>
