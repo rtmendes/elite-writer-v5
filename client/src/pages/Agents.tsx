@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils';
 
 type ChatMode = 'one_on_one' | 'group' | 'meeting';
 type ViewMode = 'gallery' | 'list';
-type SortField = 'name' | 'role' | 'articles' | 'response';
+type SortField = 'name' | 'role' | 'articles' | 'specialty';
 type SortDirection = 'asc' | 'desc';
 
 interface ChatMessage {
@@ -100,6 +100,9 @@ export default function Agents() {
   const assignMutation = trpc.agents.assign.useMutation();
   const deleteChatMutation = trpc.agents.deleteChat.useMutation();
   const contextStatusQuery = trpc.agents.getContextStatus.useQuery();
+  // Real article counts: how many articles each agent is actively assigned to
+  const articleCountsQuery = trpc.agents.articleCounts.useQuery();
+  const articleCounts = articleCountsQuery.data ?? {};
 
   // Filter + sort agents
   const filteredAgents = useMemo(() => {
@@ -136,17 +139,17 @@ export default function Agents() {
           cmp = a.role.localeCompare(b.role);
           break;
         case 'articles':
-          cmp = a.stats.articlesProcessed - b.stats.articlesProcessed;
+          cmp = (articleCounts[a.id] ?? 0) - (articleCounts[b.id] ?? 0);
           break;
-        case 'response':
-          cmp = parseInt(a.stats.avgResponseTime) - parseInt(b.stats.avgResponseTime);
+        case 'specialty':
+          cmp = a.stats.specialty.localeCompare(b.stats.specialty);
           break;
       }
       return sortDirection === 'asc' ? cmp : -cmp;
     });
 
     return list;
-  }, [searchQuery, filterRole, filterExpertise, sortField, sortDirection]);
+  }, [searchQuery, filterRole, filterExpertise, sortField, sortDirection, articleCounts]);
 
   const hasActiveFilters = filterRole !== 'all' || filterExpertise !== 'all' || searchQuery.length > 0;
 
@@ -473,8 +476,8 @@ export default function Agents() {
               {[
                 { field: 'name' as SortField, label: 'Name' },
                 { field: 'role' as SortField, label: 'Role' },
-                { field: 'articles' as SortField, label: 'Articles Processed' },
-                { field: 'response' as SortField, label: 'Response Time' },
+                { field: 'articles' as SortField, label: 'Articles Assigned' },
+                { field: 'specialty' as SortField, label: 'Specialty' },
               ].map(({ field, label }) => (
                 <DropdownMenuItem
                   key={field}
@@ -546,6 +549,7 @@ export default function Agents() {
             <AgentCard
               key={agent.id}
               agent={agent}
+              articleCount={articleCounts[agent.id] ?? 0}
               onClick={() => handleAgentClick(agent)}
               onChat={() => handleStartChat([agent.id])}
               multiSelectMode={multiSelectMode}
@@ -558,19 +562,19 @@ export default function Agents() {
         /* List View */
         <div className="rounded-lg border border-border overflow-hidden">
           {/* List header */}
-          <div className="grid grid-cols-[auto_1fr_150px_100px_80px_80px_70px] gap-3 px-4 py-2.5 bg-muted/30 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider items-center">
+          <div className="grid grid-cols-[auto_1fr_150px_100px_80px_70px] gap-3 px-4 py-2.5 bg-muted/30 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider items-center">
             {multiSelectMode && <div className="w-5" />}
             <div className={multiSelectMode ? "" : "col-start-2"}>Agent</div>
             <div>Role</div>
             <div>Specialty</div>
             <div className="text-center">Articles</div>
-            <div className="text-center">Response</div>
             <div className="text-right">Actions</div>
           </div>
           {filteredAgents.map((agent, i) => (
             <AgentListRow
               key={agent.id}
               agent={agent}
+              articleCount={articleCounts[agent.id] ?? 0}
               isEven={i % 2 === 0}
               onClick={() => handleAgentClick(agent)}
               onChat={() => handleStartChat([agent.id])}
@@ -646,6 +650,7 @@ export default function Agents() {
           {selectedAgent && (
             <AgentProfile
               agent={selectedAgent}
+              articleCount={articleCounts[selectedAgent.id] ?? 0}
               assignments={assignmentsQuery.data || []}
               onChat={() => handleStartChat([selectedAgent.id])}
               onAssign={assignMutation.mutateAsync}
@@ -732,8 +737,9 @@ export default function Agents() {
 
 // ─── Agent Card (Gallery) ────────────────────────────────
 
-function AgentCard({ agent, onClick, onChat, multiSelectMode, isSelected, onToggleSelect }: {
+function AgentCard({ agent, articleCount, onClick, onChat, multiSelectMode, isSelected, onToggleSelect }: {
   agent: Agent;
+  articleCount: number;
   onClick: () => void;
   onChat: () => void;
   multiSelectMode: boolean;
@@ -784,16 +790,18 @@ function AgentCard({ agent, onClick, onChat, multiSelectMode, isSelected, onTogg
         <h3 className="text-xs font-semibold leading-tight">{agent.name}</h3>
         <p className="text-[10px] text-muted-foreground mt-0.5">{agent.role}</p>
 
-        {/* Quick stats */}
+        {/* Quick stats — real assignment count + specialty */}
         <div className="flex items-center gap-1.5 mt-2 text-[9px] text-muted-foreground">
-          <span className="flex items-center gap-0.5">
+          <span
+            className="flex items-center gap-0.5"
+            title={articleCount === 1 ? '1 article assigned' : `${articleCount} articles assigned`}
+          >
             <FileText className="w-2.5 h-2.5" />
-            {agent.stats.articlesProcessed}
+            {articleCount}
           </span>
           <span>•</span>
-          <span className="flex items-center gap-0.5">
-            <Clock className="w-2.5 h-2.5" />
-            {agent.stats.avgResponseTime}
+          <span className="truncate max-w-[90px]" title={agent.stats.specialty}>
+            {agent.stats.specialty}
           </span>
         </div>
 
@@ -816,8 +824,9 @@ function AgentCard({ agent, onClick, onChat, multiSelectMode, isSelected, onTogg
 
 // ─── Agent List Row ──────────────────────────────────────
 
-function AgentListRow({ agent, isEven, onClick, onChat, multiSelectMode, isSelected, onToggleSelect }: {
+function AgentListRow({ agent, articleCount, isEven, onClick, onChat, multiSelectMode, isSelected, onToggleSelect }: {
   agent: Agent;
+  articleCount: number;
   isEven: boolean;
   onClick: () => void;
   onChat: () => void;
@@ -828,7 +837,7 @@ function AgentListRow({ agent, isEven, onClick, onChat, multiSelectMode, isSelec
   return (
     <div
       className={cn(
-        "grid grid-cols-[auto_1fr_150px_100px_80px_80px_70px] gap-3 px-4 py-2.5 items-center cursor-pointer transition-colors group",
+        "grid grid-cols-[auto_1fr_150px_100px_80px_70px] gap-3 px-4 py-2.5 items-center cursor-pointer transition-colors group",
         isEven ? "bg-background" : "bg-muted/20",
         "hover:bg-primary/5",
         multiSelectMode && isSelected && "bg-primary/10 hover:bg-primary/15",
@@ -877,14 +886,11 @@ function AgentListRow({ agent, isEven, onClick, onChat, multiSelectMode, isSelec
         {agent.stats.specialty}
       </div>
 
-      {/* Articles */}
+      {/* Articles — real active assignment count */}
       <div className="text-center">
-        <span className="text-sm font-semibold">{agent.stats.articlesProcessed}</span>
-      </div>
-
-      {/* Response time */}
-      <div className="text-center">
-        <span className="text-xs text-muted-foreground">{agent.stats.avgResponseTime}</span>
+        <span className={cn("text-sm font-semibold", articleCount === 0 && "text-muted-foreground/50")}>
+          {articleCount}
+        </span>
       </div>
 
       {/* Actions */}
@@ -905,8 +911,9 @@ function AgentListRow({ agent, isEven, onClick, onChat, multiSelectMode, isSelec
 
 // ─── Agent Profile (Sheet) ───────────────────────────────
 
-function AgentProfile({ agent, assignments, onChat, onAssign, onClose }: {
+function AgentProfile({ agent, articleCount, assignments, onChat, onAssign, onClose }: {
   agent: Agent;
+  articleCount: number;
   assignments: any[];
   onChat: () => void;
   onAssign: (input: any) => Promise<any>;
@@ -934,20 +941,21 @@ function AgentProfile({ agent, assignments, onChat, onAssign, onClose }: {
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* Stats — real assignment data only */}
+      <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-border p-3 text-center">
-          <p className="text-lg font-bold">{agent.stats.articlesProcessed}</p>
-          <p className="text-[10px] text-muted-foreground">Articles</p>
-        </div>
-        <div className="rounded-lg border border-border p-3 text-center">
-          <p className="text-lg font-bold">{agent.stats.avgResponseTime}</p>
-          <p className="text-[10px] text-muted-foreground">Avg Response</p>
+          <p className="text-lg font-bold">{articleCount}</p>
+          <p className="text-[10px] text-muted-foreground">Articles Assigned</p>
         </div>
         <div className="rounded-lg border border-border p-3 text-center">
           <p className="text-lg font-bold">{assignments.length}</p>
-          <p className="text-[10px] text-muted-foreground">Assignments</p>
+          <p className="text-[10px] text-muted-foreground">Total Assignments</p>
         </div>
+      </div>
+      {/* Specialty */}
+      <div className="rounded-lg border border-border p-3">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Specialty</p>
+        <p className="text-sm">{agent.stats.specialty}</p>
       </div>
 
       {/* Expertise */}
