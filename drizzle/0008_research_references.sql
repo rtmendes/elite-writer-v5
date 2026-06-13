@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS `research_references` (
   `citationCount` int DEFAULT 0,
   `tags` json,
   `notes` text,
-  `createdAt` timestamp NOT NULL DEFAULT (now()),
-  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE (now())
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- Library is listed newest-first per user; filtered by type.
