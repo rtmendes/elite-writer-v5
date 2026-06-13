@@ -37,6 +37,7 @@ import { workspaceRouter } from "./routers/workspace";
 import { videoScriptsRouter } from "./routers/videoScripts";
 import { documentationRouter } from "./routers/documentation";
 import { taskCenterRouter } from "./routers/taskCenter";
+import { acceleratorRouter } from "./routers/accelerator";
 
 export const appRouter = router({
   system: systemRouter,
@@ -103,6 +104,7 @@ export const appRouter = router({
   videoScripts: videoScriptsRouter,
   documentation: documentationRouter,
   taskCenter: taskCenterRouter,
+  accelerator: acceleratorRouter,
 });
 
 export type AppRouter = typeof appRouter;

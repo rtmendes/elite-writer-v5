@@ -16,6 +16,7 @@ import Pitches from "./pages/Pitches";
 import Financial from "./pages/Financial";
 import VideoScripts from "./pages/VideoScripts";
 import Documentation from "./pages/Documentation";
+import Accelerator from "./pages/Accelerator";
 import Settings from "./pages/Settings";
 import Brands from "./pages/Brands";
 import Queue from "./pages/Queue";
@@ -64,6 +65,7 @@ function Router() {
             <Route path="/pitches" component={Pitches} />
             <Route path="/financial" component={Financial} />
             <Route path="/video-scripts" component={VideoScripts} />
+            <Route path="/accelerator" component={Accelerator} />
             <Route path="/social" component={Social} />
             <Route path="/library" component={ContentLibrary} />
             <Route path="/knowledge-hub" component={KnowledgeHub} />
