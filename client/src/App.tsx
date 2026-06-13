@@ -14,6 +14,7 @@ import Writer from "./pages/Writer";
 import Publications from "./pages/Publications";
 import Pitches from "./pages/Pitches";
 import Financial from "./pages/Financial";
+import VideoScripts from "./pages/VideoScripts";
 import Settings from "./pages/Settings";
 import Brands from "./pages/Brands";
 import Queue from "./pages/Queue";
@@ -57,6 +58,7 @@ function Router() {
             <Route path="/publications" component={Publications} />
             <Route path="/pitches" component={Pitches} />
             <Route path="/financial" component={Financial} />
+            <Route path="/video-scripts" component={VideoScripts} />
             <Route path="/social" component={Social} />
             <Route path="/library" component={ContentLibrary} />
             <Route path="/geo" component={Geo} />
