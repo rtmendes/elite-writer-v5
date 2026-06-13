@@ -10,13 +10,14 @@
  * 6. Unified feed across all source types
  */
 import { z } from "zod";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { createHash } from "crypto";
+import { eq, desc, and, sql, inArray, lt } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
-import { invokeLLM } from "../_core/llm";
+import { invokeLLM, TIER } from "../_core/llm";
 import { ENV } from "../_core/env";
 import { getDb } from "../db";
 import {
-  contentSources, sourceItems,
+  contentSources, sourceItems, feedSeen,
   type InsertContentSource, type InsertSourceItem,
 } from "../../drizzle/schema";
 
@@ -193,6 +194,164 @@ async function scrapeWebsite(url: string): Promise<any[]> {
   }));
 }
 
+// ─── Ingest pipeline: dedup → screen → store-actionable-only ───────────────
+// The architecture that keeps storage bounded: a fetched URL is screened once
+// (feed_seen ledger), only items that clear the relevance bar are stored, and
+// unsaved/unprocessed items are purged after RETAIN_DAYS. Shared by the manual
+// "pull" button and the daily 4am-ET proactive refresh job.
+const SCREEN_MIN = Number(process.env.SOURCE_MIN_RELEVANCE ?? 6);
+const RETAIN_DAYS = Number(process.env.SOURCE_RETAIN_DAYS ?? 14);
+const SEEN_RETAIN_DAYS = 30;
+const sha1 = (s: string) => createHash("sha1").update(s).digest("hex");
+
+let feedSeenEnsured = false;
+async function ensureFeedSeenTable(db: any) {
+  if (feedSeenEnsured) return;
+  await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`feed_seen\` (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    userId INT NOT NULL,
+    sourceId INT NOT NULL,
+    urlHash VARCHAR(40) NOT NULL,
+    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_feed_seen (userId, urlHash),
+    INDEX idx_feed_seen_created (createdAt)
+  )`));
+  feedSeenEnsured = true;
+}
+
+async function fetchRawForSource(source: any, limit: number): Promise<any[]> {
+  switch (source.type) {
+    case "youtube": return fetchYouTubeVideos(source.identifier, limit);
+    case "reddit": return fetchRedditPosts(source.identifier, "hot", limit);
+    case "website": return scrapeWebsite(source.identifier);
+    case "rss": {
+      const rssResp = await fetch(source.identifier, { signal: AbortSignal.timeout(10000) });
+      const rssText = await rssResp.text();
+      const titleMatches = [...rssText.matchAll(/<title><!\[CDATA\[(.*?)\]\]>|<title>(.*?)<\/title>/g)];
+      const linkMatches = [...rssText.matchAll(/<link>(.*?)<\/link>/g)];
+      return titleMatches.slice(1, limit + 1).map((m, i) => ({
+        title: m[1] || m[2] || "Untitled",
+        url: linkMatches[i + 1]?.[1] || "",
+        content: "",
+        publishedAt: new Date().toISOString(),
+      }));
+    }
+    default: return [];
+  }
+}
+
+// One free-model pass scores the new items against the operator's beats; only
+// the actionable ones are kept. Resilient: on any failure, keep nothing rather
+// than store noise (the items stay in feed_seen so they're not re-screened).
+async function screenItems(items: any[], beats: string): Promise<Map<number, { score: number; beat: string }>> {
+  const keep = new Map<number, { score: number; beat: string }>();
+  if (items.length === 0) return keep;
+  const list = items.map((it, i) => `${i}. ${String(it.title || "").slice(0, 160)}${it.content || it.description ? ` — ${String(it.content || it.description).slice(0, 160)}` : ""}`).join("\n");
+  try {
+    const res = await invokeLLM({
+      model: TIER.free,
+      maxTokens: 1500,
+      messages: [
+        { role: "system", content: "You screen raw feed items for a freelance writer. Keep only items that could plausibly seed a pitch or article for these beats. Be strict — most feed items are noise. Return STRICT JSON only." },
+        { role: "user", content: `BEATS: ${beats}\n\nFEED ITEMS:\n${list}\n\nReturn STRICT JSON array, one object per RELEVANT item only (drop the rest): [{"index": <n>, "score": <1-10 relevance>, "beat": "<matching beat>"}]` },
+      ],
+    });
+    const txt = res.choices?.[0]?.message?.content ?? "";
+    const m = txt.match(/\[[\s\S]*\]/);
+    if (m) {
+      for (const row of JSON.parse(m[0])) {
+        const idx = Number(row.index);
+        const score = Number(row.score) || 0;
+        if (Number.isInteger(idx) && idx >= 0 && idx < items.length && score >= SCREEN_MIN) {
+          keep.set(idx, { score, beat: String(row.beat || "").slice(0, 80) });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[feed] screening failed — keeping nothing this pass:", err instanceof Error ? err.message : err);
+  }
+  return keep;
+}
+
+/** Fetch a source, dedup against feed_seen, screen the new items, store only the
+ *  actionable ones. Returns counts. The core of the bounded-storage design. */
+export async function ingestSource(db: any, source: any, limit: number, beats: string): Promise<{ fetched: number; fresh: number; kept: number }> {
+  await ensureFeedSeenTable(db);
+  const raw = (await fetchRawForSource(source, limit)).filter((it) => it.url);
+  if (raw.length === 0) return { fetched: 0, fresh: 0, kept: 0 };
+
+  const hashes = raw.map((it) => sha1(it.url));
+  const existing = await db.select({ urlHash: feedSeen.urlHash }).from(feedSeen)
+    .where(and(eq(feedSeen.userId, source.userId), inArray(feedSeen.urlHash, hashes)));
+  const seen = new Set(existing.map((r: any) => r.urlHash));
+  const fresh = raw.filter((_, i) => !seen.has(hashes[i]));
+  if (fresh.length === 0) return { fetched: raw.length, fresh: 0, kept: 0 };
+
+  const keep = await screenItems(fresh, beats);
+
+  // Record every fresh URL as seen (kept or not) so we never re-screen it.
+  await db.insert(feedSeen).values(fresh.map((it) => ({ userId: source.userId, sourceId: source.id, urlHash: sha1(it.url) }))).onDuplicateKeyUpdate({ set: { sourceId: source.id } });
+
+  const toStore: InsertSourceItem[] = [];
+  fresh.forEach((item, i) => {
+    const decision = keep.get(i);
+    if (!decision) return;
+    toStore.push({
+      userId: source.userId,
+      sourceId: source.id,
+      title: item.title || "Untitled",
+      content: item.content?.slice(0, 5000) || null,
+      summary: item.description?.slice(0, 1000) || null,
+      url: item.url || null,
+      imageUrl: item.imageUrl || null,
+      author: item.author || null,
+      publishedAt: item.publishedAt ? new Date(item.publishedAt) : null,
+      relevanceScore: decision.score * 10,
+      viralScore: item.upvoteRatio ? Math.round(item.upvoteRatio * 100) : null,
+      sentiment: null,
+      keyInsights: decision.beat ? [decision.beat] : null,
+      processed: 0,
+      saved: 0,
+    });
+  });
+  if (toStore.length > 0) await db.insert(sourceItems).values(toStore);
+
+  await db.update(contentSources)
+    .set({ lastFetched: new Date(), itemCount: sql`${contentSources.itemCount} + ${toStore.length}` })
+    .where(eq(contentSources.id, source.id));
+
+  return { fetched: raw.length, fresh: fresh.length, kept: toStore.length };
+}
+
+/** Retention: drop unsaved/unprocessed items after RETAIN_DAYS, and old dedup
+ *  ledger rows after 30d. Keeps storage tracking actionable items, not volume. */
+export async function purgeOldFeedData(db: any): Promise<{ items: number; seen: number }> {
+  await ensureFeedSeenTable(db);
+  const itemCut = new Date(Date.now() - RETAIN_DAYS * 86400e3);
+  const seenCut = new Date(Date.now() - SEEN_RETAIN_DAYS * 86400e3);
+  const delItems: any = await db.delete(sourceItems)
+    .where(and(eq(sourceItems.saved, 0), eq(sourceItems.processed, 0), lt(sourceItems.createdAt, itemCut)));
+  const delSeen: any = await db.delete(feedSeen).where(lt(feedSeen.createdAt, seenCut));
+  return { items: delItems?.[0]?.affectedRows ?? 0, seen: delSeen?.[0]?.affectedRows ?? 0 };
+}
+
+/** Refresh every active source for every user (4am-ET daily job entrypoint). */
+export async function refreshAllActiveSources(beats: string, perSource = 20): Promise<{ sources: number; kept: number }> {
+  const db = await getDb();
+  if (!db) return { sources: 0, kept: 0 };
+  const active = await db.select().from(contentSources).where(eq(contentSources.active, 1));
+  let kept = 0;
+  for (const source of active) {
+    try {
+      const r = await ingestSource(db, source, perSource, beats);
+      kept += r.kept;
+    } catch (err) {
+      console.warn(`[feed] refresh failed for source ${source.id}:`, err instanceof Error ? err.message : err);
+    }
+  }
+  return { sources: active.length, kept };
+}
+
 export const sourcesRouter = router({
   // ─── Add Source ───────────────────────────────────────────
   add: protectedProcedure
@@ -338,64 +497,10 @@ export const sourcesRouter = router({
 
       if (!source) throw new Error("Source not found");
 
-      let rawItems: any[] = [];
-
-      switch (source.type) {
-        case "youtube":
-          rawItems = await fetchYouTubeVideos(source.identifier, input.limit);
-          break;
-        case "reddit":
-          rawItems = await fetchRedditPosts(source.identifier, "hot", input.limit);
-          break;
-        case "website":
-          rawItems = await scrapeWebsite(source.identifier);
-          break;
-        case "rss": {
-          // Reuse existing RSS fetching logic
-          const rssResp = await fetch(source.identifier, { signal: AbortSignal.timeout(10000) });
-          const rssText = await rssResp.text();
-          // Basic RSS parsing
-          const titleMatches = [...rssText.matchAll(/<title><!\[CDATA\[(.*?)\]\]>|<title>(.*?)<\/title>/g)];
-          const linkMatches = [...rssText.matchAll(/<link>(.*?)<\/link>/g)];
-          rawItems = titleMatches.slice(1, input.limit + 1).map((m, i) => ({
-            title: m[1] || m[2] || "Untitled",
-            url: linkMatches[i + 1]?.[1] || "",
-            content: "",
-            publishedAt: new Date().toISOString(),
-          }));
-          break;
-        }
-      }
-
-      // AI score the items
-      const scoredItems: InsertSourceItem[] = rawItems.map((item, idx) => ({
-        userId: ctx.user.id,
-        sourceId: source.id,
-        title: item.title || "Untitled",
-        content: item.content?.slice(0, 5000) || null,
-        summary: item.description?.slice(0, 1000) || null,
-        url: item.url || null,
-        imageUrl: item.imageUrl || null,
-        author: item.author || null,
-        publishedAt: item.publishedAt ? new Date(item.publishedAt) : null,
-        relevanceScore: item.score ? Math.min(100, Math.round(Math.log10(item.score + 1) * 25)) : 50 + idx,
-        viralScore: item.upvoteRatio ? Math.round(item.upvoteRatio * 100) : null,
-        sentiment: null,
-        processed: 0,
-        saved: 0,
-      }));
-
-      // Batch insert
-      if (scoredItems.length > 0) {
-        await db.insert(sourceItems).values(scoredItems);
-      }
-
-      // Update source last fetched
-      await db.update(contentSources)
-        .set({ lastFetched: new Date(), itemCount: sql`${contentSources.itemCount} + ${scoredItems.length}` })
-        .where(eq(contentSources.id, source.id));
-
-      return { items: rawItems, count: rawItems.length, sourceType: source.type };
+      // Dedup → screen → store only actionable items (bounded-storage pipeline).
+      const beats = process.env.SCOUT_NICHES || "freelance writing, business, marketing, women's health, parenting, personal finance, technology, entrepreneurship";
+      const r = await ingestSource(db, source, input.limit, beats);
+      return { count: r.kept, fresh: r.fresh, fetched: r.fetched, sourceType: source.type };
     }),
 
   // ─── Get Source Items (already fetched) ───────────────────

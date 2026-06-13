@@ -518,6 +518,19 @@ export const sourceItems = mysqlTable("source_items", {
 export type SourceItem = typeof sourceItems.$inferSelect;
 export type InsertSourceItem = typeof sourceItems.$inferInsert;
 
+// ─── Feed dedup ledger ───────────────────────────────────
+// Every fetched URL is recorded here (kept OR discarded) so each URL is
+// screened exactly once, ever — this is what stops the daily-pull duplicate
+// explosion and the wasted re-screening. Tiny rows; auto-purged after 30 days.
+export const feedSeen = mysqlTable("feed_seen", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  sourceId: int("sourceId").notNull(),
+  urlHash: varchar("urlHash", { length: 40 }).notNull(), // sha1(url)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type FeedSeen = typeof feedSeen.$inferSelect;
+
 // ─── Content Library (GistStack: My Content) ─────────────
 export const contentLibrary = mysqlTable("content_library", {
   id: int("id").autoincrement().primaryKey(),

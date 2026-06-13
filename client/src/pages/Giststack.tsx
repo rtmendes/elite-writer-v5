@@ -65,6 +65,7 @@ export default function Giststack() {
   const fetchRSSMutation = trpc.news.fetchRSS.useMutation();
   const fetchNewsMutation = trpc.news.fetch.useMutation();
   const runPipelineMutation = trpc.news.runPipeline.useMutation();
+  const trpcUtils = trpc.useUtils();
 
   // ── Fetch live RSS feeds ──
   const fetchLiveFeeds = useCallback(async () => {
@@ -135,8 +136,28 @@ export default function Giststack() {
         publishedAt: item.publishedAt,
       }));
 
+      // Pull screened items from the operator's followed sources (YouTube,
+      // Reddit, sites) — these were already dedup'd + relevance-filtered at
+      // ingest, so they slot straight into the live feed.
+      let sourceFeedItems: FeedItem[] = [];
+      try {
+        const followed = await trpcUtils.sources.unifiedFeed.fetch({ limit: 100 });
+        sourceFeedItems = (followed || []).map((row: any) => ({
+          id: `src-${row.item.id}`,
+          title: row.item.title || 'Untitled',
+          summary: (row.item.summary || row.item.content || '').slice(0, 300),
+          source: row.sourceName || row.sourceType || 'Source',
+          url: row.item.url || '#',
+          category: row.sourceType || 'source',
+          relevance_score: row.item.relevanceScore ?? 65,
+          created_at: row.item.createdAt || new Date().toISOString(),
+          hot: false,
+          publishedAt: row.item.publishedAt,
+        }));
+      } catch { /* sources are additive — never block the RSS feed on them */ }
+
       // Merge and deduplicate by title similarity
-      const allItems = [...rssItems, ...transformedApiItems];
+      const allItems = [...rssItems, ...transformedApiItems, ...sourceFeedItems];
       const seen = new Set<string>();
       const deduped = allItems.filter(item => {
         const key = item.title.toLowerCase().slice(0, 50);
@@ -157,7 +178,7 @@ export default function Giststack() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeFeeds, topics, fetchRSSMutation, fetchNewsMutation]);
+  }, [activeFeeds, topics, fetchRSSMutation, fetchNewsMutation, trpcUtils]);
 
   // Auto-fetch on mount (only when authenticated)
   useEffect(() => {
