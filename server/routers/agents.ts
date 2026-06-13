@@ -24,7 +24,7 @@ import { ENV } from "../_core/env";
 import { getDb } from "../db";
 import {
   agentChats, agentMessages, agentAssignments, agentMemories,
-  kbItems, articles, ideas, researchNotes, brands,
+  kbItems, articles, ideas, researchNotes, brands, publications,
 } from "../../drizzle/schema";
 import { eq, and, desc, sql, like, or } from "drizzle-orm";
 
@@ -50,6 +50,28 @@ export const AGENT_PERSONAS: Record<string, { name: string; role: string; system
   quality: { name: "Elena Vasquez", role: "Quality Guardian", defaultModel: "free-big", systemPrompt: "You are Elena Vasquez, the quality guardian. Final checkpoint before publication. Review against publication standards, brand guidelines, compliance requirements. Either approve or provide specific blockers." },
   appbuilder: { name: "Nia Thompson", role: "Mini App Builder", defaultModel: "free-big", systemPrompt: "You are Nia Thompson, a mini app builder. Create interactive content experiences — calculators, quizzes, comparison tools. Think in user interactions and conversion flows. Write HTML/CSS/JS for embeddable widgets." },
 };
+
+// ─── Editorial Team (the 4 roles auto-assigned per article) ──────
+// A world-class article needs a matched team. These four cover the full
+// pipeline; the Lead Writer is style-matched to the target publication's
+// voice (see assignTeam), and the Proofreader also owns fact-check, date
+// accuracy, and image direction.
+type TeamMember = { agentId: string; role: string };
+const EDITORIAL_TEAM: TeamMember[] = [
+  { agentId: "researcher", role: "Researcher — sources, data & fact base" },
+  { agentId: "drafter", role: "Lead Writer — drafts in the publication's voice" },
+  { agentId: "editor", role: "Line Editor — structure, clarity & voice polish" },
+  { agentId: "proofreader", role: "Proofreader — grammar, fact-check, dates & image direction" },
+];
+
+// Style-match the Lead Writer to the publication. A publication with an
+// explicit voice/editor-preference profile is best served by the voice
+// rewriter (Amara), who specialises in matching a target register; a
+// publication without that signal gets the general feature drafter (Sofia).
+function pickLeadWriter(pub: { editorPreferences?: string | null; audienceAvatar?: string | null } | null): string {
+  if (pub && (pub.editorPreferences?.trim() || pub.audienceAvatar?.trim())) return "rewriter";
+  return "drafter";
+}
 
 const OPENROUTER_MODELS: Record<string, string> = {
   "claude-sonnet": "anthropic/claude-sonnet-4",
@@ -240,6 +262,57 @@ async function getContentContext(userId: number, query: string, limit: number = 
     return `\n\n--- USER'S CONTENT & PROJECTS ---\n${parts.join("\n\n")}\n--- END CONTENT CONTEXT ---`;
   } catch (err) {
     console.error("[agents.getContentContext] Error:", err);
+    return "";
+  }
+}
+
+// ─── Helper: Article assignments scoped to THIS agent ────
+// Unlike getContentContext (generic recent articles), this pulls the specific
+// articles the agent is actively assigned to via assignTeam — with the agent's
+// role on each piece, the target-publication voice notes, and the live draft
+// content. This is what lets a chat actually understand the article(s) the
+// team is working on, rather than just naming recent titles.
+async function getAssignmentContext(userId: number, agentId: string, limit: number = 3): Promise<string> {
+  try {
+    const db = await getDb();
+    if (!db) return "";
+
+    const rows = await db
+      .select({
+        role: agentAssignments.role,
+        notes: agentAssignments.notes,
+        title: articles.title,
+        status: articles.status,
+        wordCount: articles.wordCount,
+        targetPublication: articles.targetPublication,
+        content: articles.content,
+      })
+      .from(agentAssignments)
+      .innerJoin(articles, eq(agentAssignments.targetId, articles.id))
+      .where(and(
+        eq(agentAssignments.userId, userId),
+        eq(agentAssignments.agentId, agentId),
+        eq(agentAssignments.targetType, "article"),
+        eq(agentAssignments.status, "active"),
+      ))
+      .orderBy(desc(agentAssignments.createdAt))
+      .limit(limit);
+
+    if (rows.length === 0) return "";
+
+    const blocks = rows.map(r => {
+      const lines = [
+        `▸ "${r.title}" — ${r.status}${r.wordCount ? `, ${r.wordCount} words` : ""}${r.targetPublication ? `, target: ${r.targetPublication}` : ""}`,
+        r.role ? `  Your role: ${r.role}` : "",
+        r.notes?.trim() ? `  Publication voice: ${r.notes.trim()}` : "",
+        r.content?.trim() ? `  Current draft (excerpt): ${r.content.trim().slice(0, 1200)}` : "  (No draft written yet.)",
+      ];
+      return lines.filter(Boolean).join("\n");
+    }).join("\n\n");
+
+    return `\n\n--- ARTICLES YOU ARE ASSIGNED TO (your editorial team brief) ---\n${blocks}\n--- END ASSIGNED ARTICLES ---`;
+  } catch (err) {
+    console.error("[agents.getAssignmentContext] Error:", err);
     return "";
   }
 }
@@ -449,11 +522,13 @@ export const agentsRouter = router({
         const persona = AGENT_PERSONAS[agentId];
         if (!persona) continue;
 
-        // Get per-agent memories (in sequence to avoid overwhelming the DB)
+        // Get per-agent memories + the articles THIS agent is assigned to
+        // (in sequence to avoid overwhelming the DB)
         const agentMemoryContext = await getAgentMemories(ctx.user.id, agentId, 15);
+        const assignmentContext = await getAssignmentContext(ctx.user.id, agentId, 3);
 
         // Build RAG-augmented system prompt
-        const contextBlock = [kbContext, agentMemoryContext, contentContext].filter(Boolean).join("");
+        const contextBlock = [kbContext, agentMemoryContext, assignmentContext, contentContext].filter(Boolean).join("");
 
         const isGroup = validAgentIds.length > 1;
         const systemContent = `${persona.systemPrompt}${await skillBlockFor(agentId)}
@@ -464,6 +539,7 @@ CAPABILITIES:
 - You have access to the user's Knowledge Base with relevant context injected below
 - You remember facts from previous conversations with this user
 - You can see the user's recent articles, ideas, research notes, and brands
+- When you are assigned to an article, its draft, your role, and the target publication's voice are injected below — work from that brief directly
 - Use this context naturally — don't announce "I found in the KB" unless specifically relevant
 
 RESPONSE GUIDELINES:
@@ -710,6 +786,7 @@ ${contextBlock}`;
         if (!db) return [];
         const conditions = [eq(agentAssignments.userId, ctx.user.id), eq(agentAssignments.status, "active")];
         if (input.agentId) conditions.push(eq(agentAssignments.agentId, input.agentId));
+        if (input.targetType) conditions.push(eq(agentAssignments.targetType, input.targetType as any));
         if (input.targetId) conditions.push(eq(agentAssignments.targetId, input.targetId));
 
         const results = await db
@@ -739,5 +816,131 @@ ${contextBlock}`;
         console.error("[agents.unassign] Error:", err);
         throw new Error("Failed to remove assignment");
       }
+    }),
+
+  // Real article-assignment counts per agent — replaces the old fabricated
+  // `articlesProcessed` stat. Returns { [agentId]: number } of ACTIVE article
+  // assignments for this user. Degrades to {} when the DB is unavailable so
+  // the UI just shows zeros rather than erroring.
+  articleCounts: protectedProcedure.query(async ({ ctx }): Promise<Record<string, number>> => {
+    try {
+      const db = await getDb();
+      if (!db) return {};
+      const rows = await db
+        .select({ agentId: agentAssignments.agentId, count: sql<number>`count(*)` })
+        .from(agentAssignments)
+        .where(and(
+          eq(agentAssignments.userId, ctx.user.id),
+          eq(agentAssignments.targetType, "article"),
+          eq(agentAssignments.status, "active"),
+        ))
+        .groupBy(agentAssignments.agentId);
+      const out: Record<string, number> = {};
+      for (const r of rows) out[r.agentId] = Number(r.count) || 0;
+      return out;
+    } catch (err) {
+      console.error("[agents.articleCounts] Error:", err);
+      return {};
+    }
+  }),
+
+  // Assign the 4-person editorial team to an article, style-matched to the
+  // article's target publication. The Lead Writer slot swaps drafter↔rewriter
+  // depending on whether the publication has an explicit voice profile (see
+  // pickLeadWriter). A short style summary is embedded in each assignment's
+  // notes so the chat/group endpoints understand the target voice. Idempotent:
+  // re-running skips members already actively assigned to the article.
+  assignTeam: protectedProcedure
+    .input(z.object({
+      articleId: z.number(),
+      articleTitle: z.string().max(500).optional(),
+      publicationSlug: z.string().max(200).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      // Load + verify article ownership.
+      const [article] = await db
+        .select()
+        .from(articles)
+        .where(and(eq(articles.id, input.articleId), eq(articles.userId, ctx.user.id)))
+        .limit(1);
+      if (!article) throw new Error("Article not found");
+
+      // Resolve the publication: explicit slug wins, else name-match the
+      // article's free-text targetPublication against pub name or slug.
+      let pub: typeof publications.$inferSelect | null = null;
+      if (input.publicationSlug) {
+        const [p] = await db.select().from(publications)
+          .where(eq(publications.slug, input.publicationSlug)).limit(1);
+        pub = p ?? null;
+      }
+      if (!pub && article.targetPublication?.trim()) {
+        const target = article.targetPublication.trim();
+        const [p] = await db.select().from(publications)
+          .where(or(eq(publications.name, target), eq(publications.slug, target))).limit(1);
+        pub = p ?? null;
+      }
+
+      // Build a compact style summary the agents can read in their notes.
+      const styleSummary = pub
+        ? [
+            `Target publication: ${pub.name}${pub.tier ? ` (Tier ${pub.tier})` : ""}.`,
+            pub.category ? `Category: ${pub.category}.` : "",
+            pub.payRange ? `Pay: ${pub.payRange}.` : "",
+            pub.audienceAvatar?.trim() ? `Audience: ${pub.audienceAvatar.trim()}` : "",
+            pub.editorPreferences?.trim() ? `Editor preferences: ${pub.editorPreferences.trim()}` : "",
+            pub.guidelines?.trim() ? `Guidelines: ${pub.guidelines.trim().slice(0, 400)}` : "",
+          ].filter(Boolean).join(" ")
+        : "No target publication set — write to a general high-end editorial standard.";
+
+      const title = input.articleTitle?.trim() || article.title;
+      const leadWriterId = pickLeadWriter(pub);
+      const team = EDITORIAL_TEAM.map(m =>
+        m.agentId === "drafter" ? { ...m, agentId: leadWriterId } : m
+      );
+
+      // Skip members already actively assigned to this article.
+      const existing = await db
+        .select({ agentId: agentAssignments.agentId })
+        .from(agentAssignments)
+        .where(and(
+          eq(agentAssignments.userId, ctx.user.id),
+          eq(agentAssignments.targetType, "article"),
+          eq(agentAssignments.targetId, input.articleId),
+          eq(agentAssignments.status, "active"),
+        ));
+      const existingIds = new Set(existing.map(e => e.agentId));
+
+      const created: { agentId: string; role: string }[] = [];
+      for (const member of team) {
+        if (existingIds.has(member.agentId)) continue;
+        if (!AGENT_PERSONAS[member.agentId]) continue;
+        await db.insert(agentAssignments).values({
+          userId: ctx.user.id,
+          agentId: member.agentId,
+          targetType: "article",
+          targetId: input.articleId,
+          targetTitle: title,
+          role: member.role,
+          notes: styleSummary,
+        });
+        created.push({ agentId: member.agentId, role: member.role });
+      }
+
+      return {
+        articleId: input.articleId,
+        articleTitle: title,
+        publication: pub ? { slug: pub.slug, name: pub.name } : null,
+        leadWriter: leadWriterId,
+        team: team.map(m => ({
+          agentId: m.agentId,
+          name: AGENT_PERSONAS[m.agentId]?.name ?? m.agentId,
+          role: m.role,
+          newlyAssigned: created.some(c => c.agentId === m.agentId),
+        })),
+        createdCount: created.length,
+      };
     }),
 });
