@@ -1,5 +1,5 @@
 import { db, uid, makeView } from "./db";
-import type { Database, Field, Page, Row, SelectOption } from "./types";
+import type { Database, Field, Page, SelectOption } from "./types";
 
 const opt = (name: string, color: string): SelectOption => ({ id: uid(), name, color });
 
@@ -68,42 +68,6 @@ async function doSeed() {
     updatedAt: now,
   };
 
-  const sampleRows: Array<Record<string, unknown>> = [
-    {
-      [fTitle.id]: "Why the Fed's quiet pivot is reshaping regional banks",
-      [fStatus.id]: statusOptions[3].id,
-      [fPublication.id]: "Bloomberg Opinion",
-      [fFee.id]: 10000,
-      [fDeadline.id]: new Date(now + 5 * 864e5).toISOString().slice(0, 10),
-      [fNiche.id]: [nicheOptions[0].id, nicheOptions[4].id],
-      [fPriority.id]: 5,
-      [fPegged.id]: "FOMC minutes released Tuesday",
-      [fHumanized.id]: false,
-    },
-    {
-      [fTitle.id]: "The data center water wars nobody is covering",
-      [fStatus.id]: statusOptions[1].id,
-      [fPublication.id]: "The Atlantic",
-      [fFee.id]: 8500,
-      [fDeadline.id]: new Date(now + 12 * 864e5).toISOString().slice(0, 10),
-      [fNiche.id]: [nicheOptions[1].id, nicheOptions[3].id],
-      [fPriority.id]: 4,
-      [fPegged.id]: "Q2 hyperscaler capex reports",
-      [fHumanized.id]: false,
-    },
-    {
-      [fTitle.id]: "GLP-1s and the quiet collapse of snack-food forecasting",
-      [fStatus.id]: statusOptions[6].id,
-      [fPublication.id]: "WSJ",
-      [fFee.id]: 12000,
-      [fDeadline.id]: new Date(now - 9 * 864e5).toISOString().slice(0, 10),
-      [fNiche.id]: [nicheOptions[2].id, nicheOptions[4].id],
-      [fPriority.id]: 5,
-      [fPegged.id]: "Earnings season",
-      [fHumanized.id]: true,
-    },
-  ];
-
   // ── Research Vault database ──────────────────────────────────────────────
   const rTitle: Field = { id: uid(), name: "Source", type: "text", width: 300 };
   const rType: Field = {
@@ -156,16 +120,6 @@ async function doSeed() {
     // Re-check inside the transaction so concurrent callers can't double-seed
     if (await db.kv.get("seeded")) return;
     await db.databases.bulkAdd([pipeline, research]);
-    let order = now;
-    const rows: Row[] = sampleRows.map((values) => ({
-      id: uid(),
-      dbId: pipeline.id,
-      values,
-      sortOrder: order++,
-      createdAt: now,
-      updatedAt: now,
-    }));
-    await db.rows.bulkAdd(rows);
     await db.pages.add(welcome);
     await db.kv.put({ key: "seeded", value: true });
   });
