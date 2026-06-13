@@ -34,6 +34,7 @@ import { interviewsRouter } from "./routers/interviews";
 import { studioRouter } from "./routers/studio";
 import { workspaceRouter } from "./routers/workspace";
 import { videoScriptsRouter } from "./routers/videoScripts";
+import { documentationRouter } from "./routers/documentation";
 
 export const appRouter = router({
   system: systemRouter,
@@ -97,6 +98,7 @@ export const appRouter = router({
   studio: studioRouter,
   workspace: workspaceRouter,
   videoScripts: videoScriptsRouter,
+  documentation: documentationRouter,
 });
 
 export type AppRouter = typeof appRouter;

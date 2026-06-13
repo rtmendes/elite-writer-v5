@@ -15,6 +15,7 @@ import Publications from "./pages/Publications";
 import Pitches from "./pages/Pitches";
 import Financial from "./pages/Financial";
 import VideoScripts from "./pages/VideoScripts";
+import Documentation from "./pages/Documentation";
 import Settings from "./pages/Settings";
 import Brands from "./pages/Brands";
 import Queue from "./pages/Queue";
@@ -71,6 +72,7 @@ function Router() {
             <Route path="/content-insights" component={ContentInsights} />
             <Route path="/interviews" component={Interviews} />
             <Route path="/brand-voice" component={BrandVoice} />
+            <Route path="/documentation" component={Documentation} />
             <Route path="/brands" component={Brands} />
             <Route path="/settings" component={Settings} />
             <Route path="/404" component={NotFound} />
