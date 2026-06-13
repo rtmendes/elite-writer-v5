@@ -57,6 +57,7 @@ const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { path: '/brand-voice', label: 'Brand Voice', icon: Palette, description: 'Voice profile training' },
       { path: '/library', label: 'Library', icon: Library, description: 'Content & asset library' },
       { path: '/documentation', label: 'Documentation AI', icon: FileText, description: 'Generate docs & SOPs' },
+      { path: '/knowledge-hub', label: 'Knowledge Hub', icon: BookOpen, description: 'Reading view over your knowledge' },
       { path: '/geo', label: 'GEO Suite', icon: Globe, description: 'AI visibility & humanizer' },
       { path: '/strategy', label: 'Strategy', icon: Map, description: 'Keywords & content strategy' },
       { path: '/pipeline', label: 'Pipeline', icon: Zap, description: 'One-click article production' },
