@@ -21,9 +21,64 @@ import {
 } from "../../drizzle/schema";
 
 // ─── YouTube Data API Helper ──────────────────────────────
-async function fetchYouTubeChannel(channelId: string): Promise<any> {
+// Resolve whatever the operator pastes — channel URL, @handle, /c/ or /user/
+// vanity URL, bare handle, or a raw UC… id — to a canonical channel ID, so the
+// stored identifier always works with the videos endpoint.
+async function resolveYouTubeChannelId(raw: string): Promise<string> {
   const apiKey = ENV.youtubeApiKey;
   if (!apiKey) throw new Error("YOUTUBE_API_KEY not configured");
+  const input = raw.trim();
+
+  // 1. Already a channel ID
+  if (/^UC[\w-]{20,}$/.test(input)) return input;
+
+  // 2. Pull pieces out of a URL if present
+  let handle = "";
+  let username = "";
+  let searchTerm = input.replace(/^@/, "");
+  const urlMatch = input.match(/youtube\.com\/(channel\/(UC[\w-]+)|@([\w.-]+)|c\/([\w.-]+)|user\/([\w.-]+))/i);
+  if (urlMatch) {
+    if (urlMatch[2]) return urlMatch[2];        // /channel/UC...
+    if (urlMatch[3]) handle = urlMatch[3];      // /@handle
+    if (urlMatch[4]) searchTerm = urlMatch[4];  // /c/name
+    if (urlMatch[5]) username = urlMatch[5];    // /user/name
+  } else if (input.startsWith("@")) {
+    handle = input.slice(1);
+  }
+
+  const lookups: string[] = [];
+  if (handle) lookups.push(`forHandle=@${encodeURIComponent(handle)}`);
+  if (username) lookups.push(`forUsername=${encodeURIComponent(username)}`);
+  for (const q of lookups) {
+    const resp = await fetch(
+      `https://www.googleapis.com/youtube/v3/channels?part=id&${q}&key=${apiKey}`,
+      { signal: AbortSignal.timeout(10000) },
+    );
+    if (resp.ok) {
+      const data = (await resp.json()) as any;
+      const id = data.items?.[0]?.id;
+      if (id) return id;
+    }
+  }
+
+  // 3. Last resort — search by name and take the top channel hit
+  const searchResp = await fetch(
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=1&q=${encodeURIComponent(searchTerm)}&key=${apiKey}`,
+    { signal: AbortSignal.timeout(10000) },
+  );
+  if (searchResp.ok) {
+    const data = (await searchResp.json()) as any;
+    const id = data.items?.[0]?.id?.channelId;
+    if (id) return id;
+  }
+  throw new Error(`Could not resolve a YouTube channel from "${raw}"`);
+}
+
+async function fetchYouTubeChannel(channelIdOrUrl: string): Promise<any> {
+  const apiKey = ENV.youtubeApiKey;
+  if (!apiKey) throw new Error("YOUTUBE_API_KEY not configured");
+
+  const channelId = await resolveYouTubeChannelId(channelIdOrUrl);
 
   // Get channel info
   const channelResp = await fetch(
@@ -36,6 +91,7 @@ async function fetchYouTubeChannel(channelId: string): Promise<any> {
   if (!channel) throw new Error("Channel not found");
 
   return {
+    channelId,
     name: channel.snippet.title,
     description: channel.snippet.description,
     iconUrl: channel.snippet.thumbnails?.default?.url,
@@ -154,6 +210,7 @@ export const sourcesRouter = router({
       let description = "";
       let iconUrl = "";
       let metadata: any = {};
+      let resolvedIdentifier = input.identifier; // youtube: replaced with canonical UC… id
 
       // Auto-discover source info
       try {
@@ -164,6 +221,7 @@ export const sourcesRouter = router({
             description = info.description?.slice(0, 500) || "";
             iconUrl = info.iconUrl || "";
             metadata = { subscriber_count: info.subscriberCount };
+            resolvedIdentifier = info.channelId; // store canonical UC… id, not the pasted URL/handle
             break;
           }
           case "reddit": {
@@ -191,17 +249,22 @@ export const sourcesRouter = router({
           }
         }
       } catch (e: any) {
-        // Use defaults if auto-discovery fails
+        // YouTube is useless without a resolved channel ID — fail loudly so the
+        // operator can fix the URL/handle instead of getting a dead source.
+        if (input.type === "youtube") throw new Error(`Couldn't add YouTube channel: ${e?.message || "channel not found"}`);
+        // Other types: degrade gracefully with defaults.
         description = `${input.type} source: ${input.identifier}`;
+      }
+
+      if (input.type === "reddit") {
+        resolvedIdentifier = input.identifier.replace(/^\/?r\//, "");
       }
 
       const [inserted] = await db.insert(contentSources).values({
         userId: ctx.user.id,
         type: input.type,
         name,
-        identifier: input.type === "reddit"
-          ? input.identifier.replace(/^r\//, "").replace(/^\/r\//, "")
-          : input.identifier,
+        identifier: resolvedIdentifier,
         iconUrl: iconUrl || null,
         description,
         category: input.category || null,

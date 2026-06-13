@@ -7,6 +7,7 @@ import { AppLayout } from "./components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import WorkspaceShell from "./workspace/WorkspaceShell";
 import Giststack from "./pages/Giststack";
+import FeedSources from "./pages/FeedSources";
 import Ideas from "./pages/Ideas";
 import Research from "./pages/Research";
 import Writer from "./pages/Writer";
@@ -45,6 +46,7 @@ function Router() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/giststack" component={Giststack} />
+            <Route path="/sources" component={FeedSources} />
             <Route path="/workspace" component={WorkspaceShell} />
             <Route path="/ideas" component={Ideas} />
             <Route path="/research" component={Research} />

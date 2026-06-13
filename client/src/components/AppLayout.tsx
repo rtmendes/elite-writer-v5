@@ -9,7 +9,7 @@ import {
   Zap, Menu, Building2, Moon, Sun, Inbox, Loader2,
   MessageSquare, Library, Globe, Map, Users,
   Flame, Calendar, Mic, Palette, ChevronDown,
-  LayoutGrid,
+  LayoutGrid, Rss,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +26,7 @@ const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
     items: [
       { path: '/', label: 'Dashboard', icon: LayoutDashboard, description: 'Overview & metrics' },
       { path: '/giststack', label: 'Intelligence', icon: Newspaper, description: 'Content curation & trends' },
+      { path: '/sources', label: 'Feed Sources', icon: Rss, description: 'YouTube, Reddit & feeds to follow' },
       { path: '/pulse', label: 'Pulse Pipeline', icon: Zap, description: 'AI stories → matched articles' },
       { path: '/ideas', label: 'Ideas', icon: Lightbulb, description: 'Article idea pipeline' },
       { path: '/research', label: 'Research', icon: Search, description: 'Data & source gathering' },
