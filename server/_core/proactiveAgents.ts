@@ -21,6 +21,7 @@ import { ENV } from "./env";
 import { exaConfigured, exaSearch } from "./exa";
 import { invokeLLM, TIER } from "./llm";
 import { skillBlockFor } from "./skills";
+import { refreshAllActiveSources, purgeOldFeedData } from "../routers/sources";
 
 const uid = () => nanoid(12);
 
@@ -784,6 +785,37 @@ ${sample}`,
   }
 }
 
+// ── Daily feed refresh (4am ET) + retention purge ───────────────────────────
+function currentEtHour(): number {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }).format(new Date()));
+}
+
+async function sourcesRefreshJob() {
+  const db = await getDb();
+  if (!db) return;
+  // Retention runs every pass — cheap, keeps storage bounded even if a refresh is skipped.
+  try {
+    const purged = await purgeOldFeedData(db);
+    if (purged.items || purged.seen) console.log(`[proactive] feed purge: ${purged.items} stale items, ${purged.seen} dedup rows`);
+  } catch (err) {
+    console.warn("[proactive] feed purge failed:", err instanceof Error ? err.message : err);
+  }
+  // Ingest only in the 4am ET window, ≤1 real run per ~20h (ledger gap-guard).
+  if (currentEtHour() !== 4) return;
+  const databases = await loadDatabases();
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  if (ledger) {
+    const recent = (await loadRows(ledger.id)).some(
+      (r) => r.createdAt > Date.now() - 20 * 3600e3 && JSON.stringify(r.values).includes("Sources refresh"),
+    );
+    if (recent) return;
+  }
+  const beats = process.env.SCOUT_NICHES || "freelance writing, business, marketing, women's health, parenting, personal finance, technology, entrepreneurship";
+  const r = await refreshAllActiveSources(beats, 20);
+  await recordLedger("Sources refresh", TIER.free, 0, 0, 0, `${r.sources} sources, ${r.kept} actionable items kept`);
+  console.log(`[proactive] sources refresh: ${r.sources} sources, ${r.kept} actionable kept`);
+}
+
 // ── Scheduler ───────────────────────────────────────────────────────────────
 async function safely(name: string, job: () => Promise<void>) {
   try {
@@ -795,7 +827,7 @@ async function safely(name: string, job: () => Promise<void>) {
 }
 
 // Dispatch map so the durable queue worker (queue.ts) can run the same jobs.
-export type ProactiveJobName = "scout" | "scorer" | "guardian" | "followup" | "opportunities" | "modelwatch";
+export type ProactiveJobName = "scout" | "scorer" | "guardian" | "followup" | "opportunities" | "modelwatch" | "sourcesrefresh";
 export const PROACTIVE_JOBS: Record<ProactiveJobName, () => Promise<void>> = {
   scout: () => safely("scout", scoutJob),
   scorer: () => safely("scorer", scorerJob),
@@ -803,6 +835,7 @@ export const PROACTIVE_JOBS: Record<ProactiveJobName, () => Promise<void>> = {
   followup: () => safely("followup", followupJob),
   opportunities: () => safely("opportunities", opportunityJob),
   modelwatch: () => safely("modelwatch", modelWatchJob),
+  sourcesrefresh: () => safely("sourcesrefresh", sourcesRefreshJob),
 };
 
 export function initProactiveAgents() {
@@ -847,6 +880,7 @@ function armInProcessLoop() {
     void safely("scout", scoutJob);
     void safely("opportunities", opportunityJob);
     void safely("modelwatch", modelWatchJob);
+    void safely("sourcesrefresh", sourcesRefreshJob); // self-gates to 4am ET + retention every pass
   }, 60 * 60_000);
 
   setInterval(() => {
