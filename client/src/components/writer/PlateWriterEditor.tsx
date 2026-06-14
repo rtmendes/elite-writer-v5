@@ -102,10 +102,49 @@ function markdownToHtml(md: string): string {
   return html
 }
 
-function prepareContentForEditor(content: string): string {
+// ── List fidelity: annotate <li> for Plate's indent-list model ───────────────
+// Plate's @platejs/list uses the *indent-list* approach: list items are
+// paragraph nodes carrying `indent` + `listStyleType` props, not semantic
+// <ul>/<li>. Its HTML deserializer only infers listStyleType from the <li>'s
+// OWN `style`/`data-*` attributes — a plain semantic <ul><li>alpha</li></ul>
+// (what the AI pipeline and markdownToHtml emit) carries none, so each item
+// silently collapses to a bare paragraph and the bullet marker is lost.
+//
+// This stamps each <li> with the attributes the deserializer reads:
+//   data-list-style-type  decimal if the nearest list ancestor is <ol>, else disc
+//   data-indent           nesting depth (≥1)
+// Idempotent (re-stamping yields the same value) and a no-op when there are no
+// <li> at all, so non-list HTML round-trips byte-identically.
+function annotateListsForPlate(html: string): string {
+  if (!/<li\b/i.test(html)) return html
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    doc.querySelectorAll('li').forEach((li) => {
+      let depth = 0
+      let ordered = false
+      let seenList = false
+      for (let n: Element | null = li.parentElement; n; n = n.parentElement) {
+        const tag = n.tagName.toLowerCase()
+        if (tag === 'ul' || tag === 'ol') {
+          depth++
+          if (!seenList) {
+            ordered = tag === 'ol'
+            seenList = true
+          }
+        }
+      }
+      li.setAttribute('data-indent', String(Math.max(depth, 1)))
+      li.setAttribute('data-list-style-type', ordered ? 'decimal' : 'disc')
+    })
+    return doc.body.innerHTML
+  } catch {
+    return html // DOMParser unavailable (non-browser) — leave content as-is
+  }
+}
+
+export function prepareContentForEditor(content: string): string {
   if (!content || content.trim() === '') return '<p></p>'
-  if (detectIsHtml(content)) return content
-  return markdownToHtml(content)
+  return annotateListsForPlate(detectIsHtml(content) ? content : markdownToHtml(content))
 }
 
 // ── Extract plain text (consumed by Writer.tsx for word count / scoring) ──────
@@ -146,6 +185,11 @@ export function htmlToMarkdown(html: string): string {
   md = md.replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
   md = md.replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*\/?>/gi, '![$2]($1)')
   md = md.replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, '> $1\n\n')
+  // Plate's static serializer renders *unordered* (disc) list items as
+  // <div role="listitem" style="display:list-item"> with no <li> wrapper, while
+  // *ordered* items keep a real <ol><li>. Convert the former to bullets first,
+  // then the generic <li> rule below handles the latter.
+  md = md.replace(/<div[^>]*role="listitem"[^>]*>([\s\S]*?)<\/div>/gi, '- $1\n')
   md = md.replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
   md = md.replace(/<hr[^>]*\/?>/gi, '---\n\n')
   md = md.replace(/<br[^>]*\/?>/gi, '\n')
