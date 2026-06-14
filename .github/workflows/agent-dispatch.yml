@@ -1,0 +1,68 @@
+# Agent Dispatch Bridge — Triggered by Viktor AI
+# This workflow enables Viktor to dispatch tasks to Codex, Jules, or other AI agents
+# via workflow_dispatch. The task details are in .codex/task.md on the dispatch branch.
+
+name: Agent Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task description for the AI agent'
+        required: true
+        type: string
+      agent:
+        description: 'Target agent (codex, jules, auto)'
+        required: false
+        default: 'codex'
+        type: string
+      priority:
+        description: 'Task priority (high, normal, low)'
+        required: false
+        default: 'normal'
+        type: string
+  
+  # Also trigger when .codex/task.md is pushed (backup trigger)
+  push:
+    paths:
+      - '.codex/task.md'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  dispatch-log:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Log Dispatch
+        run: |
+          echo "╔══════════════════════════════════════════════╗"
+          echo "║         Agent Dispatch Bridge                ║"
+          echo "╠══════════════════════════════════════════════╣"
+          echo "║ Agent:    ${{ github.event.inputs.agent || 'codex' }}"
+          echo "║ Priority: ${{ github.event.inputs.priority || 'normal' }}"
+          echo "║ Branch:   ${{ github.ref_name }}"
+          echo "║ Actor:    ${{ github.actor }}"
+          echo "╚══════════════════════════════════════════════╝"
+          echo ""
+          echo "Task:"
+          echo "${{ github.event.inputs.task || 'See .codex/task.md' }}"
+          echo ""
+          if [ -f ".codex/task.md" ]; then
+            echo "=== .codex/task.md ==="
+            cat .codex/task.md
+          fi
+      
+      - name: Task file check
+        run: |
+          if [ -f ".codex/task.md" ]; then
+            echo "✅ Task file found at .codex/task.md"
+            echo "Codex can pick up this task from the branch."
+          else
+            echo "⚠️ No .codex/task.md found. Task is in workflow inputs only."
+          fi

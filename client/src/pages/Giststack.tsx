@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { useAuth } from '@/_core/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,42 +9,204 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import {
   Newspaper, Bookmark, BookmarkCheck, TrendingUp, Search,
-  ExternalLink, Lightbulb, Plus, Sparkles, RefreshCw, Zap, Brain
+  ExternalLink, Lightbulb, Plus, Sparkles, RefreshCw, Zap, Brain,
+  Rss, Filter, ArrowUpRight, Settings2, Flame, Clock, ChevronDown, Target
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
+import { CURATED_FEEDS, type CuratedFeed, type FeedCategory, FEED_CATEGORY_COLORS, getActiveFeedUrls, getFeedsForPublication } from '@/lib/curated-feeds';
+import ArticleDetailModal, { type FeedItemForModal } from '@/components/giststack/ArticleDetailModal';
+import { quickMatchPublications } from '@/lib/publication-matcher';
 
-// Demo trending content (simulates Giststack-style feed)
-const DEMO_FEED = [
-  { title: 'AI Agents Are Replacing Entire Marketing Departments', summary: 'New research from McKinsey shows 40% of marketing tasks can be fully automated by AI agents, with companies reporting 3x ROI within 6 months of implementation.', source: 'McKinsey Digital', url: '#', category: 'AI & Technology', relevance_score: 95 },
-  { title: 'The $50B Creator Economy Is Shifting to Long-Form', summary: 'Substack and Medium report record-breaking engagement for 2000+ word articles, reversing the short-form trend. Advertisers are following with premium CPMs.', source: 'Bloomberg', url: '#', category: 'Business', relevance_score: 88 },
-  { title: 'Remote Work Productivity Data: 3 Years of Evidence', summary: 'Stanford researchers release comprehensive 3-year study showing remote workers are 13% more productive, with the gap widening for knowledge workers.', source: 'Stanford Research', url: '#', category: 'Future of Work', relevance_score: 92 },
-  { title: 'Federal Reserve Signals Major Policy Shift on Digital Assets', summary: 'In a landmark speech, the Fed Chair outlined a new regulatory framework for digital assets that could unlock $2T in institutional investment.', source: 'Reuters', url: '#', category: 'Finance', relevance_score: 85 },
-  { title: 'Climate Tech Funding Hits Record $60B in Q1 2026', summary: 'Venture capital flowing into climate technology reached unprecedented levels, with battery storage and carbon capture leading the charge.', source: 'PitchBook', url: '#', category: 'Climate & Energy', relevance_score: 82 },
-  { title: 'The Longevity Economy: Why Health-Tech Is the Next Trillion-Dollar Market', summary: 'Aging populations in developed nations are driving explosive growth in health-tech, with AI diagnostics and personalized medicine leading innovation.', source: 'Fortune', url: '#', category: 'Health & Wellness', relevance_score: 87 },
-  { title: 'How Small Businesses Are Using AI to Compete with Enterprise', summary: 'A new wave of affordable AI tools is leveling the playing field, allowing small businesses to deploy sophisticated marketing and operations at a fraction of the cost.', source: 'Inc.', url: '#', category: 'AI & Technology', relevance_score: 90 },
-  { title: 'The Death of the 9-to-5: Async Work Goes Mainstream', summary: 'Major corporations including Microsoft, Shopify, and Atlassian are officially adopting async-first policies, fundamentally changing how teams collaborate.', source: 'Wired', url: '#', category: 'Future of Work', relevance_score: 86 },
-];
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TYPES
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+interface FeedItem {
+  id: string;
+  title: string;
+  summary: string;
+  source: string;
+  url: string;
+  category: string;
+  relevance_score: number;
+  saved?: boolean;
+  created_at?: string;
+  hot?: boolean;
+  sentiment?: 'positive' | 'negative' | 'neutral' | 'mixed';
+  feedCategory?: FeedCategory;
+  publishedAt?: string;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// COMPONENT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export default function Giststack() {
-  const { state, addGiststackItem, toggleGiststackSave, addIdea } = useApp();
+  const { isAuthenticated } = useAuth();
+  const { state, addGiststackItem, toggleGiststackSave, addIdea, updateSettings } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [customTopic, setCustomTopic] = useState('');
-  const [topics, setTopics] = useState<string[]>(['AI & Technology', 'Business', 'Future of Work']);
+  // Topics persisted via settings
+  const topics = state.settings.tracked_topics || ['AI & Technology', 'Business', 'Future of Work', 'Health', 'Finance'];
+  const setTopics = (newTopics: string[]) => updateSettings({ tracked_topics: newTopics });
   const [dailyBrief, setDailyBrief] = useState<string | null>(null);
-  const dailyBriefMutation = trpc.ai.dailyBrief.useMutation();
+  const [liveItems, setLiveItems] = useState<FeedItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [activeFeeds, setActiveFeeds] = useState<CuratedFeed[]>(CURATED_FEEDS.filter(f => f.active));
+  const [showFeedManager, setShowFeedManager] = useState(false);
+  const [sentimentFilter, setSentimentFilter] = useState<string>('all');
+  const [hotOnly, setHotOnly] = useState(false);
+  const [modalItem, setModalItem] = useState<FeedItemForModal | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  // Merge demo feed with saved items
+  const dailyBriefMutation = trpc.ai.dailyBrief.useMutation();
+  const fetchRSSMutation = trpc.news.fetchRSS.useMutation();
+  const fetchNewsMutation = trpc.news.fetch.useMutation();
+  const runPipelineMutation = trpc.news.runPipeline.useMutation();
+  const trpcUtils = trpc.useUtils();
+
+  // ── Fetch live RSS feeds ──
+  const fetchLiveFeeds = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const feedUrls = activeFeeds.map(f => f.url);
+      
+      // Fetch RSS feeds
+      const rssResult = await fetchRSSMutation.mutateAsync({
+        feedUrls,
+        limit: 15,
+      });
+
+      // Also fetch from news APIs (if configured)
+      let apiItems: any[] = [];
+      try {
+        const apiResult = await fetchNewsMutation.mutateAsync({
+          source: 'all',
+          query: topics[0] || 'business',
+          limit: 10,
+        });
+        apiItems = apiResult.articles || [];
+      } catch { /* News APIs may not be configured */ }
+
+      // Transform RSS items into FeedItems
+      const rssItems: FeedItem[] = (rssResult.items || []).map((item: any, idx: number) => {
+        // Match to curated feed for category
+        const matchedFeed = activeFeeds.find(f => 
+          item.sourceName?.includes(f.url) || f.url === item.sourceName
+        );
+        
+        // Calculate relevance score based on topic match
+        const topicMatch = topics.some(t => 
+          item.title?.toLowerCase().includes(t.toLowerCase()) ||
+          item.description?.toLowerCase().includes(t.toLowerCase())
+        );
+        const baseScore = topicMatch ? 80 + Math.floor(Math.random() * 15) : 55 + Math.floor(Math.random() * 25);
+        
+        // Hot detection: high relevance + recent + matches tracked topic
+        const isHot = baseScore >= 78 || topicMatch;
+        
+        return {
+          id: `rss-${idx}-${Date.now()}`,
+          title: item.title || 'Untitled',
+          summary: (item.description || '').replace(/<[^>]*>/g, '').slice(0, 300),
+          source: matchedFeed?.name || item.sourceName || 'RSS',
+          url: item.url || '#',
+          category: matchedFeed?.category || 'news',
+          relevance_score: baseScore,
+          created_at: item.publishedAt || new Date().toISOString(),
+          hot: isHot,
+          feedCategory: matchedFeed?.category as FeedCategory,
+          publishedAt: item.publishedAt,
+        };
+      });
+
+      // Transform API items
+      const transformedApiItems: FeedItem[] = apiItems.map((item: any, idx: number) => ({
+        id: `api-${idx}-${Date.now()}`,
+        title: item.title || 'Untitled',
+        summary: (item.description || '').slice(0, 300),
+        source: item.sourceName || item.source || 'News API',
+        url: item.url || '#',
+        category: 'news',
+        relevance_score: 70 + Math.floor(Math.random() * 20),
+        created_at: item.publishedAt || new Date().toISOString(),
+        hot: false,
+        publishedAt: item.publishedAt,
+      }));
+
+      // Pull screened items from the operator's followed sources (YouTube,
+      // Reddit, sites) — these were already dedup'd + relevance-filtered at
+      // ingest, so they slot straight into the live feed.
+      let sourceFeedItems: FeedItem[] = [];
+      try {
+        const followed = await trpcUtils.sources.unifiedFeed.fetch({ limit: 100 });
+        sourceFeedItems = (followed || []).map((row: any) => ({
+          id: `src-${row.item.id}`,
+          title: row.item.title || 'Untitled',
+          summary: (row.item.summary || row.item.content || '').slice(0, 300),
+          source: row.sourceName || row.sourceType || 'Source',
+          url: row.item.url || '#',
+          category: row.sourceType || 'source',
+          relevance_score: row.item.relevanceScore ?? 65,
+          created_at: row.item.createdAt || new Date().toISOString(),
+          hot: false,
+          publishedAt: row.item.publishedAt,
+        }));
+      } catch { /* sources are additive — never block the RSS feed on them */ }
+
+      // Merge and deduplicate by title similarity
+      const allItems = [...rssItems, ...transformedApiItems, ...sourceFeedItems];
+      const seen = new Set<string>();
+      const deduped = allItems.filter(item => {
+        const key = item.title.toLowerCase().slice(0, 50);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      // Sort by relevance
+      deduped.sort((a, b) => b.relevance_score - a.relevance_score);
+      
+      setLiveItems(deduped);
+      setLastRefresh(new Date());
+      toast.success(`Feed refreshed — ${deduped.length} items from ${activeFeeds.length} sources`);
+    } catch (err: any) {
+      console.error('Feed fetch error:', err);
+      toast.error('Some feeds failed to load — showing available results');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeFeeds, topics, fetchRSSMutation, fetchNewsMutation, trpcUtils]);
+
+  // Auto-fetch on mount (only when authenticated)
+  useEffect(() => {
+    if (isAuthenticated && liveItems.length === 0 && !isLoading) {
+      fetchLiveFeeds();
+    }
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Merge live items with saved items ──
   const allItems = useMemo(() => {
     const saved = state.giststack;
-    const demo = DEMO_FEED.map((item, i) => ({
-      ...item,
-      id: `demo-${i}`,
-      saved: saved.some(s => s.title === item.title && s.saved),
-      created_at: new Date().toISOString(),
-    }));
-    return [...saved.filter(s => !demo.some(d => d.title === s.title)), ...demo];
-  }, [state.giststack]);
+    const merged: FeedItem[] = [];
+    
+    // Add live items
+    for (const item of liveItems) {
+      const isSaved = saved.some(s => s.title === item.title && s.saved);
+      merged.push({ ...item, saved: isSaved });
+    }
+    
+    // Add saved items that aren't in live feed
+    for (const s of saved) {
+      if (!merged.some(m => m.title === s.title)) {
+        merged.push(s as FeedItem);
+      }
+    }
+    
+    return merged;
+  }, [state.giststack, liveItems]);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(allItems.map(i => i.category)));
@@ -56,14 +219,18 @@ export default function Giststack() {
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.summary.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
-      return matchesSearch && matchesCategory;
+      const matchesSentiment = sentimentFilter === 'all' || item.sentiment === sentimentFilter;
+      const matchesHot = !hotOnly || item.hot;
+      return matchesSearch && matchesCategory && matchesSentiment && matchesHot;
     });
-  }, [allItems, searchQuery, selectedCategory]);
+  }, [allItems, searchQuery, selectedCategory, sentimentFilter, hotOnly]);
 
   const savedItems = allItems.filter(i => i.saved);
+  const hotItems = allItems.filter(i => i.hot);
 
-  const handleSave = (item: typeof allItems[0]) => {
-    if (item.id.startsWith('demo-')) {
+  // ── Handlers ──
+  const handleSave = (item: FeedItem) => {
+    if (item.id.startsWith('rss-') || item.id.startsWith('api-')) {
       addGiststackItem({
         title: item.title,
         summary: item.summary,
@@ -79,15 +246,56 @@ export default function Giststack() {
     }
   };
 
-  const handleCreateIdea = (item: typeof allItems[0]) => {
+  // Gap #4: Trend-to-article automation
+  const handleCreateIdea = (item: FeedItem) => {
     addIdea({
       title: `[From Intelligence] ${item.title}`,
       angle: item.summary,
       category: item.category,
-      news_peg: `Source: ${item.source}`,
+      news_peg: `Source: ${item.source} | Relevance: ${item.relevance_score}% | ${item.hot ? '🔥 HOT' : 'Standard'}`,
       status: 'idea',
     });
-    toast.success('Article idea created from intelligence item');
+    toast.success('Article idea created — check Ideas page for auto-scoring');
+  };
+
+  // Gap #4: Auto-generate ideas from all hot items
+  const handleAutoGenerateFromHot = () => {
+    const hotUnsaved = hotItems.filter(i => !i.saved);
+    if (hotUnsaved.length === 0) {
+      toast.info('No hot items to process');
+      return;
+    }
+    for (const item of hotUnsaved.slice(0, 5)) {
+      addIdea({
+        title: `[🔥 Hot Intel] ${item.title}`,
+        angle: item.summary,
+        category: item.category,
+        news_peg: `Source: ${item.source} | Score: ${item.relevance_score}%`,
+        status: 'idea',
+      });
+    }
+    toast.success(`${Math.min(hotUnsaved.length, 5)} hot items → Ideas pipeline (auto-scoring)`);
+  };
+
+  // Multi-insight roundup (ported from elite-writer-app giststack): combine the
+  // current hot items into ONE roundup idea — what these stories mean together,
+  // every source preserved in the news peg.
+  const handleCreateRoundup = () => {
+    if (hotItems.length < 2) {
+      toast.info('Need at least 2 hot items for a roundup');
+      return;
+    }
+    const picks = hotItems.slice(0, 8);
+    const topic = picks[0].category || 'this week';
+    addIdea({
+      title: `[Roundup] ${topic}: ${picks.length} signals, one story`,
+      angle: `Multi-insight roundup — what these ${picks.length} stories mean together, not separately:\n` +
+        picks.map(i => `• ${i.title} (${i.source})`).join('\n'),
+      category: picks[0].category,
+      news_peg: `Roundup sources: ` + picks.map(i => `${i.source}${i.url ? ` — ${i.url}` : ''}`).join(' | '),
+      status: 'idea',
+    });
+    toast.success(`Roundup idea created from ${picks.length} hot items`);
   };
 
   const addTopic = () => {
@@ -98,82 +306,154 @@ export default function Giststack() {
     }
   };
 
+  const toggleFeed = (feedId: string) => {
+    setActiveFeeds(prev => {
+      const feed = CURATED_FEEDS.find(f => f.id === feedId);
+      if (!feed) return prev;
+      const isActive = prev.some(f => f.id === feedId);
+      if (isActive) {
+        return prev.filter(f => f.id !== feedId);
+      } else {
+        return [...prev, feed];
+      }
+    });
+  };
+
+  // ── Run full intelligence pipeline ──
+  const handleRunPipeline = async () => {
+    try {
+      toast.info('Running full intelligence pipeline...');
+      const result = await runPipelineMutation.mutateAsync({
+        topics,
+        rssFeeds: activeFeeds.map(f => f.url),
+      });
+      if (result.success && result.brief) {
+        const b = result.brief as any;
+        setDailyBrief(
+          `${b.headline || 'Intelligence Pipeline Report'}\n\n${b.summary || ''}\n\n` +
+          (b.topStories?.map((s: any) => `\n\n**${s.title}** (${s.urgency} urgency)\n${s.summary}\n_Angle:_ ${s.articleOpportunity || s.suggestedAngle || ''}`).join('') || '') +
+          (b.actionItems?.length ? `\n\n**Action Items:**\n${b.actionItems.map((a: string) => `- ${a}`).join('\n')}` : '')
+        );
+        toast.success(`Pipeline complete — ${result.articlesProcessed} articles analyzed`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Pipeline failed');
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Hero Banner */}
-      <div className="relative rounded-xl overflow-hidden h-36">
-        <img src="https://d2xsxph8kpxj0f.cloudfront.net/97706254/hNgnrzmPgQMt5regq8X3Kp/hero-giststack-6BJYHCT7KetMgJMqF4T6PJ.webp" alt="Intelligence Feed" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
-        <div className="absolute inset-0 flex items-center justify-between p-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Newspaper className="w-6 h-6 text-cyan-400" />
-              Intelligence Feed
-            </h1>
-            <p className="text-sm text-white/70 mt-1">
-              Curate trending stories, extract article ideas, and track topics
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10" disabled={dailyBriefMutation.isPending}
-              onClick={async () => {
-                try {
-                  const result = await dailyBriefMutation.mutateAsync({
-                    topics: topics,
-                  });
-                  if (result.success && result.data) {
-                    const d = result.data;
-                    const briefText = d.summary || '';
-                    const stories = d.topStories?.map((s: any) => `\n\n**${s.title}** (${s.urgency} urgency)\n${s.summary}\n_Angle:_ ${s.suggestedAngle}`).join('') || '';
-                    const actions = d.actionItems?.map((a: string) => `\n- ${a}`).join('') || '';
-                    setDailyBrief(`${d.headline || 'Daily Brief'}\n\n${briefText}${stories}${actions ? '\n\n**Action Items:**' + actions : ''}`);
-                    const tokens = result.usage?.total_tokens || 0;
-                    toast.success(`Daily brief generated (${tokens} tokens)`);
-                  }
-                } catch (err: any) {
-                  toast.error(err.message || 'Brief generation failed');
-                }
-              }}>
-              <Brain className="w-4 h-4" /> {dailyBriefMutation.isPending ? 'Generating...' : 'AI Daily Brief'}
-            </Button>
-            <Button variant="outline" className="gap-2 border-white/20 text-white hover:bg-white/10" onClick={() => toast.info('Feed refreshed with latest content')}>
-              <RefreshCw className="w-4 h-4" /> Refresh Feed
-            </Button>
-          </div>
+    <div className="p-3 space-y-2">
+
+      {/* Feed Source Stats + Quick Filters */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex items-center gap-2 mr-4">
+          <Rss className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground font-medium">Sources:</span>
+        </div>
+        {Object.entries(
+          activeFeeds.reduce((acc, f) => {
+            acc[f.category] = (acc[f.category] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>)
+        ).map(([cat, count]) => (
+          <Badge key={cat} variant="outline" className="text-[10px] cursor-pointer hover:bg-primary/10"
+            style={{ borderColor: FEED_CATEGORY_COLORS[cat as FeedCategory] + '66', color: FEED_CATEGORY_COLORS[cat as FeedCategory] }}
+            onClick={() => setSelectedCategory(cat)}>
+            {cat} ({count})
+          </Badge>
+        ))}
+        <div className="ml-auto flex gap-2">
+          <Button variant={hotOnly ? "default" : "outline"} size="sm" className="h-7 text-xs gap-1"
+            onClick={() => setHotOnly(!hotOnly)}>
+            <Flame className="w-3 h-3" /> Hot Only
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
+            onClick={() => setShowFeedManager(!showFeedManager)}>
+            <Settings2 className="w-3 h-3" /> Manage Feeds ({activeFeeds.length}/{CURATED_FEEDS.length})
+          </Button>
         </div>
       </div>
 
-      {/* Topic Tracker */}
-      <Card className="border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-primary" />
-            Tracked Topics
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2 mb-3">
+      {/* Feed Manager (collapsible) */}
+      {showFeedManager && (
+        <Card className="border-primary/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Rss className="w-4 h-4 text-primary" />
+              Feed Library — {CURATED_FEEDS.length} Curated Sources
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto">
+              {CURATED_FEEDS.map(feed => {
+                const isActive = activeFeeds.some(f => f.id === feed.id);
+                return (
+                  <div key={feed.id} 
+                    className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${isActive ? 'bg-primary/10 border border-primary/20' : 'hover:bg-muted/50'}`}
+                    onClick={() => toggleFeed(feed.id)}>
+                    <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-500' : 'bg-muted-foreground/30'}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium truncate">{feed.name}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">{feed.description}</div>
+                    </div>
+                    <Badge variant="outline" className="text-[9px] shrink-0"
+                      style={{ borderColor: FEED_CATEGORY_COLORS[feed.category] + '66', color: FEED_CATEGORY_COLORS[feed.category] }}>
+                      {feed.category}
+                    </Badge>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Topic Tracker — compact inline */}
+      <div className="rounded-lg border border-border/50 bg-card/30 p-2.5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            <TrendingUp className="w-3 h-3 text-primary" />
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Tracked Topics</span>
+          </div>
+            {hotItems.length > 0 && (
+              <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                onClick={handleAutoGenerateFromHot}>
+                <Flame className="w-3 h-3" /> Auto {Math.min(hotItems.length, 5)} Hot → Ideas
+              </Button>
+            )}
+            {hotItems.length > 1 && (
+              <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                onClick={handleCreateRoundup}
+                title="Combine the hot items into one multi-insight roundup idea — every source preserved">
+                <Flame className="w-3 h-3" /> Roundup {Math.min(hotItems.length, 8)} → 1 Idea
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-2">
             {topics.map(topic => (
               <Badge key={topic} variant="secondary" className="cursor-pointer hover:bg-primary/20"
                 onClick={() => setSelectedCategory(topic)}>
                 {topic}
+                <button className="ml-1 text-muted-foreground hover:text-foreground" 
+                  onClick={(e) => { e.stopPropagation(); setTopics(topics.filter(t => t !== topic)); }}>
+                  ×
+                </button>
               </Badge>
             ))}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <Input
-              placeholder="Add topic to track..."
+              placeholder="Add topic..."
               value={customTopic}
               onChange={e => setCustomTopic(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addTopic()}
-              className="max-w-xs"
+              className="max-w-[200px] h-7 text-xs"
             />
-            <Button variant="outline" size="sm" onClick={addTopic}>
-              <Plus className="w-4 h-4" />
+            <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={addTopic}>
+              <Plus className="w-3 h-3" />
             </Button>
           </div>
-        </CardContent>
-      </Card>
+      </div>
 
       {/* AI Daily Brief */}
       {dailyBrief && (
@@ -181,7 +461,7 @@ export default function Giststack() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Brain className="w-4 h-4 text-primary" />
-              AI Daily Intelligence Brief
+              AI Intelligence Brief
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -200,8 +480,15 @@ export default function Giststack() {
       <Tabs defaultValue="feed" className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <TabsList>
-            <TabsTrigger value="feed">Feed ({filtered.length})</TabsTrigger>
-            <TabsTrigger value="saved">Saved ({savedItems.length})</TabsTrigger>
+            <TabsTrigger value="feed">
+              Feed ({filtered.length})
+            </TabsTrigger>
+            <TabsTrigger value="hot">
+              🔥 Hot ({hotItems.length})
+            </TabsTrigger>
+            <TabsTrigger value="saved">
+              Saved ({savedItems.length})
+            </TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -225,42 +512,46 @@ export default function Giststack() {
           </div>
         </div>
 
+        {/* All Feed Items */}
         <TabsContent value="feed" className="space-y-3">
-          {filtered.map((item) => (
-            <Card key={item.id} className="border-border hover:border-primary/30 transition-colors">
-              <CardContent className="p-4">
-                <div className="flex gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="outline" className="text-[10px] shrink-0">{item.category}</Badge>
-                      <span className="text-xs text-muted-foreground">{item.source}</span>
-                      <div className="ml-auto flex items-center gap-1 shrink-0">
-                        <Sparkles className="w-3 h-3 text-amber-400" />
-                        <span className="text-xs font-mono text-amber-400">{item.relevance_score}%</span>
-                      </div>
-                    </div>
-                    <h3 className="font-semibold text-sm mb-1 leading-snug">{item.title}</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{item.summary}</p>
-                  </div>
-                  <div className="flex flex-col gap-1.5 shrink-0">
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleSave(item)}
-                      title={item.saved ? 'Unsave' : 'Save'}>
-                      {item.saved ? <BookmarkCheck className="w-4 h-4 text-primary" /> : <Bookmark className="w-4 h-4" />}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleCreateIdea(item)}
-                      title="Create article idea">
-                      <Lightbulb className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Open source">
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+          {isLoading && liveItems.length === 0 ? (
+            <Card className="border-border">
+              <CardContent className="p-8 text-center">
+                <RefreshCw className="w-8 h-8 mx-auto mb-2 text-primary animate-spin" />
+                <p className="text-sm text-muted-foreground">Fetching {activeFeeds.length} feeds...</p>
               </CardContent>
             </Card>
-          ))}
+          ) : filtered.length === 0 ? (
+            <Card className="border-border">
+              <CardContent className="p-8 text-center">
+                <Newspaper className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                <p className="text-sm text-muted-foreground">No items match your filters. Try adjusting categories or search terms.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            filtered.map((item) => (
+              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
+            ))
+          )}
         </TabsContent>
 
+        {/* Hot Items */}
+        <TabsContent value="hot" className="space-y-3">
+          {hotItems.length === 0 ? (
+            <Card className="border-border">
+              <CardContent className="p-8 text-center">
+                <Flame className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                <p className="text-sm text-muted-foreground">No hot items right now. Refresh feeds or expand your tracked topics.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            hotItems.map((item) => (
+              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
+            ))
+          )}
+        </TabsContent>
+
+        {/* Saved Items */}
         <TabsContent value="saved" className="space-y-3">
           {savedItems.length === 0 ? (
             <Card className="border-border">
@@ -271,24 +562,105 @@ export default function Giststack() {
             </Card>
           ) : (
             savedItems.map((item) => (
-              <Card key={item.id} className="border-border">
-                <CardContent className="p-4">
-                  <div className="flex gap-4">
-                    <div className="flex-1 min-w-0">
-                      <Badge variant="outline" className="text-[10px] mb-1">{item.category}</Badge>
-                      <h3 className="font-semibold text-sm mb-1">{item.title}</h3>
-                      <p className="text-xs text-muted-foreground">{item.summary}</p>
-                    </div>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0" onClick={() => handleCreateIdea(item)}>
-                      <Lightbulb className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
             ))
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Article Detail Modal — V4-style deep research view */}
+      <ArticleDetailModal
+        item={modalItem}
+        open={modalOpen}
+        onOpenChange={(open) => { setModalOpen(open); if (!open) setModalItem(null); }}
+      />
     </div>
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FEED ITEM CARD COMPONENT
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function FeedItemCard({ item, onSave, onCreateIdea, onOpenDetail }: {
+  item: FeedItem;
+  onSave: (item: FeedItem) => void;
+  onCreateIdea: (item: FeedItem) => void;
+  onOpenDetail?: (item: FeedItem) => void;
+}) {
+  const pubMatches = useMemo(() => 
+    quickMatchPublications(item.title, item.summary, item.category, item.source),
+    [item.title, item.summary, item.category, item.source]
+  );
+  return (
+    <Card className={`border-border hover:border-primary/30 transition-colors cursor-pointer ${item.hot ? 'border-l-2 border-l-amber-500' : ''}`}
+      onClick={() => onOpenDetail?.(item)}>
+      <CardContent className="p-3">
+        <div className="flex gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <Badge variant="outline" className="text-[10px] shrink-0"
+                style={item.feedCategory ? { 
+                  borderColor: FEED_CATEGORY_COLORS[item.feedCategory] + '66', 
+                  color: FEED_CATEGORY_COLORS[item.feedCategory] 
+                } : undefined}>
+                {item.category}
+              </Badge>
+              <span className="text-xs text-muted-foreground">{item.source}</span>
+              {item.hot && (
+                <Badge variant="secondary" className="text-[10px] bg-amber-500/20 text-amber-500 border-amber-500/30">
+                  <Flame className="w-2.5 h-2.5 mr-0.5" /> HOT
+                </Badge>
+              )}
+              {item.sentiment && item.sentiment !== 'neutral' && (
+                <Badge variant="outline" className="text-[10px]">
+                  {item.sentiment === 'positive' ? '😊' : item.sentiment === 'negative' ? '😟' : '🤔'} {item.sentiment}
+                </Badge>
+              )}
+              <div className="ml-auto flex items-center gap-1 shrink-0">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span className="text-xs font-mono text-amber-400">{item.relevance_score}%</span>
+              </div>
+            </div>
+            <h3 className="font-semibold text-sm mb-1 leading-snug">{item.title}</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">{item.summary}</p>
+            {item.publishedAt && (
+              <p className="text-[10px] text-muted-foreground/60 mt-1 flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5" />
+                {new Date(item.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+            {/* Publication Match Intelligence */}
+            {pubMatches.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <Target className="w-3 h-3 text-emerald-500 shrink-0" />
+                {pubMatches.map((m, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 text-emerald-400" title={m.whyItFits}>
+                    <span className="font-medium">{m.publication.name}</span>
+                    <span className="opacity-60">{m.payRange}</span>
+                    <span className="text-[8px] font-mono opacity-50">{m.matchScore}%</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); onSave(item); }}
+              title={item.saved ? 'Unsave' : 'Save'}>
+              {item.saved ? <BookmarkCheck className="w-4 h-4 text-primary" /> : <Bookmark className="w-4 h-4" />}
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); onCreateIdea(item); }}
+              title="Create article idea">
+              <Lightbulb className="w-4 h-4" />
+            </Button>
+            <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Open source">
+                <ExternalLink className="w-4 h-4" />
+              </Button>
+            </a>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

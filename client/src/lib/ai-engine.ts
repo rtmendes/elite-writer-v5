@@ -326,3 +326,56 @@ export function getUsageSummary(): { totalCost: number; totalTokens: number; byP
 }
 
 export { MODEL_CATALOG, getAvailableProviders };
+// Add after the existing exports at the bottom of ai-engine.ts
+
+// Sync from server env vars — called once on Settings page mount
+export async function syncFromServer(): Promise<LLMConfig | null> {
+  try {
+    let data: any = null;
+    const directRes = await fetch('/api/server-keys', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (directRes.ok) {
+      data = await directRes.json();
+    } else {
+      const trpcRes = await fetch('/api/trpc/system.getServerKeys', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!trpcRes.ok) return null;
+      const json = await trpcRes.json();
+      data = json?.result?.data?.json ?? json?.result?.data ?? null;
+    }
+    if (!data) return null;
+
+    const current = loadAIConfig();
+    let changed = false;
+
+    // Merge server keys into config (only fill empty fields)
+    const keyMap: Array<[keyof LLMConfig, string]> = [
+      ['openai_key', 'openai_key'],
+      ['anthropic_key', 'anthropic_key'],
+      ['openrouter_key', 'openrouter_key'],
+      ['gemini_key', 'gemini_key'],
+      ['newsapi_key', 'newsapi_key'],
+      ['gnews_key', 'gnews_key'],
+      ['mediastack_key', 'mediastack_key'],
+    ];
+
+    for (const [configKey, serverKey] of keyMap) {
+      if (!current[configKey] && data[serverKey]) {
+        (current as any)[configKey] = data[serverKey];
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      saveAIConfig(current);
+    }
+    return current;
+  } catch (e) {
+    console.warn('Failed to sync from server:', e);
+    return null;
+  }
+}

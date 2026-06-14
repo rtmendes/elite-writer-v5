@@ -1,53 +1,57 @@
+/**
+ * Auth Routes — Standalone login endpoint.
+ * Replaces Manus OAuth callback with simple email/password login.
+ */
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import type { Express, Request, Response } from "express";
-import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
-function getQueryParam(req: Request, key: string): string | undefined {
-  const value = req.query[key];
-  return typeof value === "string" ? value : undefined;
-}
-
 export function registerOAuthRoutes(app: Express) {
-  app.get("/api/oauth/callback", async (req: Request, res: Response) => {
-    const code = getQueryParam(req, "code");
-    const state = getQueryParam(req, "state");
-
-    if (!code || !state) {
-      res.status(400).json({ error: "code and state are required" });
-      return;
-    }
-
+  // POST /api/auth/login — Email/password login
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
-      const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-      const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
+      const { email, password } = req.body || {};
 
-      if (!userInfo.openId) {
-        res.status(400).json({ error: "openId missing from user info" });
+      if (!email || !password) {
+        res.status(400).json({ error: "Email and password are required" });
         return;
       }
 
-      await db.upsertUser({
-        openId: userInfo.openId,
-        name: userInfo.name || null,
-        email: userInfo.email ?? null,
-        loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-        lastSignedIn: new Date(),
-      });
-
-      const sessionToken = await sdk.createSessionToken(userInfo.openId, {
-        name: userInfo.name || "",
-        expiresInMs: ONE_YEAR_MS,
-      });
+      const { token, user } = await sdk.login(email, password);
 
       const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      res.redirect(302, "/");
-    } catch (error) {
-      console.error("[OAuth] Callback failed", error);
-      res.status(500).json({ error: "OAuth callback failed" });
+      res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    } catch (error: any) {
+      console.error("[Auth] Login failed:", error.message);
+      res.status(401).json({ error: "Invalid credentials" });
     }
+  });
+
+  // GET /api/auth/check — Check if session is valid
+  app.get("/api/auth/check", async (req: Request, res: Response) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      res.json({ authenticated: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    } catch {
+      res.json({ authenticated: false });
+    }
+  });
+
+  // POST /api/auth/hash — Generate password hash (setup utility)
+  app.post("/api/auth/hash", (req: Request, res: Response) => {
+    const { password } = req.body || {};
+    if (!password) {
+      res.status(400).json({ error: "Password required" });
+      return;
+    }
+    res.json({ hash: sdk.generatePasswordHash(password) });
+  });
+
+  // Legacy: Keep /api/oauth/callback for compatibility, redirect to login
+  app.get("/api/oauth/callback", (_req: Request, res: Response) => {
+    res.redirect(302, "/login");
   });
 }

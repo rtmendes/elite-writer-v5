@@ -160,7 +160,30 @@ export default function Pitches() {
     toast.success('Marked as sent');
   };
 
-  const filtered = state.pitches.filter(p => filterStatus === 'all' || p.status === filterStatus);
+  const [sortBy, setSortBy] = useState<'newest' | 'publication' | 'status'>('newest');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelected = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const bulkDelete = () => {
+    selectedIds.forEach(id => {
+      const dbId = pitchIdMap.get(id);
+      if (dbId) deletePitchDb.mutate({ id: dbId });
+      deletePitch(id);
+    });
+    toast.success(`${selectedIds.size} pitches deleted`);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  };
+  const filtered = useMemo(() => {
+    const list = state.pitches.filter(p => filterStatus === 'all' || p.status === filterStatus);
+    if (sortBy === 'publication') return [...list].sort((a, b) => (a.publication_name || '').localeCompare(b.publication_name || ''));
+    if (sortBy === 'status') return [...list].sort((a, b) => (a.status || '').localeCompare(b.status || ''));
+    return list;
+  }, [state.pitches, filterStatus, sortBy]);
   const viewingPitch = state.pitches.find(p => p.id === viewPitch);
 
   const stats = useMemo(() => ({
@@ -289,13 +312,29 @@ export default function Pitches() {
       </div>
 
       {/* Filter */}
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 items-center flex-wrap">
         {['all', 'draft', 'sent', 'accepted', 'rejected', 'no_response'].map(status => (
           <Button key={status} variant={filterStatus === status ? 'default' : 'outline'} size="sm"
             onClick={() => setFilterStatus(status)} className="text-xs capitalize">
             {status === 'all' ? 'All' : status.replace('_', ' ')}
           </Button>
         ))}
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+          className="h-8 text-xs rounded-md border border-input bg-background px-2 ml-auto"
+          title="Sort pitches">
+          <option value="newest">Newest</option>
+          <option value="publication">Publication A→Z</option>
+          <option value="status">Status</option>
+        </select>
+        <Button variant={selectMode ? 'default' : 'outline'} size="sm" className="text-xs"
+          onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}>
+          {selectMode ? 'Done' : 'Select'}
+        </Button>
+        {selectMode && selectedIds.size > 0 && (
+          <Button variant="destructive" size="sm" className="text-xs" onClick={bulkDelete}>
+            Delete {selectedIds.size}
+          </Button>
+        )}
       </div>
 
       {/* Pitches List */}
@@ -317,6 +356,11 @@ export default function Pitches() {
               <Card key={pitch.id} className="border-border hover:border-primary/20 transition-colors group">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
+                    {selectMode && (
+                      <input type="checkbox" className="mt-1 shrink-0 accent-primary"
+                        checked={selectedIds.has(pitch.id)}
+                        onChange={() => toggleSelected(pitch.id)} />
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Badge variant="outline" className={`text-[10px] ${config.color}`}>

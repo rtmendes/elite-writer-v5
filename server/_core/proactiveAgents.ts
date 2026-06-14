@@ -1,0 +1,891 @@
+/**
+ * Proactive agent loop — agents act WITHOUT being asked.
+ *
+ * Jobs (all budget-capped via the AI Ledger, all costs recorded centrally):
+ *  - Scout (Thomas Fischer): files fresh news-pegged article ideas into the
+ *    Article Pipeline workspace database, at most once per ~20h and only while
+ *    fewer than 12 ideas are waiting. Uses live NewsAPI headlines when available.
+ *  - Scorer (Priya Sharma): auto-scores any pipeline row sitting in Idea or
+ *    Research status that has no AI Score yet.
+ *  - Quality Guardian (Elena Vasquez): reviews rows reaching Edit/Submitted and
+ *    stamps an Approved/Blocked verdict with reasons before anything goes out.
+ *
+ * Everything is written into the workspace tables (wsDatabases/wsRows) with a
+ * fresh updatedAt, so every device's sync picks the changes up automatically.
+ */
+import { sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { getDb } from "../db";
+import { AGENT_PERSONAS } from "../routers/agents";
+import { ENV } from "./env";
+import { exaConfigured, exaSearch } from "./exa";
+import { invokeLLM, TIER } from "./llm";
+import { skillBlockFor } from "./skills";
+import { refreshAllActiveSources, purgeOldFeedData } from "../routers/sources";
+
+const uid = () => nanoid(12);
+
+// ── Workspace data model mirrors (kept minimal, matches client types.ts) ───
+interface WsSelectOption { id: string; name: string; color: string }
+interface WsField { id: string; name: string; type: string; options?: WsSelectOption[]; width?: number }
+interface WsDatabase { id: string; name: string; icon: string; fields: WsField[]; views: unknown[]; createdAt: number; updatedAt: number; description?: string }
+interface WsRow { id: string; dbId: string; values: Record<string, unknown>; doc?: unknown[]; sortOrder: number; createdAt: number; updatedAt: number }
+
+async function dbExec(query: string): Promise<Array<Record<string, unknown>>> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.execute(sql.raw(query));
+  return ((result as unknown as [Array<Record<string, unknown>>])[0] ?? []);
+}
+
+/** The workspace sync tables are normally created lazily by the first client
+ *  sync — but the proactive agents must not depend on a client ever having
+ *  synced. Without this, every job fails on a fresh database (which is exactly
+ *  what happened in production: no wsDatabases table, all agents silently dead). */
+let wsTablesEnsured = false;
+async function ensureWsTables() {
+  if (wsTablesEnsured) return;
+  for (const table of ["wsPages", "wsDatabases", "wsRows"]) {
+    await dbExec(`CREATE TABLE IF NOT EXISTS \`${table}\` (
+      id VARCHAR(32) PRIMARY KEY,
+      data JSON NOT NULL,
+      updatedAt BIGINT NOT NULL DEFAULT 0,
+      deleted BOOLEAN NOT NULL DEFAULT FALSE,
+      INDEX idx_${table}_updated (updatedAt)
+    )`);
+  }
+  try {
+    await dbExec(
+      "ALTER TABLE `wsRows` ADD COLUMN `dbId` VARCHAR(40) " +
+      "GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.dbId'))) STORED, " +
+      "ADD INDEX `idx_wsRows_dbId` (`dbId`)",
+    );
+  } catch { /* already migrated */ }
+  wsTablesEnsured = true;
+}
+
+function parseData<T>(raw: unknown): T {
+  return (typeof raw === "string" ? JSON.parse(raw) : raw) as T;
+}
+
+export async function loadDatabases(): Promise<WsDatabase[]> {
+  const rows = await dbExec("SELECT data FROM `wsDatabases` WHERE deleted = FALSE");
+  return rows.map((r) => parseData<WsDatabase>(r.data));
+}
+
+export async function loadRows(dbId: string): Promise<WsRow[]> {
+  // Uses the indexed generated `dbId` column (see ensureTables migration) so
+  // this is an index lookup, not a full-table scan + JS filter. Falls back to
+  // a scan only if the column hasn't been added yet (first boot before migrate).
+  try {
+    const rows = await dbExec(`SELECT data FROM \`wsRows\` WHERE deleted = FALSE AND dbId = ${JSON.stringify(dbId)}`);
+    return rows.map((r) => parseData<WsRow>(r.data));
+  } catch {
+    const rows = await dbExec("SELECT data FROM `wsRows` WHERE deleted = FALSE");
+    return rows.map((r) => parseData<WsRow>(r.data)).filter((r) => r.dbId === dbId);
+  }
+}
+
+async function saveDatabase(database: WsDatabase) {
+  const db = await getDb();
+  if (!db) return;
+  database.updatedAt = Date.now();
+  await db.execute(sql`
+    INSERT INTO wsDatabases (id, data, updatedAt, deleted)
+    VALUES (${database.id}, ${JSON.stringify(database)}, ${database.updatedAt}, FALSE)
+    ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = VALUES(updatedAt), deleted = FALSE
+  `);
+}
+
+export async function saveRow(row: WsRow) {
+  const db = await getDb();
+  if (!db) return;
+  row.updatedAt = Date.now();
+  await db.execute(sql`
+    INSERT INTO wsRows (id, data, updatedAt, deleted)
+    VALUES (${row.id}, ${JSON.stringify(row)}, ${row.updatedAt}, FALSE)
+    ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = VALUES(updatedAt), deleted = FALSE
+  `);
+}
+
+export function fieldByName(database: WsDatabase, name: string): WsField | undefined {
+  return database.fields.find((f) => f.name.toLowerCase() === name.toLowerCase());
+}
+
+function optionByPattern(field: WsField, pattern: RegExp): WsSelectOption | undefined {
+  return field.options?.find((o) => pattern.test(o.name));
+}
+
+async function ensureWsField(database: WsDatabase, name: string, type: string, options?: WsSelectOption[]): Promise<WsField> {
+  let field = fieldByName(database, name);
+  if (!field) {
+    field = { id: uid(), name, type, options, width: 140 };
+    database.fields.push(field);
+    await saveDatabase(database);
+  }
+  return field;
+}
+
+function appendNotes(row: WsRow, heading: string, text: string) {
+  const doc = Array.isArray(row.doc) ? [...row.doc] : [];
+  doc.push({ type: "heading", props: { level: 2 }, content: [{ type: "text", text: heading, styles: {} }] });
+  for (const line of text.split(/\n+/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    doc.push({ type: "paragraph", content: [{ type: "text", text: trimmed, styles: {} }] });
+  }
+  row.doc = doc;
+}
+
+// ── Cost accounting (shared with the workspace router) ─────────────────────
+const PRICING: Array<{ match: RegExp; in: number; out: number }> = [
+  { match: /haiku/i, in: 1, out: 5 },
+  { match: /sonnet/i, in: 3, out: 15 },
+  { match: /opus/i, in: 5, out: 25 },
+  { match: /./, in: 3, out: 15 },
+];
+
+export function estimateCost(model: string, tokensIn: number, tokensOut: number): number {
+  const p = PRICING.find((x) => x.match.test(model))!;
+  return (tokensIn / 1e6) * p.in + (tokensOut / 1e6) * p.out;
+}
+
+export async function recordCentralCost(task: string, model: string, tokensIn: number, tokensOut: number, cost: number, context: string) {
+  const url = (ENV.supabaseUrl || "https://supabase.insightprofit.live").replace(/\/$/, "");
+  const key = ENV.supabaseServiceKey;
+  if (!key) return;
+  try {
+    await fetch(`${url}/rest/v1/rpc/record_cost_event`, {
+      method: "POST",
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_agent: "elite-writer-v5-workspace",
+        p_tool: task,
+        p_model: model,
+        p_event_type: "llm_call",
+        p_input_tokens: tokensIn,
+        p_output_tokens: tokensOut,
+        p_cost_usd: Math.round(cost * 10000) / 10000,
+        p_metadata: { context: context.slice(0, 120) },
+      }),
+    });
+  } catch (err) {
+    console.warn("[proactive] record_cost_event failed:", err instanceof Error ? err.message : err);
+  }
+}
+
+/** Optional Slack alerts via incoming webhook (set SLACK_WEBHOOK_URL). */
+export async function slackAlert(message: string) {
+  const webhook = process.env.SLACK_WEBHOOK_URL;
+  if (!webhook) return;
+  try {
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: message.slice(0, 3900) }),
+    });
+  } catch { /* alerts are best-effort */ }
+}
+
+const LEDGER_COLORS = ["purple", "teal", "blue", "orange", "green", "yellow", "pink", "gray", "red"];
+
+async function recordLedger(taskLabel: string, model: string, tokensIn: number, tokensOut: number, cost: number, context: string) {
+  const databases = await loadDatabases();
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  if (!ledger) return;
+  const taskField = fieldByName(ledger, "Task");
+  let taskOpt = taskField?.options?.find((o) => o.name === taskLabel);
+  if (taskField && !taskOpt) {
+    taskOpt = { id: uid(), name: taskLabel, color: LEDGER_COLORS[(taskField.options?.length ?? 0) % LEDGER_COLORS.length] };
+    taskField.options = [...(taskField.options ?? []), taskOpt];
+    await saveDatabase(ledger);
+  }
+  const v = (name: string) => fieldByName(ledger, name)?.id ?? "";
+  const now = Date.now();
+  await saveRow({
+    id: uid(),
+    dbId: ledger.id,
+    values: {
+      [v("Entry")]: `${taskLabel} — ${context.slice(0, 60)}`,
+      [v("Task")]: taskOpt?.id ?? null,
+      [v("Model")]: model.replace(/^.*\//, ""),
+      [v("Tokens in")]: tokensIn,
+      [v("Tokens out")]: tokensOut,
+      [v("Cost")]: Math.round(cost * 10000) / 10000,
+      [v("Date")]: new Date().toISOString().slice(0, 10),
+    },
+    sortOrder: now,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+async function monthSpend(): Promise<number> {
+  const databases = await loadDatabases();
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  if (!ledger) return 0;
+  const costFieldId = fieldByName(ledger, "Cost")?.id;
+  if (!costFieldId) return 0;
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const rows = await loadRows(ledger.id);
+  return rows
+    .filter((r) => r.createdAt >= monthStart.getTime())
+    .reduce((sum, r) => sum + (Number(r.values[costFieldId]) || 0), 0);
+}
+
+function budgetLimit(): number {
+  return Number(process.env.WORKSPACE_AGENT_BUDGET ?? 50);
+}
+
+const HOUSE_RULES = `
+House rules: US English. Concrete numbers, named sources, dates. No AI-tell phrasing ("delve", "landscape", "moreover", "in conclusion", "game-changer", rule-of-three triplets). Return ONLY the requested output in EXACTLY the requested format.`;
+
+/** Run one LLM call with persona + budget gate + full cost accounting. */
+async function agentCall(taskLabel: string, personaKey: keyof typeof AGENT_PERSONAS, model: string, prompt: string, context: string, maxTokens = 4000): Promise<string | null> {
+  const spent = await monthSpend();
+  const budget = budgetLimit();
+  if (budget > 0 && spent >= budget) {
+    console.warn(`[proactive] budget reached ($${spent.toFixed(2)}/$${budget}) — skipping ${taskLabel}`);
+    void slackAlert(`⛔ Elite Writer: monthly AI budget reached ($${spent.toFixed(2)}/$${budget}). Proactive agents paused until next month or budget raise.`);
+    return null;
+  }
+  const persona = AGENT_PERSONAS[personaKey];
+  const result = await invokeLLM({
+    messages: [
+      { role: "system", content: persona.systemPrompt + "\n" + HOUSE_RULES + (await skillBlockFor(personaKey)) },
+      { role: "user", content: prompt },
+    ],
+    model,
+    maxTokens,
+  });
+  const text = result.choices?.[0]?.message?.content?.trim() ?? "";
+  const tokensIn = result.usage?.prompt_tokens ?? 0;
+  const tokensOut = result.usage?.completion_tokens ?? 0;
+  const cost = estimateCost(result.model ?? model, tokensIn, tokensOut);
+  await recordLedger(taskLabel, result.model ?? model, tokensIn, tokensOut, cost, context);
+  void recordCentralCost(taskLabel.toLowerCase().replace(/\s+/g, "_"), result.model ?? model, tokensIn, tokensOut, cost, context);
+  return text || null;
+}
+
+async function findPipeline(): Promise<WsDatabase | null> {
+  const databases = await loadDatabases();
+  return (
+    databases.find((d) => d.name === "Article Pipeline") ??
+    databases.find((d) => d.fields.some((f) => f.name === "Status" && f.type === "select" && f.options?.some((o) => /publish/i.test(o.name)))) ??
+    null
+  );
+}
+
+// ── Job 1: Scout files fresh ideas ──────────────────────────────────────────
+/** Scout: pull USA news, score relevance, match to the outlets whose topics fit,
+ *  and file news-pegged ideas (with the matched publication linked). USA-only. */
+async function fetchUsNews(): Promise<Array<{ title: string; source: string; url: string }>> {
+  const out: Array<{ title: string; source: string; url: string }> = [];
+  // NewsAPI — US top headlines
+  if (ENV.newsapiKey) {
+    try {
+      const r = await fetch(`https://newsapi.org/v2/top-headlines?country=us&pageSize=40&apiKey=${ENV.newsapiKey}`);
+      if (r.ok) {
+        const d = await r.json();
+        for (const a of d.articles ?? []) out.push({ title: a.title ?? "", source: a.source?.name ?? "", url: a.url ?? "" });
+      }
+    } catch { /* best effort */ }
+  }
+  // GNews — US English
+  if (ENV.gnewsKey && out.length < 30) {
+    try {
+      const r = await fetch(`https://gnews.io/api/v4/top-headlines?country=us&lang=en&max=25&apikey=${ENV.gnewsKey}`);
+      if (r.ok) {
+        const d = await r.json();
+        for (const a of d.articles ?? []) out.push({ title: a.title ?? "", source: a.source?.name ?? "", url: a.url ?? "" });
+      }
+    } catch { /* best effort */ }
+  }
+  // de-dup by title
+  const seen = new Set<string>();
+  return out.filter((a) => a.title && !seen.has(a.title.toLowerCase()) && seen.add(a.title.toLowerCase()));
+}
+
+async function buildPublicationIndex(): Promise<string> {
+  const databases = await loadDatabases();
+  const pubs = databases.find((d) => d.name === "Publications");
+  if (!pubs) return "";
+  const f = (n: string) => pubs.fields.find((x) => x.name.toLowerCase() === n.toLowerCase());
+  const nameF = pubs.fields[0], topicsF = f("Preferred Topics") ?? f("Topics"), kwF = f("Keyword Filter"), catF = f("Category"), payF = f("Pay Max ($)");
+  const rows = await loadRows(pubs.id);
+  return rows.slice(0, 200).map((r) => {
+    const name = String(r.values[nameF.id] ?? "").trim();
+    const topics = (topicsF ? String(r.values[topicsF.id] ?? "") : "") || (kwF ? String(r.values[kwF.id] ?? "") : "");
+    const cat = catF ? String((catF.options?.find((o) => o.id === r.values[catF.id])?.name) ?? "") : "";
+    const pay = payF ? Number(r.values[payF.id]) || 0 : 0;
+    return name ? `${name}${cat ? ` [${cat}]` : ""}${pay ? ` ($${pay})` : ""}: ${topics}` : "";
+  }).filter(Boolean).join("\n");
+}
+
+async function scoutJob() {
+  if (process.env.SCOUT_ENABLED === "0") return;
+  const pipeline = await findPipeline();
+  if (!pipeline) return;
+  const statusField = fieldByName(pipeline, "Status");
+  const ideaOpt = statusField ? optionByPattern(statusField, /idea/i) : undefined;
+  if (!statusField || !ideaOpt) return;
+
+  const rows = await loadRows(pipeline.id);
+  const databases = await loadDatabases();
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  if (ledger) {
+    const recent = (await loadRows(ledger.id)).some(
+      (r) => r.createdAt > Date.now() - 20 * 3600e3 && JSON.stringify(r.values).includes("Scout ideas"),
+    );
+    if (recent) return;
+  }
+  const waiting = rows.filter((r) => r.values[statusField.id] === ideaOpt.id).length;
+  if (waiting >= 12) return;
+
+  const news = await fetchUsNews();
+  if (news.length === 0) { console.warn("[proactive] scout: no US news fetched (check NEWSAPI_KEY/GNEWS_KEY)"); return; }
+  const pubIndex = await buildPublicationIndex();
+  const nicheField = pipeline.fields.find((f) => f.name === "Niche" && f.type === "multiselect");
+  const niches = process.env.SCOUT_NICHES || "chief marketing officer (CMO), small business, AI automation, online growth, women's health, perimenopause and menopause, parenting, executive functioning and ADHD/ADD, homesteading, pilot training, commercial pilot training, women in aviation, business access to capital, ecommerce strategy, entrepreneurship";
+  const minRel = Number(process.env.SCOUT_MIN_RELEVANCE ?? 6);
+
+  const out = await agentCall(
+    "Scout ideas",
+    "scout",
+    TIER.freeBig,
+    `From the US news headlines below, file the 3 strongest news-pegged article ideas worth $8,000+ at premium outlets.
+HARD FILTERS:
+- USA audience only. Discard anything not relevant to a US readership.
+- Must match these beats (the author's expertise): ${niches}.
+- Each idea MUST map to a specific outlet from the OUTLET INDEX whose topics fit — only file if a named editor would plausibly accept it.
+- Must be genuinely news-pegged (tie to a dated event in the headlines).
+
+OUTLET INDEX (name [category] ($max pay): topics):
+${pubIndex.slice(0, 12000)}
+
+US HEADLINES:
+${news.map((a, i) => `${i + 1}. ${a.title} (${a.source})`).join("\n").slice(0, 8000)}
+
+Return STRICT JSON only — an array of up to 3 objects:
+[{"headline": "<the article headline you'd pitch>", "peg": "<the dated news event and why now>", "niche": "<one beat from the list>", "angle": "<the unique/contrarian angle>", "publication": "<exact outlet name from the index that fits best>", "relevance": <1-10 how strongly it matches the beats + that outlet>, "peg_days": <1-21 days until the peg goes stale>}]`,
+    "overnight scout run (US, matched)",
+    4000,
+  );
+  if (!out) return;
+
+  let ideas: Array<{ headline?: string; peg?: string; niche?: string; angle?: string; publication?: string; relevance?: number; peg_days?: number }> = [];
+  try { ideas = JSON.parse(out.replace(/^```(json)?|```$/g, "").trim()); }
+  catch { console.warn("[proactive] scout returned non-JSON, skipping"); return; }
+
+  ideas = ideas.filter((i) => i.headline && (Number(i.relevance) || 0) >= minRel);
+  if (ideas.length === 0) { console.log("[proactive] scout: no ideas cleared the relevance filter"); return; }
+
+  const titleField = pipeline.fields[0];
+  const pegField = fieldByName(pipeline, "News Peg");
+  const expiresField = await ensureWsField(pipeline, "Peg Expires", "date");
+  const relField = pipeline.fields.find((f) => f.type === "relation" && /publication|outlet/i.test(f.name));
+  const pubs = databases.find((d) => d.name === "Publications");
+  const pubRows = pubs ? await loadRows(pubs.id) : [];
+
+  let filed = 0;
+  for (const idea of ideas.slice(0, 3)) {
+    const now = Date.now();
+    const values: Record<string, unknown> = { [titleField.id]: idea.headline!, [statusField.id]: ideaOpt.id };
+    if (pegField && idea.peg) values[pegField.id] = idea.peg;
+    values[expiresField.id] = new Date(now + Math.max(1, Math.min(21, Number(idea.peg_days) || 7)) * 864e5).toISOString().slice(0, 10);
+    if (nicheField && idea.niche) {
+      const opt = nicheField.options?.find((o) => o.name.toLowerCase() === idea.niche!.toLowerCase());
+      if (opt) values[nicheField.id] = [opt.id];
+    }
+    // Link the matched publication (relation)
+    if (relField && pubs && idea.publication) {
+      const match = pubRows.find((r) => String(r.values[pubs.fields[0].id] ?? "").trim().toLowerCase() === idea.publication!.trim().toLowerCase());
+      if (match) values[relField.id] = [match.id];
+    }
+    const row: WsRow = { id: uid(), dbId: pipeline.id, values, sortOrder: now, createdAt: now, updatedAt: now };
+    appendNotes(row, "Filed by Scout (Thomas Fischer)", `Matched outlet: ${idea.publication ?? "—"} (relevance ${idea.relevance ?? "?"}/10)\nAngle: ${idea.angle ?? ""}\nPeg: ${idea.peg ?? ""}`);
+    await saveRow(row);
+    filed++;
+  }
+  console.log(`[proactive] Scout filed ${filed} US-matched ideas`);
+  // Ideas are actioned inside the app (Article Pipeline board) — no chat noise.
+}
+
+// ── Job 2: Scorer auto-scores new ideas ─────────────────────────────────────
+async function scorerJob() {
+  const pipeline = await findPipeline();
+  if (!pipeline) return;
+  const statusField = fieldByName(pipeline, "Status");
+  if (!statusField) return;
+  const earlyIds = (statusField.options ?? []).filter((o) => /idea|research/i.test(o.name)).map((o) => o.id);
+  const scoreField = await ensureWsField(pipeline, "AI Score", "rating");
+
+  const expires = fieldByName(pipeline, "Peg Expires");
+  const rows = await loadRows(pipeline.id);
+  const todo = rows
+    .filter((r) => earlyIds.includes(r.values[statusField.id] as string) && !r.values[scoreField.id])
+    .sort((a, b) => {
+      const av = expires ? String(a.values[expires.id] ?? "9999") : "9999";
+      const bv = expires ? String(b.values[expires.id] ?? "9999") : "9999";
+      return av.localeCompare(bv); // soonest-expiring pegs first
+    })
+    .slice(0, 3);
+
+  for (const row of todo) {
+    const summary = pipeline.fields
+      .map((f) => {
+        const v = row.values[f.id];
+        if (v === undefined || v === null || v === "") return null;
+        if (f.type === "select") return `${f.name}: ${f.options?.find((o) => o.id === v)?.name ?? ""}`;
+        if (f.type === "multiselect") return `${f.name}: ${(Array.isArray(v) ? v : []).map((id) => f.options?.find((o) => o.id === id)?.name).join(", ")}`;
+        if (f.type === "image") return null;
+        return `${f.name}: ${String(v).slice(0, 200)}`;
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    const title = String(row.values[pipeline.fields[0].id] ?? "idea");
+    const out = await agentCall(
+      "Score idea",
+      "scorer",
+      TIER.free,
+      `Score this article idea for a premium-outlet pitch. Return EXACTLY:
+SCORE: <1-10 overall>
+NEWSWORTHINESS: <1-10> <one short reason>
+AUDIENCE MATCH: <1-10> <one short reason>
+EARNING POTENTIAL: <estimated realistic fee in USD, number only>
+VERDICT: <2 sentences: pursue/park/kill and the single sharpest angle>
+
+IDEA:
+${summary}`,
+      title,
+      2000,
+    );
+    if (!out) return; // budget hit — stop the whole batch
+
+    const score = Number(out.match(/SCORE:\s*(\d+(?:\.\d+)?)/i)?.[1] ?? 0);
+    row.values[scoreField.id] = Math.max(1, Math.min(5, Math.round(score / 2)));
+    const fee = Number(out.match(/EARNING POTENTIAL:\s*\$?([\d,]+)/i)?.[1]?.replace(/,/g, "") ?? 0);
+    const feeField = pipeline.fields.find((f) => f.type === "currency");
+    if (feeField && fee > 0 && !row.values[feeField.id]) row.values[feeField.id] = fee;
+    appendNotes(row, "Auto-scored by Priya Sharma", out);
+    await saveRow(row);
+    console.log(`[proactive] scored "${title.slice(0, 50)}" → ${score}/10`);
+  }
+}
+
+// ── Job 3: Quality Guardian gates Edit/Submitted rows ───────────────────────
+async function guardianJob() {
+  const pipeline = await findPipeline();
+  if (!pipeline) return;
+  const statusField = fieldByName(pipeline, "Status");
+  if (!statusField) return;
+  const gateIds = (statusField.options ?? []).filter((o) => /edit|submit/i.test(o.name)).map((o) => o.id);
+  if (gateIds.length === 0) return;
+  const guardianField = await ensureWsField(pipeline, "Guardian", "select", [
+    { id: uid(), name: "Approved", color: "green" },
+    { id: uid(), name: "Blocked", color: "red" },
+  ]);
+
+  const rows = await loadRows(pipeline.id);
+  const todo = rows.filter((r) => gateIds.includes(r.values[statusField.id] as string) && !r.values[guardianField.id]).slice(0, 2);
+
+  for (const row of todo) {
+    const title = String(row.values[pipeline.fields[0].id] ?? "article");
+    const notesText = Array.isArray(row.doc)
+      ? (row.doc as Array<{ content?: Array<{ text?: string }> }>)
+          .map((b) => (Array.isArray(b.content) ? b.content.map((c) => c.text ?? "").join("") : ""))
+          .join("\n")
+          .slice(0, 8000)
+      : "";
+
+    const out = await agentCall(
+      "Guardian review",
+      "quality",
+      TIER.freeBig,
+      `Review this article package before it goes to an editor. Return EXACTLY:
+VERDICT: APPROVED or BLOCKED
+Then 3-6 "- " bullets: if BLOCKED, the specific blockers (missing sourcing, weak peg, unverified claims, thin sections); if APPROVED, the remaining nice-to-haves.
+
+TITLE: ${title}
+
+NOTES, BRIEFS AND DRAFT MATERIAL:
+${notesText || "(no notes yet — judge on the fields alone, and say so)"}`,
+      title,
+      2500,
+    );
+    if (!out) return;
+
+    const approved = /VERDICT:\s*APPROVED/i.test(out);
+    const opt = guardianField.options?.find((o) => o.name === (approved ? "Approved" : "Blocked"));
+    if (opt) row.values[guardianField.id] = opt.id;
+    appendNotes(row, `Quality Guardian: ${approved ? "Approved" : "Blocked"} (Elena Vasquez)`, out);
+    await saveRow(row);
+    console.log(`[proactive] guardian ${approved ? "approved" : "BLOCKED"} "${title.slice(0, 50)}"`);
+  }
+}
+
+// ── Job 4: pitch follow-up nudges ───────────────────────────────────────────
+async function followupJob() {
+  try {
+    const stale = await dbExec(
+      "SELECT id, publicationName, editorEmail, articleTitle, sentAt FROM pitches WHERE status = 'sent' AND sentAt < DATE_SUB(NOW(), INTERVAL 4 DAY) AND sentAt > DATE_SUB(NOW(), INTERVAL 30 DAY)",
+    );
+    if (stale.length === 0) return;
+    const lines = stale.slice(0, 8).map((piece) =>
+      `• ${piece.publicationName ?? "?"} — "${String(piece.articleTitle ?? "").slice(0, 60)}" (sent ${String(piece.sentAt).slice(0, 10)})`,
+    );
+    void slackAlert(`✉️ ${stale.length} pitch${stale.length === 1 ? "" : "es"} awaiting reply 4+ days — time for the polite follow-up:\n${lines.join("\n")}`);
+  } catch (err) {
+    console.warn("[proactive] followup check failed:", err instanceof Error ? err.message : err);
+  }
+}
+
+
+// ── Job 5: Opportunity scout (Exa) ──────────────────────────────────────────
+// Daily semantic-web sweep for fresh calls-for-pitches / paid writing
+// opportunities on the operator's beats, filed into an "Opportunities"
+// database (created on first run). Dedupes by URL. Relevance-gated.
+const OPP_FIELDS: Array<{ name: string; type: string; options?: WsSelectOption[] }> = [
+  { name: "Opportunity", type: "text" },
+  { name: "Outlet/Source", type: "text" },
+  { name: "URL", type: "url" },
+  { name: "Pay", type: "text" },
+  { name: "Deadline", type: "text" },
+  { name: "Beat", type: "text" },
+  { name: "Status", type: "select", options: [
+    { id: "opp-new", name: "New", color: "blue" },
+    { id: "opp-rev", name: "Reviewing", color: "purple" },
+    { id: "opp-pit", name: "Pitched", color: "green" },
+    { id: "opp-skip", name: "Skipped", color: "gray" },
+  ] },
+  { name: "Found", type: "date" },
+];
+
+async function ensureOpportunitiesDb(): Promise<WsDatabase | null> {
+  const databases = await loadDatabases();
+  let opps = databases.find((d) => d.name === "Opportunities");
+  if (opps) return opps;
+  const now = Date.now();
+  opps = {
+    id: uid(),
+    name: "Opportunities",
+    icon: "📣",
+    description: "Live writing opportunities — calls for pitches, contributor openings, paid assignments — found daily by the Exa opportunity scout. Review New items each morning; move to Pitched or Skipped.",
+    fields: OPP_FIELDS.map((f) => ({ id: uid(), name: f.name, type: f.type, options: f.options, width: f.name === "Opportunity" ? 320 : 160 })),
+    views: [{ id: uid(), name: "All", type: "table", filters: [], sorts: [] }],
+    createdAt: now,
+    updatedAt: now,
+  } as unknown as WsDatabase;
+  await saveDatabase(opps);
+  return opps;
+}
+
+async function opportunityJob() {
+  if (!exaConfigured()) return;
+  const databases = await loadDatabases();
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  if (ledger) {
+    const recent = (await loadRows(ledger.id)).some(
+      (r) => r.createdAt > Date.now() - 20 * 3600e3 && JSON.stringify(r.values).includes("Opportunity scout"),
+    );
+    if (recent) return; // ≤1 run per ~20h
+  }
+  const opps = await ensureOpportunitiesDb();
+  if (!opps) return;
+  const f = (n: string) => fieldByName(opps, n);
+  const urlField = f("URL"), titleField = f("Opportunity");
+  if (!urlField || !titleField) return;
+
+  const existing = new Set(
+    (await loadRows(opps.id)).map((r) => String(r.values[urlField.id] ?? "").trim().toLowerCase()).filter(Boolean),
+  );
+
+  const niches = process.env.SCOUT_NICHES || "small business, AI automation, women's health, menopause, parenting, ADHD, homesteading, aviation, ecommerce, entrepreneurship, marketing";
+  // Three cheap searches (= $0.015/day)
+  const queries = [
+    "call for pitches freelance writers paid submission this week",
+    `editor seeking pitches freelance ${niches.split(",").slice(0, 4).join(" ")}`,
+    "publication accepting contributor applications paid writing opportunity",
+  ];
+  const results = (await Promise.all(queries.map((q) => exaSearch(q, 10, { daysBack: 10, includeText: true })))).flat();
+  const fresh = results.filter((r) => r.url && !existing.has(r.url.trim().toLowerCase()));
+  if (fresh.length === 0) { console.log("[proactive] opportunity scout: nothing new"); return; }
+
+  // One haiku call structures + relevance-gates the batch
+  const out = await agentCall(
+    "Opportunity scout",
+    "scout",
+    TIER.free,
+    `From these web results, extract REAL paid writing opportunities (calls for pitches, contributor openings, assignments) relevant to these beats: ${niches}.
+Discard: job boards aggregating stale listings, content mills, unpaid gigs, anything older than ~2 weeks, duplicates.
+Return STRICT JSON — an array (max 8) of:
+[{"title": "<one-line opportunity>", "source": "<outlet/site>", "url": "<url>", "pay": "<pay if stated, else ''>", "deadline": "<if stated, else ''>", "beat": "<matching beat>", "relevance": <1-10>}]
+
+WEB RESULTS:
+${fresh.slice(0, 24).map((r, i) => `${i + 1}. ${r.title} | ${r.url}${r.text ? ` | ${r.text.slice(0, 250)}` : ""}`).join("\n")}`,
+    "daily opportunity sweep",
+    3000,
+  );
+  if (!out) return;
+  let items: Array<{ title?: string; source?: string; url?: string; pay?: string; deadline?: string; beat?: string; relevance?: number }> = [];
+  try { items = JSON.parse(out.replace(/^```(json)?|```$/g, "").trim()); } catch { return; }
+  items = items.filter((i) => i.title && i.url && (Number(i.relevance) || 0) >= 6 && !existing.has(i.url!.trim().toLowerCase()));
+
+  const statusField = f("Status");
+  const newOpt = statusField?.options?.find((o) => o.name === "New");
+  let filed = 0;
+  for (const item of items.slice(0, 8)) {
+    const now = Date.now();
+    const values: Record<string, unknown> = {
+      [titleField.id]: item.title,
+      [urlField.id]: item.url,
+    };
+    const set = (name: string, v: unknown) => { const fl = f(name); if (fl && v) values[fl.id] = v; };
+    set("Outlet/Source", item.source);
+    set("Pay", item.pay);
+    set("Deadline", item.deadline);
+    set("Beat", item.beat);
+    if (statusField && newOpt) values[statusField.id] = newOpt.id;
+    set("Found", new Date().toISOString().slice(0, 10));
+    await saveRow({ id: uid(), dbId: opps.id, values, sortOrder: now, createdAt: now, updatedAt: now });
+    filed++;
+  }
+  console.log(`[proactive] opportunity scout filed ${filed} new opportunities`);
+}
+
+// ── Model Quality Watch ─────────────────────────────────────────────────────
+// Daily benchmark proving the free fleet still performs at expert level.
+// Runs one fixed drafting probe on the free tiers AND a paid reference model,
+// has the (free) judge score each against the house calibration anchors, and
+// writes results to the "Model Quality Watch" workspace database. If a free
+// tier falls ≥1.5 points behind paid or below 7/10 absolute, the row is marked
+// UPGRADE and a Slack alert fires — the operator's signal that a paid model
+// would genuinely earn its cost on that stage.
+const WATCH_PROBE = `Write the opening 250 words of a Business Insider-style as-told-to essay: "I left a six-figure airline job to teach checkride prep — and tripled my income." Open in a concrete scene. Include at least one specific number in every paragraph. US English, AP style. Return only the prose.`;
+
+async function ensureModelWatchDb(): Promise<WsDatabase | null> {
+  const databases = await loadDatabases();
+  let watch = databases.find((d) => d.name === "Model Quality Watch");
+  if (watch) return watch;
+  const now = Date.now();
+  watch = {
+    id: uid(),
+    name: "Model Quality Watch",
+    icon: "🛰️",
+    description: "Daily free-vs-paid model benchmark. The judge scores a fixed drafting probe against the house calibration (5 = mid-tier blog, 7 = trade outlet, 9 = top-tier). UPGRADE rows mean a paid model is currently worth the money for that work — review before the next writing sprint.",
+    fields: [
+      { id: uid(), name: "Date", type: "text", width: 110 },
+      { id: uid(), name: "Model", type: "text", width: 280 },
+      { id: uid(), name: "Tier", type: "select", width: 110, options: [
+        { id: uid(), name: "Free", color: "#10b981" },
+        { id: uid(), name: "Free-Big", color: "#0ea5e9" },
+        { id: uid(), name: "Paid Ref", color: "#f59e0b" },
+      ] },
+      { id: uid(), name: "Score", type: "number", width: 90 },
+      { id: uid(), name: "Verdict", type: "select", width: 120, options: [
+        { id: uid(), name: "OK", color: "#10b981" },
+        { id: uid(), name: "WATCH", color: "#f59e0b" },
+        { id: uid(), name: "UPGRADE", color: "#ef4444" },
+        { id: uid(), name: "REF", color: "#a3a3a3" },
+      ] },
+      { id: uid(), name: "Notes", type: "longtext", width: 420 },
+    ],
+    views: [{ id: uid(), name: "All", type: "table", filters: [], sorts: [] }],
+    createdAt: now,
+    updatedAt: now,
+  } as unknown as WsDatabase;
+  await saveDatabase(watch);
+  return watch;
+}
+
+async function modelWatchJob() {
+  const databases = await loadDatabases();
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  if (ledger) {
+    const recent = (await loadRows(ledger.id)).some(
+      (r) => r.createdAt > Date.now() - 20 * 3600e3 && JSON.stringify(r.values).includes("Model watch"),
+    );
+    if (recent) return; // ≤1 run per ~20h
+  }
+  const watch = await ensureModelWatchDb();
+  if (!watch) return;
+  const f = (n: string) => fieldByName(watch, n);
+  const fDate = f("Date"), fModel = f("Model"), fTier = f("Tier"), fScore = f("Score"), fVerdict = f("Verdict"), fNotes = f("Notes");
+  if (!fDate || !fModel || !fScore) return;
+
+  const candidates = [
+    { tier: "Free", model: TIER.free },
+    { tier: "Free-Big", model: TIER.freeBig },
+    { tier: "Paid Ref", model: "anthropic/claude-sonnet-4.6" },
+  ];
+  const results: Array<{ tier: string; model: string; score: number; notes: string }> = [];
+  for (const c of candidates) {
+    const sample = await agentCall("Model watch probe", "drafter", c.model, WATCH_PROBE, `model-watch ${c.tier}`, 2500);
+    if (!sample) { results.push({ tier: c.tier, model: c.model, score: 0, notes: "no output (model unavailable)" }); continue; }
+    const judged = await agentCall(
+      "Model watch judge",
+      "scorer",
+      TIER.free, // fast free tier: reasoning models burn max_tokens on thinking and truncate strict-JSON replies
+      `Score this draft opening against the calibration anchors (5 = publishable mid-tier blog, 7 = solid trade outlet, 9 = top-tier ready). Apply the mandatory penalties for AI-tell phrasing and unsupported vagueness. Return STRICT JSON only: {"score": <1-10, one decimal allowed>, "slop": ["<each AI-tell or weakness found, max 4>"]}
+
+DRAFT:
+${sample}`,
+      `model-watch judge ${c.tier}`,
+      1200,
+    );
+    let score = 0; let slop: string[] = [];
+    try {
+      const parsed = JSON.parse((judged ?? "").replace(/^```(?:json)?|```$/gm, "").trim());
+      score = Number(parsed.score) || 0;
+      slop = Array.isArray(parsed.slop) ? parsed.slop.map(String).slice(0, 4) : [];
+    } catch {
+      const m = (judged ?? "").match(/"?score"?\s*[:=]\s*([\d.]+)/i);
+      score = m ? Number(m[1]) : 0;
+    }
+    results.push({ tier: c.tier, model: c.model, score, notes: slop.join(" | ") || "clean" });
+  }
+
+  const paid = results.find((r) => r.tier === "Paid Ref")?.score ?? 0;
+  const bestFree = Math.max(...results.filter((r) => r.tier !== "Paid Ref").map((r) => r.score), 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const now = Date.now();
+  for (const r of results) {
+    let verdict = "REF";
+    if (r.tier !== "Paid Ref") {
+      // Relative-first: free matching/beating the paid reference is OK even when
+      // the judge scores everyone harshly; UPGRADE only when paid clearly wins.
+      verdict = paid - r.score >= 1.5 ? "UPGRADE" : r.score >= 7 || r.score >= paid ? "OK" : "WATCH";
+    }
+    const verdictOption = fVerdict?.options?.find((o) => o.name === verdict);
+    const tierOption = fTier?.options?.find((o) => o.name === r.tier);
+    await saveRow({
+      id: uid(),
+      dbId: watch.id,
+      values: {
+        [fDate.id]: today,
+        [fModel.id]: r.model,
+        ...(fTier && tierOption ? { [fTier.id]: tierOption.id } : {}),
+        [fScore.id]: r.score,
+        ...(fVerdict && verdictOption ? { [fVerdict.id]: verdictOption.id } : {}),
+        ...(fNotes ? { [fNotes.id]: r.notes } : {}),
+      },
+      sortOrder: now,
+      createdAt: now,
+      updatedAt: now,
+    } as WsRow);
+  }
+  if (paid - bestFree >= 1.5 || (bestFree < 7 && paid >= 7)) {
+    void slackAlert(`🛰️ Model Quality Watch: free fleet scored ${bestFree.toFixed(1)} vs paid ${paid.toFixed(1)}. A paid model is currently worth it for drafting — review "Model Quality Watch" in the workspace.`);
+    console.warn(`[proactive] model watch: UPGRADE signal (free ${bestFree} vs paid ${paid})`);
+  } else {
+    console.log(`[proactive] model watch: free fleet OK (free ${bestFree} vs paid ${paid})`);
+  }
+}
+
+// ── Daily feed refresh (4am ET) + retention purge ───────────────────────────
+function currentEtHour(): number {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }).format(new Date()));
+}
+
+async function sourcesRefreshJob() {
+  const db = await getDb();
+  if (!db) return;
+  // Retention runs every pass — cheap, keeps storage bounded even if a refresh is skipped.
+  try {
+    const purged = await purgeOldFeedData(db);
+    if (purged.items || purged.seen) console.log(`[proactive] feed purge: ${purged.items} stale items, ${purged.seen} dedup rows`);
+  } catch (err) {
+    console.warn("[proactive] feed purge failed:", err instanceof Error ? err.message : err);
+  }
+  // Ingest only in the 4am ET window, ≤1 real run per ~20h (ledger gap-guard).
+  if (currentEtHour() !== 4) return;
+  const databases = await loadDatabases();
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  if (ledger) {
+    const recent = (await loadRows(ledger.id)).some(
+      (r) => r.createdAt > Date.now() - 20 * 3600e3 && JSON.stringify(r.values).includes("Sources refresh"),
+    );
+    if (recent) return;
+  }
+  const beats = process.env.SCOUT_NICHES || "freelance writing, business, marketing, women's health, parenting, personal finance, technology, entrepreneurship";
+  const r = await refreshAllActiveSources(beats, 20);
+  await recordLedger("Sources refresh", TIER.free, 0, 0, 0, `${r.sources} sources, ${r.kept} actionable items kept`);
+  console.log(`[proactive] sources refresh: ${r.sources} sources, ${r.kept} actionable kept`);
+}
+
+// ── Scheduler ───────────────────────────────────────────────────────────────
+async function safely(name: string, job: () => Promise<void>) {
+  try {
+    await ensureWsTables();
+    await job();
+  } catch (err) {
+    console.warn(`[proactive] ${name} failed:`, err instanceof Error ? err.message : err);
+  }
+}
+
+// Dispatch map so the durable queue worker (queue.ts) can run the same jobs.
+export type ProactiveJobName = "scout" | "scorer" | "guardian" | "followup" | "opportunities" | "modelwatch" | "sourcesrefresh";
+export const PROACTIVE_JOBS: Record<ProactiveJobName, () => Promise<void>> = {
+  scout: () => safely("scout", scoutJob),
+  scorer: () => safely("scorer", scorerJob),
+  guardian: () => safely("guardian", guardianJob),
+  followup: () => safely("followup", followupJob),
+  opportunities: () => safely("opportunities", opportunityJob),
+  modelwatch: () => safely("modelwatch", modelWatchJob),
+  sourcesrefresh: () => safely("sourcesrefresh", sourcesRefreshJob),
+};
+
+export function initProactiveAgents() {
+  if (process.env.WORKSPACE_PROACTIVE === "0") {
+    console.log("[proactive] disabled via WORKSPACE_PROACTIVE=0");
+    return;
+  }
+  if (!process.env.DATABASE_URL) return;
+
+  // Durable path: if Redis is configured, run jobs through the BullMQ queue
+  // (retries, repeatable schedules, survives restarts). Falls back below.
+  if (process.env.REDIS_URL) {
+    void import("./queue").then(async ({ startQueue }) => {
+      const ok = await startQueue();
+      if (ok) {
+        // kick off an immediate first pass via the queue
+        void PROACTIVE_JOBS.scorer();
+        void PROACTIVE_JOBS.guardian();
+        return;
+      }
+      armInProcessLoop();
+    });
+    return;
+  }
+  armInProcessLoop();
+}
+
+function armInProcessLoop() {
+  // First pass shortly after boot, then steady cadence
+  setTimeout(() => {
+    void safely("scorer", scorerJob);
+    void safely("guardian", guardianJob);
+    void safely("scout", scoutJob);
+  }, 90_000);
+
+  setInterval(() => {
+    void safely("scorer", scorerJob);
+    void safely("guardian", guardianJob);
+  }, 10 * 60_000);
+
+  setInterval(() => {
+    void safely("scout", scoutJob);
+    void safely("opportunities", opportunityJob);
+    void safely("modelwatch", modelWatchJob);
+    void safely("sourcesrefresh", sourcesRefreshJob); // self-gates to 4am ET + retention every pass
+  }, 60 * 60_000);
+
+  setInterval(() => {
+    void safely("followup", followupJob);
+  }, 12 * 3600_000);
+
+  console.log("[proactive] in-process loop armed: scout (≤1/20h), scorer + guardian (every 10m), budget $" + budgetLimit() + "/mo");
+}

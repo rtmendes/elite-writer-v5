@@ -1,7 +1,7 @@
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -24,9 +24,15 @@ export function useAuth(options?: UseAuthOptions) {
     },
   });
 
+  // Stable ref for logoutMutation to avoid re-creating logout callback every render
+  const logoutMutationRef = useRef(logoutMutation);
+  logoutMutationRef.current = logoutMutation;
+  const utilsRef = useRef(utils);
+  utilsRef.current = utils;
+
   const logout = useCallback(async () => {
     try {
-      await logoutMutation.mutateAsync();
+      await logoutMutationRef.current.mutateAsync();
     } catch (error: unknown) {
       if (
         error instanceof TRPCClientError &&
@@ -36,29 +42,32 @@ export function useAuth(options?: UseAuthOptions) {
       }
       throw error;
     } finally {
-      utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
+      utilsRef.current.auth.me.setData(undefined, null);
+      await utilsRef.current.auth.me.invalidate();
     }
-  }, [logoutMutation, utils]);
+  }, []);
 
-  const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
-    return {
-      user: meQuery.data ?? null,
-      loading: meQuery.isLoading || logoutMutation.isPending,
-      error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
-    };
-  }, [
+  // Pure useMemo — no side effects (localStorage moved to useEffect below)
+  const state = useMemo(() => ({
+    user: meQuery.data ?? null,
+    loading: meQuery.isLoading || logoutMutation.isPending,
+    error: meQuery.error ?? logoutMutation.error ?? null,
+    isAuthenticated: Boolean(meQuery.data),
+  }), [
     meQuery.data,
     meQuery.error,
     meQuery.isLoading,
     logoutMutation.error,
     logoutMutation.isPending,
   ]);
+
+  // Side effect belongs in useEffect, not useMemo
+  useEffect(() => {
+    localStorage.setItem(
+      "elite-writer-user-info",
+      JSON.stringify(meQuery.data ?? null)
+    );
+  }, [meQuery.data]);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
@@ -67,7 +76,7 @@ export function useAuth(options?: UseAuthOptions) {
     if (typeof window === "undefined") return;
     if (window.location.pathname === redirectPath) return;
 
-    window.location.href = redirectPath
+    window.location.href = redirectPath;
   }, [
     redirectOnUnauthenticated,
     redirectPath,

@@ -1,0 +1,157 @@
+// ── Deep per-publication style enrichment ──────────────────────────────────
+// Curated/researched style + voice + audience detail that goes BEYOND the
+// imported swipe-file (which is mostly one-liners). Applied to the live
+// Publications rows by ensurePublicationEnrichment() so the agents' brand/
+// publication matching writes in each outlet's real register.
+//
+// Keyed by a normalized publication name; matched leniently (equals or
+// row-name-includes-key). Add outlets in batches — fields provided here
+// OVERWRITE the matching column because this data is higher quality.
+export interface PubEnrichment {
+  match: string; // normalized name fragment to find the row by
+  writingStyle?: string;
+  editorLikes?: string;
+  editorStyle?: string;
+  doNotWrite?: string;
+  targetAudience?: string;
+  submission?: string;
+}
+
+export const PUBLICATION_ENRICHMENT: PubEnrichment[] = [
+  {
+    match: "success",
+    writingStyle: "Personal and professional development for self-made achievers. AP style with in-house exceptions. Take a broad topic (e.g. leadership) and hone to ONE specific angle. Essays with anecdotes that illustrate real experience, backed by research and relevant examples, always with tangible takeaways that explain the 'how' behind the message.",
+    editorLikes: "Compelling, well-written pieces on personal development, professional growth, soft skills, and self-discovery; demonstrated expertise and tangible, actionable advice; a clear single angle with practical takeaways.",
+    doNotWrite: "Biased promotion of a product or company; old information or unoriginal ideas; broad claims lacking evidence; bare personality profiles with no reader takeaway.",
+    targetAudience: "Aspirational, self-responsible achievers — entrepreneurs, micro-business owners, and professionals who own their growth and income and want practical tips, traits, and tactics to improve personally and professionally.",
+    submission: "Editor Kristen Tribe oversees the freelancer/contributor program. News-pegged pitch idea + writing samples required. Monday.com pitch form.",
+  },
+  {
+    match: "inc",
+    writingStyle: "Fresh perspectives and original insight — never generic business advice. 'Profiles with a purpose': someone doing something in business that carries a clear takeaway for founders. Concise and specific.",
+    editorLikes: "An original angle backed by data/stats or a breaking-news peg; real business experience (strategies, mistakes, successes) over products; a clear, transferable reader takeaway.",
+    doNotWrite: "Generic business advice; product or company promotion; personality profiles with no takeaway; recycled ideas.",
+    targetAudience: "CEOs, founders, and small-to-medium business owners; startup and tech business leaders — NOT internet marketers or online-hustle audiences.",
+    submission: "Pitch in a few sentences to contributors@inc.com (or Graham Winfrey / the Inc. columnist proposal form).",
+  },
+  {
+    match: "fast company",
+    writingStyle: "Lively, polished writing that balances research or news with memorable anecdotes and examples. Op-ed, not content marketing — introduce a new idea and advance the conversation. 600–900 words.",
+    editorLikes: "New ideas and trends that engage readers; a POV supported by real business experience; Work Life topics (productivity, creativity, career, hiring, culture, entrepreneurship, innovation) or Impact topics (climate, sustainability, social justice).",
+    doNotWrite: "Over-the-top self-promotion; dense jargon; abstract blanket assertions; press releases, abstracts, or outlines (send complete pieces).",
+    targetAudience: "Business leaders, innovators, and creative professionals shaping the future of work.",
+    submission: "Complete, unpublished articles (600–900 words) to submissions@fastcompany.com. No pay, but strong promotion.",
+  },
+  {
+    match: "entrepreneur",
+    writingStyle: "Conversational and direct; authentic first-hand expertise. A genuinely contrarian angle + data backing the claim + clear practical application for the founder/executive reader.",
+    editorLikes: "Personal stories and lessons learned first-hand — successes, struggles, pivots; contrarian angles backed by data; actionable insight; writers open to revisions.",
+    doNotWrite: "Promotional material, advertorials, or paid placements disguised as journalism; generic advice.",
+    targetAudience: "Entrepreneurs, startup founders, small business owners, and executives seeking solutions, new ideas, and inspiration.",
+  },
+  {
+    match: "business insider",
+    writingStyle: "Juicy, fun, entertaining, and insightful — the reader hops paragraph to paragraph. Minimal jargon. Often as-told-to format (mention it in the pitch if used).",
+    editorLikes: "Actionable insight and fresh perspectives for a 'go-getter' audience; a specific sub-audience with clear pain points (e.g. Gen Z creators, millennial-mom side-hustlers); as-told-to stories.",
+    doNotWrite: "Jargon-heavy or medical tone; non-exclusive pitches (all pitches must be exclusive); unverified claims — editors require proof (emails, screenshots, documentation).",
+    targetAudience: "Entrepreneurship, tech, and economy 'go-getters' — broad but ambitious; aspiring creators, side-hustlers, millennials and Gen Z.",
+  },
+  {
+    match: "forbes",
+    writingStyle: "Bylined op-ed/analysis from a subject-matter authority writing in ONE specific lane. Three story types Forbes loves: Innovation (changing an industry with new ideas/tech), Impact (real-world outcomes/community benefit), Inspiration (overcoming adversity — especially founders and small businesses).",
+    editorLikes: "A unique, authoritative perspective targeted to the right editor's beat; genuine thought leadership with clear value to Forbes' audience.",
+    doNotWrite: "Mass/untargeted pitches; pitching outside an editor's beat (a fintech story to a healthcare writer); promotional fluff.",
+    targetAudience: "Business owners, C-suite executives, investors, and financial professionals.",
+    submission: "Pitch the relevant contributor editor for your beat. Forbes Councils requires $500k+ revenue or 3+ years as a recognized coach.",
+  },
+  {
+    match: "cnbc make it",
+    writingStyle: "Career- and money-oriented for a YOUNGER reader — write to them, not a C-suite peer. 600–900 words, anchored on a specific data point; every piece connects to the reader's financial or career self-interest.",
+    editorLikes: "A specific data point or finding; proprietary research, internal data, or quantified outcomes; brevity and specificity (≤150-word pitch).",
+    doNotWrite: "Opinion dressed as analysis; positions stated without evidence; writing to executives instead of the career-building reader.",
+    targetAudience: "Young professionals and millennials focused on earning more, spending smarter, and building wealth.",
+  },
+  {
+    match: "kiplinger",
+    writingStyle: "Practical, present-tense personal finance that matters to real people right now. Sections: Ahead (finance/economic news), Investing (stocks/funds), Your Money (taxes, insurance, college saving), Rewards (big-ticket advice).",
+    editorLikes: "Stories that are important to real people in the present moment; clear, actionable money guidance.",
+    doNotWrite: "Executive profiles or stories about how great a CEO/CFO is — emphatically not published.",
+    targetAudience: "Highly educated, managerial readers (~70% male, ~$70k+ household income) focused on retirement, investing, taxes, and building long-term wealth.",
+  },
+  {
+    match: "women's health",
+    writingStyle: "The newest, most innovative stories in the women's-health sphere — burgeoning trends, new tools reshaping an industry, investigations, women pushing boundaries, medical-progress stories. Feature the voices of real women.",
+    editorLikes: "A specific STORY (not a topic), with a data/quantitative measure, real-women voices, and a service element (sidebar or how-to); timely hooks turned around fast.",
+    doNotWrite: "Pitches that are too broad or vague; a topic instead of a story; ideas already covered elsewhere.",
+    targetAudience: "Women seeking science-backed wellness, fitness, and nutrition — readers who want to live happier, healthier lives.",
+  },
+  {
+    match: "parents",
+    writingStyle: "Fresh, current, well-researched service journalism for millennial parents of kids under 10. Parenting changes daily — keep it current; practical and reassuring, never judgmental.",
+    editorLikes: "Pregnancy and kids'-health angles; genuinely fresh takes not already on the site (check site:parents.com first); clear service value for new-generation moms and dads.",
+    doNotWrite: "Recycled topics already covered; judgmental or preachy tone; thin, unresearched takes.",
+    targetAudience: "Millennial moms and dads with children under age 10.",
+  },
+  {
+    match: "harvard business review",
+    writingStyle: "Evidence-based management insight written for practitioners. Every piece judged on five criteria: expertise (why you), evidence (data, research, examples), originality (a NEW idea — not a well-executed summary of existing thinking), usefulness (readers can apply it Monday morning), and persuasive, jargon-free writing. Counterintuitive findings backed by rigorous support perform best.",
+    editorLikes: "A 500–750-word narrative outline pitch that shows the argument's spine: the problem, why existing approaches fail, your evidence, and the practical payoff. Authors with proprietary research, original data, or deep field experience.",
+    doNotWrite: "Anything readers 'already know' — the most common rejection; recycled frameworks with new labels; promotion of your firm or product; opinion without evidence; academic writing that buries the takeaway.",
+    targetAudience: "Senior managers, executives, and ambitious professionals worldwide who apply management research to real decisions.",
+    submission: "Submit a 500–750-word narrative outline (not a finished draft) via hbr.org/guidelines-for-authors. Expect heavy editing and revision rounds.",
+  },
+  {
+    match: "digiday",
+    writingStyle: "Insider trade journalism on digital media and marketing. Honest, sharp, and specific — a real point of view earned from doing the work, supported by data and concrete examples from inside the industry.",
+    editorLikes: "A genuine POV from a practitioner, not a marketing pitch in disguise; data over opinion; specifics about how budgets, platforms, and teams actually work; fresh tension or contrarian takes on industry orthodoxy.",
+    doNotWrite: "Thinly veiled product or agency promotion; generic 'state of the industry' takes; opinion with no data; anything a PR team could have written.",
+    targetAudience: "Marketers, agency leaders, publishers, and platform operators who control real budgets and make media-spend decisions.",
+  },
+  {
+    match: "newsweek",
+    writingStyle: "First-person 'My Turn' essays with a real narrative arc, 1,200–1,700 words. Distinctive personal stories — ordinary people with extraordinary experiences sit alongside doctors and celebrities. The story IS the argument; vulnerability + specificity over punditry.",
+    editorLikes: "A unique first-person story with a clear arc and a timely hook (health, dating, work, AI, cultural moments); stories only YOU can tell; strong opening scenes.",
+    doNotWrite: "Op-ed punditry without personal experience; topic essays with no narrative; anything already widely told.",
+    targetAudience: "Broad mainstream news readership — general-interest, story-driven.",
+    submission: "Email the essay or pitch to myturn@newsweek.com (My Turn desk).",
+  },
+  {
+    match: "next avenue",
+    writingStyle: "Service-first journalism for readers 50+ (and mid-40s). 800–1,400 words; reported stories carry ~3 named sources; personal essays must still deliver usable insight for midlife readers.",
+    editorLikes: "Pitches summarized in 150 words via their form, with an explicit 'why this fits Next Avenue's audience' line; health, money, work, caregiving, and reinvention angles for the 50+ reader. Pays $300 essays / $400–500 reported.",
+    doNotWrite: "Youth-oriented framing; pieces that mention the 50+ audience without actually serving it; pitching while submissions are paused without checking the form status first.",
+    targetAudience: "Americans 50 and up (PBS audience), plus readers in their mid-to-late 40s planning the next stage — overlaps the perimenopause/midlife-women beat.",
+    submission: "Next Avenue submissions form only (150-word summary + audience fit). NOTE: pitches paused as of Jan 2026 — check nextavenue.org/submission-guidelines before pitching.",
+  },
+  {
+    match: "fortune",
+    writingStyle: "Authority commentary and reported features for business decision-makers. Pitch = <500 words proving four things: the idea is original, it matters, it's urgent NOW, and you're the person to write it. Specific scenes and data points, not topics.",
+    editorLikes: "Specifics: who you'll feature and why, the scenes or data the piece will contain; beats: finance, tech, health, crypto, workplace/careers, leadership, wellness; writers who've clearly read Fortune first.",
+    doNotWrite: "Topic pitches ('I want to explore AI in HR'); generic thought leadership; anything that ignores Fortune's existing coverage.",
+    targetAudience: "Executives, investors, and ambitious professionals tracking business and leadership.",
+    submission: "Commentary: mohamed.elaassar@fortune.com (commentary editor). Keep the pitch under 500 words.",
+  },
+  {
+    match: "good housekeeping",
+    writingStyle: "Long-form narratives, deeply reported service pieces, and personal essays rooted in home, health, family, and personal struggle. Essays 1,000–1,200 words. Warm, trustworthy, practical.",
+    editorLikes: "Fresh voices with ideas visibly tailored to the GH reader; pitches that let an editor envision the piece on the page; new writers may submit essays on spec. Pays $500–$2,000 (up to $2/word).",
+    doNotWrite: "Generic ideas not tailored to the audience — their stated #1 rejection; sending a full article cold instead of a pitch (except essay spec).",
+    targetAudience: "Women running busy households — home, health, family, food, and real-life resilience stories.",
+    submission: "Pitch Deputy Managing Editor Dana A. Levy (dalevy@hearst.com) or Editor-at-large Carla Levy (clevy@hearst.com).",
+  },
+  {
+    match: "oprah",
+    writingStyle: "Intention-led personal growth writing: self-improvement, motivation, spirituality, mental health, relationships, family. Loving and supportive register — insight wrapped in story, never preachy.",
+    editorLikes: "Transformation narratives with earned wisdom; expert-grounded service on emotional well-being; ideas that fit the live-your-best-life mission. Pays ~$1/word digital (up to ~$2,000).",
+    doNotWrite: "Cynicism or hot takes; clinical/medical tone on wellness topics; self-promotion dressed as personal growth.",
+    targetAudience: "Women 35–60 invested in personal growth, well-being, and meaning — squarely the perimenopause/midlife audience.",
+    submission: "Pitch oprahmagstoryIdeas@hearst.com; no formal public guidelines — study recent OprahDaily.com pieces first.",
+  },
+  {
+    match: "black enterprise",
+    writingStyle: "Thought-provoking commentary and actionable insight on personal finance, small business, and careers for Black professionals and entrepreneurs — deep dives plus practical steps.",
+    editorLikes: "Personal finance, small business, and careers (plus tech, lifestyle, development); pitches sent to the SPECIFIC section editor; relationship-built, well-targeted ideas.",
+    doNotWrite: "Identical mass pitches to every editor; wrong editor name/title; generic, unfocused ideas.",
+    targetAudience: "Black professionals, entrepreneurs, executives, and investors building generational wealth.",
+  },
+];

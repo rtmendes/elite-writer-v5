@@ -57,6 +57,8 @@ export interface ArticleScores {
   expertise_depth: number;
   readability: number;
   conclusion_cta: number;
+  reader_resonance?: number;
+  editor_alignment?: number;
   suggestions?: { category: string; title: string; impact: number; action_items: string[] }[];
 }
 
@@ -181,6 +183,7 @@ export interface AppState {
     monthly_revenue_goal: number;
     content_revenue_goal: number;
     product_revenue_goal: number;
+    tracked_topics: string[];
   };
 }
 
@@ -410,6 +413,7 @@ function getDefaultState(): AppState {
       monthly_revenue_goal: 200000,
       content_revenue_goal: 100000,
       product_revenue_goal: 100000,
+      tracked_topics: ['AI & Technology', 'Business', 'Future of Work', 'Health', 'Finance'],
     },
   };
 }

@@ -50,14 +50,35 @@ export default function Ideas() {
     return d.toDateString() === new Date().toDateString();
   }).length;
 
+  const [sortBy, setSortBy] = useState<'newest' | 'score' | 'title'>('newest');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelected = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const bulkDelete = () => {
+    selectedIds.forEach(id => {
+      const dbId = idMap.get(id);
+      if (dbId) deleteIdeaDb.mutate({ id: dbId });
+      deleteIdea(id);
+    });
+    toast.success(`${selectedIds.size} ideas deleted`);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  };
   const filtered = useMemo(() => {
-    return state.ideas.filter(idea => {
+    const list = state.ideas.filter(idea => {
       const matchesSearch = !searchQuery ||
         idea.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         idea.angle.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
     });
-  }, [state.ideas, searchQuery]);
+    if (sortBy === 'score') return [...list].sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
+    if (sortBy === 'title') return [...list].sort((a, b) => a.title.localeCompare(b.title));
+    return list;
+  }, [state.ideas, searchQuery, sortBy]);
 
   const groupedByStatus = useMemo(() => {
     const groups: Record<string, typeof filtered> = {};
@@ -103,7 +124,7 @@ export default function Ideas() {
           });
         });
         const tokens = result.usage?.total_tokens || 0;
-        toast.success(`${result.data.ideas.length} ideas generated (${tokens} tokens)`);
+        toast.success(`${result.data.ideas?.length ?? 0} ideas generated (${tokens} tokens)`);
         setShowNewIdea(false);
       }
     } catch (err: any) {
@@ -157,17 +178,13 @@ export default function Ideas() {
   };
 
   return (
-    <div className="p-6 max-w-full mx-auto space-y-6">
+    <div className="p-3 max-w-full mx-auto space-y-2">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Lightbulb className="w-6 h-6 text-amber-400" />
-            Article Ideas Pipeline
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Drag ideas across stages — from concept to publication
-          </p>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Lightbulb className="w-4 h-4 text-amber-400" />
+          <h1 className="text-sm font-semibold">Ideas Pipeline</h1>
+          <Badge variant="outline" className="text-[10px]">{state.ideas.length} total</Badge>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex border border-border rounded-md overflow-hidden">
@@ -224,31 +241,40 @@ export default function Ideas() {
         </div>
       </div>
 
-      {/* Daily Target + Search */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <Card className="border-border flex-1 min-w-[250px]">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-3">
-              <Target className="w-4 h-4 text-primary shrink-0" />
-              <div className="flex-1">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">Today's ideas</span>
-                  <span className="font-mono font-semibold">{todayCount} / {state.settings.daily_target}</span>
-                </div>
-                <Progress value={(todayCount / state.settings.daily_target) * 100} className="h-1.5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search ideas..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 h-9" />
+      {/* Compact toolbar — daily target + search + status counts */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1.5 text-xs">
+          <Target className="w-3 h-3 text-primary" />
+          <span className="text-muted-foreground">{todayCount}/{state.settings.daily_target}</span>
+          <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, (todayCount / state.settings.daily_target) * 100)}%` }} />
+          </div>
         </div>
-        <div className="flex gap-2 text-xs text-muted-foreground">
+        <div className="relative flex-1 max-w-[220px]">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-7 h-7 text-xs" />
+        </div>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+          className="h-7 text-xs rounded-md border border-input bg-background px-2"
+          title="Sort ideas">
+          <option value="newest">Newest</option>
+          <option value="score">Score high→low</option>
+          <option value="title">Title A→Z</option>
+        </select>
+        <Button variant={selectMode ? 'default' : 'outline'} size="sm" className="h-7 text-xs"
+          onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}>
+          {selectMode ? 'Done' : 'Select'}
+        </Button>
+        {selectMode && selectedIds.size > 0 && (
+          <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={bulkDelete}>
+            Delete {selectedIds.size}
+          </Button>
+        )}
+        <div className="flex gap-1.5 text-xs text-muted-foreground">
           {STATUSES.map(s => (
-            <span key={s} className="flex items-center gap-1">
-              <span className="text-sm">{STATUS_CONFIG[s].icon}</span>
-              <span className="font-mono">{groupedByStatus[s]?.length || 0}</span>
+            <span key={s} className="flex items-center gap-0.5" title={STATUS_CONFIG[s].label}>
+              <span className="text-xs">{STATUS_CONFIG[s].icon}</span>
+              <span className="font-mono text-[10px]">{groupedByStatus[s]?.length || 0}</span>
             </span>
           ))}
         </div>
@@ -301,6 +327,12 @@ export default function Ideas() {
                       }`}
                     >
                       <div className="flex items-start gap-1.5">
+                        {selectMode && (
+                          <input type="checkbox" className="mt-0.5 shrink-0 accent-primary"
+                            checked={selectedIds.has(idea.id)}
+                            onChange={() => toggleSelected(idea.id)}
+                            onClick={e => e.stopPropagation()} />
+                        )}
                         <GripVertical className="w-3 h-3 text-muted-foreground/30 mt-0.5 shrink-0 group-hover:text-muted-foreground" />
                         <div className="flex-1 min-w-0">
                           <h4 className="text-xs font-medium leading-snug line-clamp-2">{idea.title}</h4>
