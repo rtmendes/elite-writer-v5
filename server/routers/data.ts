@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, isNotNull } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { syncArticleToPipeline } from "../lib/supabase-sync";
 import {
-  ideas, articles, pitches, researchNotes,
+  ideas, articles, pitches, researchNotes, generatedImages,
   brands, products, earnings, intelligenceItems, userSettings,
   type InsertIdea, type InsertArticle, type InsertPitch,
   type InsertResearchNote, type InsertBrand, type InsertProduct,
@@ -67,6 +67,21 @@ const articlesRouter = router({
     const db = await getDb();
     if (!db) return [];
     return db.select().from(articles).where(eq(articles.userId, ctx.user.id)).orderBy(desc(articles.updatedAt));
+  }),
+  // Per-article cover thumbnails. Returns this user's generated images that are
+  // linked to an article, newest-first; the client de-dupes to one cover per
+  // article via buildCoverMap (skipping the "(base64)" placeholder rows that
+  // aren't fetchable URLs). Avoids a schema change — covers already live in the
+  // generated_images table via articleId.
+  covers: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [] as { articleId: number | null; imageUrl: string | null }[];
+    return db
+      .select({ articleId: generatedImages.articleId, imageUrl: generatedImages.imageUrl })
+      .from(generatedImages)
+      .where(and(eq(generatedImages.userId, ctx.user.id), isNotNull(generatedImages.articleId)))
+      .orderBy(desc(generatedImages.createdAt))
+      .limit(200);
   }),
   create: protectedProcedure.input(z.object({
     title: z.string().min(1),
