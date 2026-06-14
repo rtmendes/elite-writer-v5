@@ -36,11 +36,11 @@ import { EnhancementPanel } from '@/components/writer/EnhancementPanel';
 import { SettingsModal, loadSettings, type WriterSettings } from '@/components/writer/SettingsModal';
 import { checkContentQuality, getGradeBgColor, type QualityReport, type QualityIssue } from '@/lib/quality-checker';
 import {
-  WriterBlockNoteEditor,
+  PlateWriterEditor,
   htmlToPlainText,
   htmlToMarkdown,
   parseContentToHtml,
-} from '@/components/writer/BlockNoteEditor';
+} from '@/components/writer/PlateWriterEditor';
 import { cn } from '@/lib/utils';
 
 // ─── Research Panel (Sidebar) ───────────────────────────────
@@ -1534,7 +1534,7 @@ ${editorHtml}
             "h-full overflow-hidden writer-reading-surface",
             !focusMode && "rounded-2xl border border-border/80 bg-card/35 shadow-sm"
           )}>
-            <WriterBlockNoteEditor
+            <PlateWriterEditor
               value={editorHtml}
               onValueChange={setEditorHtml}
               placeholder="Start writing your article... Type / for slash commands."
