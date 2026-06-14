@@ -13,7 +13,16 @@ const THEMES: { id: Theme; label: string; bg: string; border: string }[] = [
 function applyTheme(theme: Theme) {
   const html = document.documentElement;
 
-  // Inject or remove frost stylesheet
+  // Keep Tailwind dark class in sync (ThemeContext reads 'theme' key)
+  if (theme === 'dark') {
+    html.classList.add('dark');
+    localStorage.setItem('theme', 'dark');
+  } else {
+    html.classList.remove('dark');
+    localStorage.setItem('theme', 'light');
+  }
+
+  // Frost stylesheet + init script
   let frostLink = document.getElementById('frost-css') as HTMLLinkElement | null;
   if (theme === 'frost') {
     if (!frostLink) {
@@ -23,7 +32,6 @@ function applyTheme(theme: Theme) {
       frostLink.href = '/frost.css';
       document.head.appendChild(frostLink);
     }
-    // Inject paste sanitizer once
     if (!document.getElementById('frost-init-js')) {
       const s = document.createElement('script');
       s.id = 'frost-init-js';
@@ -34,7 +42,7 @@ function applyTheme(theme: Theme) {
     frostLink?.remove();
   }
 
-  // Set data-theme attribute
+  // data-theme attribute
   if (theme === 'dark') {
     html.removeAttribute('data-theme');
   } else {
@@ -47,7 +55,6 @@ function applyTheme(theme: Theme) {
 function readStoredTheme(): Theme {
   const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
   if (stored && ['dark', 'light', 'frost'].includes(stored)) return stored;
-  // Infer from current DOM
   const attr = document.documentElement.getAttribute('data-theme');
   if (attr === 'light') return 'light';
   if (attr === 'frost') return 'frost';
@@ -89,6 +96,7 @@ export function ThemeSelector() {
           fontSize: '12px',
           fontWeight: 500,
           cursor: 'pointer',
+          whiteSpace: 'nowrap',
           transition: 'background .12s',
         }}
       >
@@ -110,7 +118,6 @@ export function ThemeSelector() {
 
       {open && (
         <>
-          {/* backdrop */}
           <div
             onClick={() => setOpen(false)}
             style={{ position: 'fixed', inset: 0, zIndex: 998 }}

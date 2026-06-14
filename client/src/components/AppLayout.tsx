@@ -6,12 +6,13 @@ import { useAuth } from '@/_core/hooks/useAuth';
 import {
   LayoutDashboard, Newspaper, Lightbulb, Search, PenTool,
   BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
-  Zap, Menu, Building2, Moon, Sun, Inbox, Loader2,
+  Zap, Menu, Building2, Inbox, Loader2,
   MessageSquare, Library, Globe, Map, Users,
   Flame, Calendar, Mic, Palette, ChevronDown,
   LayoutGrid, Rss, Clapperboard, FileText, ListChecks, Network,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ThemeSelector } from './ThemeSelector';
 
 type NavItem = {
   path: string;
@@ -78,7 +79,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem("ew_nav_sections") ?? "{}"); } catch { return {}; }
   });
-  const { theme, toggleTheme, switchable } = useTheme();
+  // useTheme retained for components that may need it; ThemeSelector manages theme switching
   const { loading: authLoading, isAuthenticated } = useAuth({ redirectOnUnauthenticated: true });
 
   // Show loading spinner while checking auth
@@ -219,16 +220,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
             <div className="flex-1" />
 
-            {/* Theme toggle */}
-            {switchable && toggleTheme && (
-              <button
-                onClick={toggleTheme}
-                className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              >
-                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-            )}
+            {/* Theme selector */}
+            <ThemeSelector />
 
             {/* Status indicators */}
             <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
