@@ -41,6 +41,8 @@ import {
   htmlToMarkdown,
   parseContentToHtml,
 } from '@/components/writer/PlateWriterEditor';
+import { useAuth } from '@/_core/hooks/useAuth';
+import { useRealtimeDoc } from '@/hooks/useRealtimeDoc';
 import { cn } from '@/lib/utils';
 
 // ─── Research Panel (Sidebar) ───────────────────────────────
@@ -251,6 +253,48 @@ function getInlineReplacement(issue: QualityIssue): { replacement: string; actio
   return { replacement: firstOption, action: firstOption ? 'replace' : 'remove' };
 }
 
+// ─── Realtime presence: stacked initials avatars + live dot ─────────────────
+function RealtimePresence({
+  connected,
+  peers,
+}: {
+  connected: boolean;
+  peers: { id: string; name: string; color: string }[];
+}) {
+  if (!connected) return null;
+  const initials = (name: string) =>
+    name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'G';
+  return (
+    <div className="flex items-center gap-2" aria-label="People editing now">
+      <span
+        className="inline-block w-2 h-2 rounded-full bg-emerald-500"
+        title="Live — changes sync to everyone here"
+      />
+      {peers.length === 0 ? (
+        <span className="text-xs text-muted-foreground">Just you</span>
+      ) : (
+        <div className="flex -space-x-1.5">
+          {peers.slice(0, 4).map(p => (
+            <span
+              key={p.id}
+              title={p.name}
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold text-white ring-2 ring-background"
+              style={{ backgroundColor: p.color }}
+            >
+              {initials(p.name)}
+            </span>
+          ))}
+          {peers.length > 4 && (
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold bg-muted text-muted-foreground ring-2 ring-background">
+              +{peers.length - 4}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Writer Component ──────────────────────────────────
 export default function Writer() {
   const { state, addArticle, updateArticle } = useApp();
@@ -276,6 +320,24 @@ export default function Writer() {
     const newText = typeof updater === 'function' ? updater(htmlToPlainText(editorHtml)) : updater;
     setEditorHtml(parseContentToHtml(newText));
   }, [editorHtml]);
+
+  // ─── Slice 4: realtime collaboration (Supabase Broadcast) ──────────────────
+  // Off until BOTH an article is saved (has a db id) AND VITE_SUPABASE_* are set;
+  // the hook itself is a graceful no-op otherwise, so this is always safe to call.
+  const { user } = useAuth();
+  const realtimeIdentity = useMemo(
+    () => ({
+      id: String(user?.id ?? 'anon'),
+      name: user?.name || user?.email || 'Guest',
+    }),
+    [user?.id, user?.name, user?.email]
+  );
+  const { connected: rtConnected, peers: rtPeers } = useRealtimeDoc({
+    articleId: dbArticleId ?? undefined,
+    html: editorHtml,
+    onRemoteHtml: setEditorHtml,
+    identity: realtimeIdentity,
+  });
 
   // Insert rich content (markdown or HTML) at end of editor without lossy round-trip
   const insertRichContent = useCallback((mdOrHtml: string) => {
@@ -1362,6 +1424,7 @@ ${editorHtml}
                   Quality {qualityReport.grade}
                 </Badge>
               )}
+              <RealtimePresence connected={rtConnected} peers={rtPeers} />
             </div>
 
             {!focusMode && (

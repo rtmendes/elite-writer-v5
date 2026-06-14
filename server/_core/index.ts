@@ -65,6 +65,7 @@ async function startServer() {
         newsapi: Boolean(process.env.NEWSAPI_KEY || process.env.GNEWS_KEY),
         slack: Boolean(process.env.SLACK_WEBHOOK_URL),
         exa: Boolean(process.env.EXA_API_KEY),
+        supabaseRealtime: Boolean(process.env.VITE_SUPABASE_URL && process.env.VITE_SUPABASE_ANON_KEY),
       },
     });
   });
