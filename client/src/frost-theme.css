@@ -1,0 +1,222 @@
+/* ═══════════════════════════════════════════════════════
+   FROST MINIMAL — InsightProfit OS v5 (src layer)
+   Imported by index.css. Scoped to [data-theme="frost"].
+   ═══════════════════════════════════════════════════════ */
+
+[data-theme="frost"],
+html[data-theme="frost"] body {
+  --bg:               #F6F7F9;
+  --bg-deep:          #FFFFFF;
+  --bg-elev:          #FFFFFF;
+  --bg-card:          #FFFFFF;
+  --bg-hover:         #FAFBFC;
+  --surface:          #F0F2F5;
+  --surface-1:        #F0F2F5;
+  --surface-2:        #E8EBF0;
+  --surface-3:        #DDE1E7;
+  --surface-hi:       #E8EBF0;
+  --hairline:         #E8EBF0;
+  --border:           #E8EBF0;
+  --border-dim:       #DDE1E7;
+  --ink:              #0F172A;
+  --ink-secondary:    #1E293B;
+  --ink-subtle:       #475569;
+  --text:             #0F172A;
+  --text-dim:         #1E293B;
+  --text-faint:       #94A3B8;
+  --text-secondary:   #64748B;
+  --accent:           #0F172A;
+  --accent-hover:     #1E293B;
+  --accent-dim:       #334155;
+  --accent-glow:      rgba(15,23,42,.08);
+  --accent-gold:      #D97706;
+  --accent-emerald:   #059669;
+  --success:          #059669;
+  --warning:          #D97706;
+  --error:            #DC2626;
+  --danger:           #DC2626;
+  --info:             #2563EB;
+  --gold:             #D97706;
+  --font-sans:        "Inter", system-ui, -apple-system, sans-serif;
+  --font-display:     "Lora", Georgia, serif;
+  --font-mono:        "JetBrains Mono", "Fira Code", monospace;
+  --radius:           8px;
+  --radius-sm:        6px;
+  --radius-lg:        12px;
+  --shadow-sm:        0 1px 3px rgba(15,23,42,.07), 0 1px 2px rgba(15,23,42,.04);
+  --shadow-md:        0 4px 12px rgba(15,23,42,.10), 0 1px 4px rgba(15,23,42,.06);
+  --shadow-lg:        0 8px 24px rgba(15,23,42,.12);
+
+  /* shadcn / Tailwind CSS variable overrides */
+  --primary:                   #0F172A;
+  --primary-foreground:        #FFFFFF;
+  --secondary:                 #F6F7F9;
+  --secondary-foreground:      #0F172A;
+  --muted:                     #F0F2F5;
+  --muted-foreground:          #64748B;
+  --card:                      #FFFFFF;
+  --card-foreground:           #0F172A;
+  --popover:                   #FFFFFF;
+  --popover-foreground:        #0F172A;
+  --destructive:               #DC2626;
+  --destructive-foreground:    #FFFFFF;
+  --ring:                      #0F172A;
+  --background:                #F6F7F9;
+  --foreground:                #0F172A;
+  --input:                     #E8EBF0;
+  --accent-foreground:         #0F172A;
+  --sidebar-background:        #F0F2F5;
+  --sidebar-foreground:        #475569;
+  --sidebar-primary:           #0F172A;
+  --sidebar-primary-foreground:#FFFFFF;
+  --sidebar-accent:            rgba(15,23,42,.06);
+  --sidebar-accent-foreground: #0F172A;
+  --sidebar-border:            #E8EBF0;
+  --sidebar-ring:              #0F172A;
+}
+
+/* ── Body ── */
+html[data-theme="frost"] body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Kill purple/violet from shadcn + Tailwind ── */
+html[data-theme="frost"] [class*="bg-purple"],
+html[data-theme="frost"] [class*="bg-violet"] {
+  background-color: #0F172A !important;
+}
+html[data-theme="frost"] [class*="text-purple"],
+html[data-theme="frost"] [class*="text-violet"] {
+  color: #0F172A !important;
+}
+
+/* ── Sidebar ── */
+html[data-theme="frost"] [data-sidebar="sidebar"],
+html[data-theme="frost"] aside[class*="sidebar"],
+html[data-theme="frost"] .sidebar {
+  background: #F0F2F5 !important;
+  border-color: #E8EBF0 !important;
+  background-image: none !important;
+}
+
+/* ── Nav items ── */
+html[data-theme="frost"] [data-sidebar="menu-button"] {
+  color: #475569 !important;
+  background: transparent !important;
+  border-radius: 6px;
+  position: relative;
+  transition: background .12s, color .12s;
+}
+html[data-theme="frost"] [data-sidebar="menu-button"]:hover {
+  background: rgba(15,23,42,.05) !important;
+  color: #0F172A !important;
+}
+html[data-theme="frost"] [data-sidebar="menu-button"][data-active="true"] {
+  color: #0F172A !important;
+  background: rgba(15,23,42,.06) !important;
+}
+html[data-theme="frost"] [data-sidebar="menu-button"][data-active="true"]::after {
+  content: '';
+  position: absolute;
+  right: -8px; top: 5px; bottom: 5px;
+  width: 2.5px;
+  background: #0F172A;
+  border-radius: 2px 0 0 2px;
+}
+html[data-theme="frost"] [data-sidebar="menu-button"] svg { color: #94A3B8 !important; }
+html[data-theme="frost"] [data-sidebar="menu-button"][data-active="true"] svg { color: #0F172A !important; }
+html[data-theme="frost"] [data-sidebar="group-label"] {
+  color: #94A3B8 !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+html[data-theme="frost"] [data-sidebar="footer"] {
+  background: #F0F2F5 !important;
+  border-color: #E8EBF0 !important;
+}
+
+/* ── Cards ── */
+html[data-theme="frost"] .card,
+html[data-theme="frost"] [class*="Card"] {
+  background: #FFFFFF !important;
+  border-color: #E8EBF0 !important;
+  box-shadow: 0 1px 3px rgba(15,23,42,.07), 0 1px 2px rgba(15,23,42,.04) !important;
+}
+
+/* ── Tables ── */
+html[data-theme="frost"] th {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .06em !important;
+  color: #94A3B8 !important;
+  background: #F6F7F9 !important;
+}
+
+/* ── Page titles ── */
+html[data-theme="frost"] h1,
+html[data-theme="frost"] .page-title {
+  font-family: "Lora", Georgia, serif;
+  letter-spacing: -0.3px;
+  color: #0F172A;
+}
+
+/* ── Buttons ── */
+html[data-theme="frost"] button[class*="primary"],
+html[data-theme="frost"] .btn-primary {
+  background: #0F172A !important;
+  color: #fff !important;
+  border: none !important;
+}
+
+/* ── KPI strip ── */
+html[data-theme="frost"] .kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px;
+  background: #E8EBF0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #E8EBF0;
+}
+html[data-theme="frost"] .kpi-cell {
+  background: #FFFFFF;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background .12s;
+}
+html[data-theme="frost"] .kpi-cell:hover { background: #FAFBFC; }
+
+/* ── Status badges ── */
+html[data-theme="frost"] .badge-green  { background: #ECFDF5; color: #059669; }
+html[data-theme="frost"] .badge-amber  { background: #FFFBEB; color: #D97706; }
+html[data-theme="frost"] .badge-red    { background: #FEF2F2; color: #DC2626; }
+html[data-theme="frost"] .badge-blue   { background: #EFF6FF; color: #2563EB; }
+
+/* ── Inputs ── */
+html[data-theme="frost"] input,
+html[data-theme="frost"] textarea,
+html[data-theme="frost"] select {
+  background: #FFFFFF;
+  border-color: #E8EBF0;
+  color: #0F172A;
+}
+html[data-theme="frost"] input::placeholder,
+html[data-theme="frost"] textarea::placeholder { color: #94A3B8; }
+
+/* ── Scrollbars ── */
+html[data-theme="frost"] ::-webkit-scrollbar { width: 5px; height: 5px; }
+html[data-theme="frost"] ::-webkit-scrollbar-track { background: transparent; }
+html[data-theme="frost"] ::-webkit-scrollbar-thumb { background: #DDE1E7; border-radius: 3px; }
+html[data-theme="frost"] ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ── Paste flash ── */
+html[data-theme="frost"] .fm-paste-flash {
+  transition: box-shadow .15s !important;
+  box-shadow: 0 0 0 2px rgba(15,23,42,.2) !important;
+}
