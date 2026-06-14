@@ -260,6 +260,7 @@ export default function Writer() {
   // tRPC mutations
   const scoreMutation = trpc.ai.score.useMutation();
   const draftMutation = trpc.ai.draft.useMutation();
+  const rewriteMutation = trpc.ai.rewrite.useMutation();
   const saveArticleMutation = trpc.data.articles.create.useMutation();
   const updateArticleMutation = trpc.data.articles.update.useMutation();
   const googleCreateDoc = trpc.google.createDoc.useMutation();
@@ -491,6 +492,27 @@ export default function Writer() {
       toast.error('AI draft failed: ' + (err.message || 'Unknown error'));
     }
   };
+
+  // Inline AI rewrite of the editor's current selection (Slice 2).
+  // The editor reads + replaces the selection; this just resolves the new text.
+  // Reuses the same brand-voice / target-publication context as scoring & drafting.
+  const handleAIRewrite = useCallback(
+    async (
+      text: string,
+      action: 'improve' | 'shorten' | 'expand' | 'grammar' | 'tone' | 'custom',
+      customPrompt?: string
+    ): Promise<string> => {
+      const result = await rewriteMutation.mutateAsync({
+        text,
+        action,
+        customPrompt,
+        brandVoice: BRAND_VOICES.find(b => b.id === selectedVoice)?.name,
+        targetPublication: selectedPub?.name,
+      });
+      return result.success ? result.text : '';
+    },
+    [rewriteMutation, selectedVoice, selectedPub]
+  );
 
   // Assign the 4-role editorial team (Researcher, Lead Writer, Line Editor, Proofreader)
   // for an article + publication. Guarded against duplicate calls per (article, pub) pair.
@@ -1538,6 +1560,7 @@ ${editorHtml}
               value={editorHtml}
               onValueChange={setEditorHtml}
               placeholder="Start writing your article... Type / for slash commands."
+              onAIRewrite={handleAIRewrite}
             />
           </div>
         </div>

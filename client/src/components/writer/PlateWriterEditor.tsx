@@ -8,6 +8,7 @@ import { getEditorDOMFromHtmlString, serializeHtml } from 'platejs/static'
 import { EditorContainer, Editor } from '@/components/ui/editor'
 import { EditorStatic } from '@/components/ui/editor-static'
 import { BaseEditorKit } from '@/components/editor/editor-base-kit'
+import { InlineAIProvider, type InlineAIRewrite } from '@/components/writer/inline-ai-context'
 
 // Curated, article-editing plugin kits (live React UI) ────────────────────────
 import { BasicNodesKit } from '@/components/editor/plugins/basic-nodes-kit'
@@ -42,6 +43,12 @@ export interface PlateWriterEditorProps {
   placeholder?: string
   /** Read-only mode */
   readOnly?: boolean
+  /**
+   * Inline AI rewrite handler. When provided, the floating toolbar's "Ask AI"
+   * dropdown rewrites the current selection via this callback. When omitted,
+   * the button hides itself.
+   */
+  onAIRewrite?: InlineAIRewrite
 }
 
 const EMPTY_VALUE: Value = [{ type: 'p', children: [{ text: '' }] }]
@@ -191,6 +198,7 @@ export function PlateWriterEditor({
   onValueChange,
   placeholder = 'Start writing your article... Type / for slash commands.',
   readOnly = false,
+  onAIRewrite,
 }: PlateWriterEditorProps) {
   const { theme } = useTheme()
   const [showSource, setShowSource] = useState(false)
@@ -358,11 +366,13 @@ export function PlateWriterEditor({
         </div>
       ) : (
         <div className="writer-plate-container flex-1 overflow-y-auto">
-          <Plate editor={editor} onValueChange={scheduleEmit} readOnly={readOnly}>
-            <EditorContainer>
-              <Editor variant="default" placeholder={placeholder} readOnly={readOnly} />
-            </EditorContainer>
-          </Plate>
+          <InlineAIProvider rewrite={onAIRewrite}>
+            <Plate editor={editor} onValueChange={scheduleEmit} readOnly={readOnly}>
+              <EditorContainer>
+                <Editor variant="default" placeholder={placeholder} readOnly={readOnly} />
+              </EditorContainer>
+            </Plate>
+          </InlineAIProvider>
         </div>
       )}
     </div>

@@ -271,6 +271,62 @@ Return the full article in markdown format.`,
       return { success: true, text, usage: result.usage };
     }),
 
+  // Inline AI rewrite of a SELECTED passage (Slice 2).
+  // Unlike `draft` (which emits a whole article), this returns ONLY the
+  // rewritten passage so it can drop straight back into the editor selection.
+  // No `model` is passed to invokeLLM → free-first model + fallback ladder +
+  // budget cap + AI-ledger write are all inherited automatically.
+  rewrite: publicProcedure
+    .input(
+      z.object({
+        text: z.string().min(1).max(8000),
+        action: z.enum(["improve", "shorten", "expand", "grammar", "tone", "custom"]),
+        customPrompt: z.string().max(500).optional(),
+        brandVoice: z.string().optional(),
+        targetPublication: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const ACTION_INSTRUCTIONS: Record<typeof input.action, string> = {
+        improve: "Rewrite the passage to be clearer, sharper, and more compelling while preserving its meaning and length.",
+        shorten: "Tighten the passage. Cut filler and redundancy so it is noticeably shorter while keeping every key point.",
+        expand: "Expand the passage with relevant detail, evidence, or explanation so it is more substantial, without padding or repetition.",
+        grammar: "Fix grammar, spelling, and punctuation only. Do not change the meaning, voice, or structure.",
+        tone: input.customPrompt
+          ? `Rewrite the passage to adopt this tone: ${input.customPrompt}.`
+          : "Rewrite the passage in a more polished, professional editorial tone.",
+        custom: input.customPrompt
+          ? `Apply this instruction to the passage: ${input.customPrompt}.`
+          : "Improve the passage.",
+      };
+
+      const result = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content:
+              `You are an elite line editor rewriting a single selected passage from an article. ` +
+              `Return ONLY the rewritten passage as plain text — no preamble, no explanation, no quotation marks, and no markdown code fences. ` +
+              `Write in US English with no AI-tell phrasing. Match the surrounding article's register.` +
+              `${input.brandVoice ? ` Write in this brand voice: ${input.brandVoice}.` : ""}` +
+              `${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ""}` +
+              (await skillBlockFor("editor")),
+          },
+          {
+            role: "user",
+            content: `${ACTION_INSTRUCTIONS[input.action]}\n\nPassage:\n${input.text}`,
+          },
+        ],
+        maxTokens: 2048,
+      });
+
+      const text =
+        typeof result.choices[0]?.message?.content === "string"
+          ? result.choices[0].message.content.trim()
+          : "";
+      return { success: true, text, usage: result.usage };
+    }),
+
   // Generate a pitch email for a specific publication
   pitch: publicProcedure
     .input(
