@@ -17,6 +17,7 @@ flag. Method is chosen in this order:
 | Slack (webhook) | n/a | ✅ covered | `slack` | Free webhook — no marginal cost |
 | Exa (search) | wrap | ⚠️ planned | `exa` | Per-search spend wrapped to `record_cost_event` |
 | **Supabase Realtime (collab)** | **n/a** | **✅ covered** | **`supabaseRealtime`** | **Self-hosted Supabase on the Oracle VPS — no per-message/per-connection fee. Cost is capacity-bound (VPS CPU/RAM), not usage-billed, so there is no marginal spend to meter. If ever migrated to Supabase Cloud, switch method to `browser` (scrape Supabase billing) and add a `record_cost_event` wrap.** |
+| **Image generation (covers/hero)** | **wrap** | **✅ covered** | **`imageGen`** | **Multi-provider chain (OpenAI GPT Image → DALL·E 3 → Gemini → PiAPI). Each successful render in `creative.generateArticleImage` wraps a per-provider list-price estimate (`IMAGE_COST_USD`) to `record_cost_event` (`p_tool: "article_image"`, `p_model: <source>`). Estimates are ballpark per-image costs, refined when providers expose exact usage.** |
 
 ## Coverage legend
 - ✅ **covered** — spend is visible (logged, or zero marginal cost by design)

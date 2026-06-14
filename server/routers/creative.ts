@@ -17,7 +17,20 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { ENV } from "../_core/env";
 import { getDb } from "../db";
+import { recordCentralCost } from "../_core/proactiveAgents";
 import { generatedImages } from "../../drizzle/schema";
+
+// Rough per-image cost (USD) by provider source, so every paid image
+// generation lands in the central record_cost_event ledger (cost-tracking
+// rule). Values are list-price ballparks for a single high-quality render;
+// "unknown"/free fall back to ~0 so we never over-report.
+const IMAGE_COST_USD: Record<string, number> = {
+  "gpt-image-2": 0.04,
+  "gpt-image-1": 0.02,
+  "dall-e-3": 0.04,
+  gemini: 0.003,
+  piapi: 0.01,
+};
 import {
   generateImage,
   generateImageGPT2,
@@ -231,6 +244,17 @@ Return JSON:
       if (!imageUrl) {
         throw new Error("Image generation failed — no provider available");
       }
+
+      // Cost ledger: log the paid render to the central record_cost_event RPC.
+      // Fire-and-forget so a logging hiccup never fails the image request.
+      void recordCentralCost(
+        "article_image",
+        source,
+        0,
+        0,
+        IMAGE_COST_USD[source] ?? 0,
+        input.articleTitle || input.type,
+      );
 
       // Store in DB
       const db = await getDb();
