@@ -12,12 +12,19 @@ import { serializeHtml } from 'platejs/static'
 
 import { BaseEditorKit } from '@/components/editor/editor-base-kit'
 import { EditorStatic } from '@/components/ui/editor-static'
-import { parseContentToHtml, htmlToPlainText, htmlToMarkdown } from './PlateWriterEditor'
+import {
+  parseContentToHtml,
+  prepareContentForEditor,
+  htmlToPlainText,
+  htmlToMarkdown,
+} from './PlateWriterEditor'
 
-// Mirror of the component's load → serialize cycle.
+// Faithful mirror of the component's load → serialize cycle: loadHtmlIntoEditor
+// deserializes prepareContentForEditor(html) (NOT the raw html), so the probe
+// must apply the same prep — this is where <li> list annotation happens.
 async function roundTrip(html: string): Promise<string> {
   const probe = createSlateEditor({ plugins: BaseEditorKit })
-  const nodes = probe.api.html.deserialize({ element: html })
+  const nodes = probe.api.html.deserialize({ element: prepareContentForEditor(html) })
   const staticEditor = createSlateEditor({ plugins: BaseEditorKit, value: nodes as Value })
   return serializeHtml(staticEditor, { editorComponent: EditorStatic })
 }
@@ -85,7 +92,7 @@ describe('HTML round-trip fidelity (load → serialize)', () => {
     expect(out).toContain('https://insightprofit.live')
   })
 
-  it('preserves ordered and unordered list items', async () => {
+  it('preserves ordered and unordered list items as real bullets', async () => {
     const out = await roundTrip(
       '<p>Intro</p><ul><li>alpha</li><li>beta</li></ul><ol><li>first</li><li>second</li></ol>'
     )
@@ -93,6 +100,14 @@ describe('HTML round-trip fidelity (load → serialize)', () => {
     expect(out).toContain('beta')
     expect(out).toContain('first')
     expect(out).toContain('second')
+
+    // Bullet fidelity: semantic <li> must survive deserialization as list nodes
+    // (not flatten to paragraphs) and export to markdown with "- " markers.
+    const md = htmlToMarkdown(out)
+    expect(md).toContain('- alpha')
+    expect(md).toContain('- beta')
+    expect(md).toContain('- first')
+    expect(md).toContain('- second')
   })
 
   it('preserves an embedded iframe (the BlockNote regression being fixed)', async () => {
@@ -182,6 +197,11 @@ describe('parity: Full Pipeline write path (setEditorHtml(parseContentToHtml(mar
     expect(out).toContain('Cost relative to existing plans')
     expect(out).toContain('Low awareness of the new service')
     expect(out).toContain('insightprofit.live/method')
+
+    // The markdown bullets the pipeline produced must round-trip back to bullets.
+    const md = htmlToMarkdown(out)
+    expect(md).toContain('- Cost relative to existing plans')
+    expect(md).toContain('- Low awareness of the new service')
   })
 })
 
@@ -211,12 +231,10 @@ describe('parity: Export path (htmlToMarkdown)', () => {
     expect(md).toContain('## What the data shows')
     expect(md).toContain('**$42')
     expect(md).toContain('[full report](https://insightprofit.live/report)')
-    // KNOWN LIMITATION (carried from the Slice-0 list round-trip test): Plate's
-    // indent-list model has no deserializer for semantic <ul><li>, so bullets
-    // flatten to paragraphs in the static serializer. Item *text* still exports
-    // (so no content is lost for scoring/reading), but the "- " marker is not
-    // reproduced. Tracked separately — see the bullet-fidelity follow-up.
-    expect(md).toContain('Cost is the top barrier')
-    expect(md).toContain('Awareness is the second')
+    // Bullet fidelity (the follow-up fix): semantic <ul><li> in the sample
+    // article now survives the indent-list deserializer and exports with real
+    // "- " markers, not just bare item text.
+    expect(md).toContain('- Cost is the top barrier')
+    expect(md).toContain('- Awareness is the second')
   })
 })
