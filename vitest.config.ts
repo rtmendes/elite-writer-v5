@@ -14,6 +14,18 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
+    include: [
+      "server/**/*.test.ts",
+      "server/**/*.spec.ts",
+      "client/**/*.test.{ts,tsx}",
+      "client/**/*.spec.{ts,tsx}",
+    ],
+    // Plate's math kit imports katex's CSS; inlining routes that .css through
+    // Vite's transform (stubbed in test) instead of Node's native loader.
+    server: {
+      deps: {
+        inline: [/@platejs\//, /^platejs/, /katex/, /react-tweet/, /react-lite-youtube-embed/],
+      },
+    },
   },
 });
