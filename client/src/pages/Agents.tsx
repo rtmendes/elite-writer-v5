@@ -21,6 +21,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { AgentActivity } from '@/components/agents/AgentActivity';
 import {
   MessageSquare, Users, Send, Search, Clock, Zap, X, Check,
   Loader2, Sparkles, FileText, MoreHorizontal, Trash2, MessagesSquare,
@@ -397,6 +398,9 @@ export default function Agents() {
           </div>
         </div>
       )}
+
+      {/* Agent Activity — read-only proof the proactive agents are alive */}
+      <AgentActivity />
 
       {/* ─── Toolbar: Search + Filter + Sort + View ─── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
