@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Elite Writer · Fine-Tune Tracker</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --surface:#ffffff; --surface-2:#eef0f3; --border:#dcdfe4;
+    --text:#1c2127; --text-dim:#5b636e; --text-faint:#8b929c;
+    --gold:#9a7b3f; --gold-soft:#c8a76a;
+    --done:#2f7d57; --progress:#b07d2a; --planned:#5b6b86; --blocked:#a23b3b;
+    --shadow:0 1px 2px rgba(20,24,31,.06),0 4px 16px rgba(20,24,31,.05);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0f1216; --surface:#171b21; --surface-2:#1d232b; --border:#2a313b;
+      --text:#e7eaee; --text-dim:#9aa3af; --text-faint:#6b7480;
+      --gold:#c8a76a; --gold-soft:#9a7b3f;
+      --done:#5fcf95; --progress:#e0b35e; --planned:#8ea2c4; --blocked:#e07a7a;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 28px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5;padding:32px 24px 80px}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-family:Lora,Georgia,"Times New Roman",serif;font-weight:600;
+    font-size:30px;letter-spacing:-.01em;margin:0 0 4px}
+  .sub{color:var(--text-dim);font-size:14px;margin:0 0 24px}
+  .sub code{background:var(--surface-2);padding:1px 6px;border-radius:5px;font-size:12px}
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:16px 18px;box-shadow:var(--shadow)}
+  .stat .n{font-family:Lora,Georgia,serif;font-size:28px;font-weight:600;line-height:1}
+  .stat .l{color:var(--text-faint);font-size:11px;text-transform:uppercase;
+    letter-spacing:.08em;margin-top:6px}
+  /* controls */
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
+  input[type=search],select{background:var(--surface);border:1px solid var(--border);
+    color:var(--text);border-radius:9px;padding:9px 12px;font-size:13px;font-family:inherit}
+  input[type=search]{flex:1;min-width:220px}
+  select{cursor:pointer}
+  .count{color:var(--text-faint);font-size:12px;margin-left:auto}
+  /* table */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    overflow:hidden;box-shadow:var(--shadow)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{text-align:left;padding:12px 14px;font-size:11px;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--text-faint);border-bottom:1px solid var(--border);
+    cursor:pointer;user-select:none;white-space:nowrap;background:var(--surface-2)}
+  thead th:hover{color:var(--gold)}
+  thead th .arr{opacity:.5;font-size:9px}
+  tbody td{padding:13px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--surface-2)}
+  .id{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12px;
+    color:var(--gold);white-space:nowrap}
+  .files{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:11px;
+    color:var(--text-dim);max-width:200px;word-break:break-word}
+  .what{max-width:360px}
+  .why{max-width:240px;color:var(--text-dim);font-size:12px}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;
+    font-weight:600;white-space:nowrap;border:1px solid transparent}
+  .s-Done{color:var(--done);border-color:var(--done)}
+  .s-Inprogress{color:var(--progress);border-color:var(--progress)}
+  .s-Planned{color:var(--planned);border-color:var(--planned)}
+  .s-Blocked{color:var(--blocked);border-color:var(--blocked)}
+  .cat{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11px;
+    background:var(--surface-2);color:var(--text-dim);white-space:nowrap}
+  .empty{padding:48px;text-align:center;color:var(--text-faint);font-size:14px}
+  footer{margin-top:22px;color:var(--text-faint);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Elite Writer — Fine-Tune Tracker</h1>
+  <p class="sub">Every change and its impact on <code>elite-writer-v5</code> (the keeper). Source of truth: <code>CHANGELOG.csv</code> · no deletions made from v5.</p>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="controls">
+    <input type="search" id="q" placeholder="Search id, area, file, change…" />
+    <select id="fCat"><option value="">All categories</option></select>
+    <select id="fStatus"><option value="">All statuses</option></select>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr id="head"></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div>
+
+  <footer>Mirror of CHANGELOG.csv. Open the CSV in Sheets/Excel for the same rows. Updated as work lands.</footer>
+</div>
+
+<script>
+// ── DATA: mirrors docs/finetune/CHANGELOG.csv (keep in sync when adding rows) ──
+const DATA = [
+  {id:"EW-000",date:"2026-06-19",category:"Baseline",area:"repo (whole)",files:"—",type:"Audit",
+   what:"Established elite-writer-v5 as the canonical fine-tune base (cloned @96e5103, Jun 14). bud's local elite-writer is a different architecture — feature-donor only, never a source of deletions from v5.",
+   why:"Two divergent EW builds existed; need one source of truth + a no-deletion rule on the keeper.",
+   impact:"Defines scope for all later rows. No code changed.",status:"Done",ref:"feat/finetune-tracker"},
+  {id:"EW-001",date:"2026-06-19",category:"Persistence",area:"server + client auth flow",files:"server/db.ts, server/storage.ts, client hooks",type:"Audit",
+   what:"v5 todo.md admits the end-to-end persistence test (create → reload → verify, while logged in) was never run.",
+   why:"Cannot call the app ready/proven if a logged-in user's data has never been confirmed to survive reload.",
+   impact:"Readiness sign-off blocker. Touches auth + DB hydration hook + every page that writes.",status:"Planned",ref:"—"},
+  {id:"EW-002",date:"2026-06-19",category:"UX / Ease-of-use",area:"client/src/pages (34) + sidebar",files:"client/src/pages/*, sidebar nav",type:"Audit",
+   what:"34 page components is a heavy surface. Assess nav load, first-run clarity, and loading/error/empty states vs UI_STANDARDS for every collection view.",
+   why:"'Not yet easy to use' is the stated problem. Too many entry points + missing states = confusion.",
+   impact:"Likely edits to sidebar + multiple pages. Medium-large; staged page-by-page.",status:"Planned",ref:"—"},
+  {id:"EW-003",date:"2026-06-19",category:"Agentic Intelligence",area:"proactive loop + agentic panel",files:"proactiveAgents.ts, agentic.ts, AgenticPanel.tsx",type:"Audit",
+   what:"18 personas wired + a server proactive loop runs, but there is no user-facing proof it is alive: no last-run, run history, cost, or 'what the agents did for me' surface.",
+   why:"Agentic intelligence is 'unproven' to the user because it is invisible. Trust needs observability.",
+   impact:"Needs a read-only agent-activity surface (reads existing AI Ledger). Low risk to existing logic.",status:"Planned",ref:"—"},
+  {id:"EW-004",date:"2026-06-19",category:"Tracking",area:"docs/finetune",files:"CHANGELOG.csv, tracker.html",type:"Feature",
+   what:"Built this change-tracking system: a spreadsheet source of truth + an interactive HTML page with search, filters, sortable columns, and impact summary.",
+   why:"User asked to see exactly what was impacted, in an interactive HTML page plus a spreadsheet.",
+   impact:"Self-contained. No app code touched.",status:"Done",ref:"feat/finetune-tracker"},
+];
+
+const COLS=[
+  {k:"id",label:"ID"},{k:"date",label:"Date"},{k:"category",label:"Category"},
+  {k:"area",label:"Area"},{k:"files",label:"Files Impacted"},{k:"type",label:"Type"},
+  {k:"what",label:"What Changed"},{k:"why",label:"Why"},{k:"impact",label:"Impact / Blast Radius"},
+  {k:"status",label:"Status"},
+];
+let sortK="id",sortAsc=true;
+const $=s=>document.querySelector(s);
+const sClass=s=>"s-"+s.replace(/\s+/g,"");
+
+function fillSelect(sel,vals){vals.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;sel.appendChild(o);});}
+fillSelect($("#fCat"),[...new Set(DATA.map(d=>d.category))].sort());
+fillSelect($("#fStatus"),[...new Set(DATA.map(d=>d.status))]);
+
+function renderHead(){
+  $("#head").innerHTML=COLS.map(c=>{
+    const arr=sortK===c.k?(sortAsc?"▲":"▼"):"";
+    return `<th data-k="${c.k}">${c.label} <span class="arr">${arr}</span></th>`;
+  }).join("");
+  document.querySelectorAll("th").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k; if(sortK===k)sortAsc=!sortAsc; else{sortK=k;sortAsc=true;} render();
+  });
+}
+function renderStats(rows){
+  const by=s=>DATA.filter(d=>d.status===s).length;
+  const cards=[["Total",DATA.length],["Done",by("Done")],["In progress",by("In progress")],["Planned",by("Planned")]];
+  $("#stats").innerHTML=cards.map(([l,n])=>`<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
+}
+function render(){
+  renderHead();
+  const q=$("#q").value.toLowerCase(),fc=$("#fCat").value,fs=$("#fStatus").value;
+  let rows=DATA.filter(d=>{
+    if(fc&&d.category!==fc)return false;
+    if(fs&&d.status!==fs)return false;
+    if(q){const blob=Object.values(d).join(" ").toLowerCase();if(!blob.includes(q))return false;}
+    return true;
+  });
+  rows.sort((a,b)=>{const x=(a[sortK]||"").toString(),y=(b[sortK]||"").toString();return sortAsc?x.localeCompare(y):y.localeCompare(x);});
+  renderStats();
+  $("#count").textContent=rows.length+" of "+DATA.length+" rows";
+  $("#body").innerHTML=rows.length?rows.map(d=>`<tr>
+    <td class="id">${d.id}</td><td>${d.date}</td>
+    <td><span class="cat">${d.category}</span></td>
+    <td>${d.area}</td><td class="files">${d.files}</td><td>${d.type}</td>
+    <td class="what">${d.what}</td><td class="why">${d.why}</td>
+    <td class="why">${d.impact}</td>
+    <td><span class="pill ${sClass(d.status)}">${d.status}</span></td>
+  </tr>`).join(""):`<tr><td colspan="${COLS.length}" class="empty">No rows match.</td></tr>`;
+}
+["#q","#fCat","#fStatus"].forEach(s=>$(s).addEventListener("input",render));
+render();
+</script>
+</body>
+</html>
