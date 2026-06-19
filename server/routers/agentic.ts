@@ -15,6 +15,19 @@ import { ENV } from "../_core/env";
 import { getDb } from "../db";
 import { articles } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
+import { loadDatabases, loadRows, fieldByName } from "../_core/proactiveAgents";
+
+// Static description of the proactive jobs + their cadence (mirrors armInProcessLoop
+// in proactiveAgents.ts). Surfaced read-only so the user can SEE the agents that run.
+const PROACTIVE_JOBS_META = [
+  { key: "scout", label: "Scout", desc: "Pulls US news, scores relevance, files news-pegged ideas matched to outlets", cadence: "≤ 1× / 20h" },
+  { key: "scorer", label: "Scorer", desc: "Scores pipeline ideas by acceptance likelihood + pay", cadence: "every 10 min" },
+  { key: "guardian", label: "Quality Guardian", desc: "Reviews drafts against house rules", cadence: "every 10 min" },
+  { key: "opportunities", label: "Opportunity Scout", desc: "Finds new outlet / pitch openings", cadence: "hourly" },
+  { key: "modelwatch", label: "Model Watch", desc: "Free-vs-paid model quality benchmark", cadence: "hourly" },
+  { key: "sourcesrefresh", label: "Sources Refresh", desc: "Refreshes source feeds (self-gates to 4am ET)", cadence: "hourly" },
+  { key: "followup", label: "Follow-up", desc: "Nudges stale pitches", cadence: "every 12h" },
+] as const;
 
 // ─── OpenRouter Multi-Model Helper ───────────────────────
 
@@ -92,6 +105,75 @@ export const agenticRouter = router({
     }
     
     return { models: available, hasOpenRouter: !!ENV.openrouterApiKey };
+  }),
+
+  // ─── Agent Activity (read-only proof of the proactive intelligence) ───────
+  // Reads the AI Ledger workspace database the proactive loop already writes to,
+  // so the user can SEE what the agents did, when, and what it cost.
+  activity: protectedProcedure.query(async () => {
+    const empty = {
+      configured: false,
+      proactiveEnabled: process.env.WORKSPACE_PROACTIVE !== "0",
+      totals: { today: 0, month: 0, total: 0, runs: 0, budget: Number(process.env.WORKSPACE_AGENT_BUDGET ?? 50), remaining: null as number | null },
+      recent: [] as Array<{ id: string; entry: string; task: string; model: string; tokensIn: number; tokensOut: number; cost: number; at: number }>,
+      byTask: [] as Array<{ task: string; runs: number; cost: number; lastRun: number }>,
+      jobs: PROACTIVE_JOBS_META,
+      lastActivityAt: null as number | null,
+    };
+
+    const databases = await loadDatabases();
+    const ledger = databases.find((d) => d.name === "AI Ledger");
+    if (!ledger) return empty;
+
+    const fid = (name: string) => fieldByName(ledger, name)?.id ?? "";
+    const taskField = fieldByName(ledger, "Task");
+    const taskName = (id: unknown) => taskField?.options?.find((o) => o.id === id)?.name ?? "—";
+    const num = (v: unknown) => Number(v) || 0;
+    const costId = fid("Cost");
+
+    const rows = (await loadRows(ledger.id)).sort((a, b) => b.createdAt - a.createdAt);
+
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const sumCost = (pred: (r: (typeof rows)[number]) => boolean) =>
+      Math.round(rows.filter(pred).reduce((s, r) => s + num(r.values[costId]), 0) * 10000) / 10000;
+
+    const month = sumCost((r) => r.createdAt >= monthStart.getTime());
+    const today = sumCost((r) => r.createdAt >= todayStart.getTime());
+    const total = sumCost(() => true);
+    const budget = Number(process.env.WORKSPACE_AGENT_BUDGET ?? 50);
+
+    const recent = rows.slice(0, 30).map((r) => ({
+      id: r.id,
+      entry: String(r.values[fid("Entry")] ?? ""),
+      task: taskName(r.values[fid("Task")]),
+      model: String(r.values[fid("Model")] ?? ""),
+      tokensIn: num(r.values[fid("Tokens in")]),
+      tokensOut: num(r.values[fid("Tokens out")]),
+      cost: num(r.values[costId]),
+      at: r.createdAt,
+    }));
+
+    const byTaskMap = new Map<string, { task: string; runs: number; cost: number; lastRun: number }>();
+    for (const r of rows) {
+      const t = taskName(r.values[fid("Task")]);
+      const e = byTaskMap.get(t) ?? { task: t, runs: 0, cost: 0, lastRun: 0 };
+      e.runs += 1;
+      e.cost = Math.round((e.cost + num(r.values[costId])) * 10000) / 10000;
+      e.lastRun = Math.max(e.lastRun, r.createdAt);
+      byTaskMap.set(t, e);
+    }
+    const byTask = [...byTaskMap.values()].sort((a, b) => b.lastRun - a.lastRun);
+
+    return {
+      configured: true,
+      proactiveEnabled: process.env.WORKSPACE_PROACTIVE !== "0",
+      totals: { today, month, total, runs: rows.length, budget, remaining: budget > 0 ? Math.round(Math.max(0, budget - month) * 100) / 100 : null },
+      recent,
+      byTask,
+      jobs: PROACTIVE_JOBS_META,
+      lastActivityAt: rows[0]?.createdAt ?? null,
+    };
   }),
 
   // ─── Autonomous Research → Draft Pipeline ─────────────────
