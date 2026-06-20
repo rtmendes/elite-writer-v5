@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { AppProvider } from '@/contexts/AppContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeSelector } from './ThemeSelector';
+import {
+  CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
+} from '@/components/ui/command';
 
 type NavItem = {
   path: string;
@@ -73,14 +76,27 @@ const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
 const NAV_ITEMS = NAV_SECTIONS.flatMap(section => section.items);
 
 export function AppLayout({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem("ew_nav_sections") ?? "{}"); } catch { return {}; }
   });
   // useTheme retained for components that may need it; ThemeSelector manages theme switching
   const { loading: authLoading, isAuthenticated } = useAuth({ redirectOnUnauthenticated: true });
+
+  // ⌘K / Ctrl+K opens the jump-to-page command palette (31 destinations, no scanning)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   // Show loading spinner while checking auth
   if (authLoading) {
@@ -220,6 +236,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
             <div className="flex-1" />
 
+            {/* Jump-to-page search — opens command palette (⌘K) */}
+            <button
+              onClick={() => setPaletteOpen(true)}
+              className="flex items-center gap-2 h-8 px-2.5 rounded-lg border border-border/80 bg-muted/40 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Search pages"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Search…</span>
+              <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border/80 bg-background/60 px-1 font-mono text-[10px]">⌘K</kbd>
+            </button>
+
             {/* Theme selector */}
             <ThemeSelector />
 
@@ -238,6 +265,33 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </main>
         </div>
       </div>
+
+      {/* Jump-to-page command palette — searches all 31 destinations by name + description */}
+      <CommandDialog open={paletteOpen} onOpenChange={setPaletteOpen} title="Jump to page" description="Search any page by name">
+        <CommandInput placeholder="Jump to a page…" />
+        <CommandList>
+          <CommandEmpty>No page found.</CommandEmpty>
+          {NAV_SECTIONS.map((section) => (
+            <CommandGroup key={section.title} heading={section.title}>
+              {section.items.map((item) => (
+                <CommandItem
+                  key={item.path}
+                  value={`${item.label} ${item.description}`}
+                  onSelect={() => {
+                    setLocation(item.path);
+                    setPaletteOpen(false);
+                    setMobileOpen(false);
+                  }}
+                >
+                  <item.icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                  <span className="ml-auto text-xs text-muted-foreground truncate max-w-[45%]">{item.description}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ))}
+        </CommandList>
+      </CommandDialog>
     </AppProvider>
   );
 }
