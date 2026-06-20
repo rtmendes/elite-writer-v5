@@ -6,7 +6,9 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { ListChecks, Play, Loader2, Sparkles, Copy } from "lucide-react";
+import { ListChecks, Play, Loader2, Sparkles, Copy, RotateCw } from "lucide-react";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TaskCenter() {
   const jobs = trpc.taskCenter.jobs.useQuery();
@@ -52,20 +54,48 @@ export default function TaskCenter() {
       {/* Proactive jobs */}
       <div>
         <h2 className="text-base font-medium text-white mb-2">Agent jobs</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {(jobs.data ?? []).map((j: any) => (
-            <div key={j.name} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm text-white">{j.label}</div>
-                <div className="text-xs text-zinc-500">{j.description}</div>
+        {jobs.isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-[68px] rounded-xl bg-zinc-800/60" />
+            ))}
+          </div>
+        ) : jobs.isError ? (
+          <Empty className="border-zinc-800 bg-zinc-900/60">
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><RotateCw className="text-zinc-400" /></EmptyMedia>
+              <EmptyTitle>Couldn't load agent jobs</EmptyTitle>
+              <EmptyDescription>{jobs.error?.message || "Something went wrong fetching the scheduled jobs."}</EmptyDescription>
+            </EmptyHeader>
+            <button onClick={() => jobs.refetch()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm">
+              <RotateCw className="w-4 h-4" /> Retry
+            </button>
+          </Empty>
+        ) : (jobs.data ?? []).length === 0 ? (
+          <Empty className="border-zinc-800 bg-zinc-900/60">
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><ListChecks className="text-zinc-400" /></EmptyMedia>
+              <EmptyTitle>No agent jobs yet</EmptyTitle>
+              <EmptyDescription>Scheduled proactive jobs will appear here once they're configured. Until then, use the one-off task box below to hand any of the 18 agents a single instruction.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {(jobs.data ?? []).map((j: any) => (
+              <div key={j.name} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm text-white">{j.label}</div>
+                  <div className="text-xs text-zinc-500">{j.description}</div>
+                </div>
+                <button onClick={() => fire(j.name)} disabled={runningJob === j.name}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm shrink-0 disabled:opacity-50">
+                  {runningJob === j.name ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} Run
+                </button>
               </div>
-              <button onClick={() => fire(j.name)} disabled={runningJob === j.name}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm shrink-0 disabled:opacity-50">
-                {runningJob === j.name ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />} Run
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* One-off agent task */}

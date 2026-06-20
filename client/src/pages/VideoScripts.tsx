@@ -6,7 +6,8 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Clapperboard, Loader2, Copy, Sparkles } from "lucide-react";
+import { Clapperboard, Loader2, Copy, Sparkles, RotateCw } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const FORMAT_BLURB: Record<string, string> = {
   vsl: "Long-form sales letter — hook → mechanism → offer → guarantee → CTA",
@@ -45,12 +46,23 @@ export default function VideoScripts() {
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3">
         <div className="flex flex-wrap gap-1.5">
-          {(formats.data ?? []).map((f: any) => (
-            <button key={f.id} onClick={() => setFormat(f.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${format === f.id ? "bg-violet-600 border-violet-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white"}`}>
-              {f.label}
+          {formats.isLoading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-[34px] w-20 rounded-lg bg-zinc-800/60" />
+            ))
+          ) : formats.isError ? (
+            <button onClick={() => formats.refetch()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-white text-sm">
+              <RotateCw className="w-3.5 h-3.5" /> Couldn't load formats — retry
             </button>
-          ))}
+          ) : (
+            (formats.data ?? []).map((f: any) => (
+              <button key={f.id} onClick={() => setFormat(f.id)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${format === f.id ? "bg-violet-600 border-violet-500 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white"}`}>
+                {f.label}
+              </button>
+            ))
+          )}
         </div>
         <p className="text-xs text-zinc-600">{FORMAT_BLURB[format]}</p>
         <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Topic / angle (required) — e.g. 'AI marketing dept for SMB owners'"

@@ -125,6 +125,10 @@ const DATA = [
    what:"Built this change-tracking system: a spreadsheet source of truth + an interactive HTML page with search, filters, sortable columns, and impact summary.",
    why:"User asked to see exactly what was impacted, in an interactive HTML page plus a spreadsheet.",
    impact:"Self-contained. No app code touched.",status:"Done",ref:"feat/finetune-tracker"},
+  {id:"EW-006",date:"2026-06-19",category:"UX / Ease-of-use",area:"client/src/pages (state coverage)",files:"TaskCenter.tsx, VideoScripts.tsx",type:"Feature",
+   what:"Added loading skeleton + error-with-retry + descriptive empty state to the two pages that rendered blank at zero rows. TaskCenter 'Agent jobs' grid: 4-card skeleton, Empty+Retry on error, 'No agent jobs yet' Empty pointing to the one-off task box. VideoScripts format chips: skeleton chips while loading, inline retry chip on error (no big Empty — page still works on default vsl format). Reuses the previously-unused shadcn Empty + Skeleton primitives (build-once). Pipeline + ContentCalendar left unchanged — they render fixed scaffolds, never truly blank.",
+   why:"Audit finding (b): agent-jobs and video-format collections went blank with no message, reading as broken. States make the app legible at zero data.",
+   impact:"Additive only — 2 files, no deletions, no new deps. Validated: tsc 0 errors, 55/55 tests, build clean. Live verification pending a logged-in session.",status:"In progress",ref:"feat/finetune-tracker"},
 ];
 
 const COLS=[
