@@ -1,9 +1,17 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, User, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+
+// Dev-only in-memory user store. When there's no DATABASE_URL (local laptop,
+// no MySQL box), login would otherwise pass the password check but fail at the
+// user-write — leaving inner pages impossible to verify without prod. In
+// development we persist the admin user in memory instead so the app is fully
+// browsable offline. NEVER used in production (gated by ENV.isProduction).
+const _memUsers = new Map<string, User>();
+let _memId = 1;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -25,6 +33,23 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
   const db = await getDb();
   if (!db) {
+    if (!ENV.isProduction) {
+      // Dev fallback: keep the user in memory so local login + inner pages work.
+      const existing = _memUsers.get(user.openId);
+      const merged: User = {
+        id: existing?.id ?? _memId++,
+        openId: user.openId,
+        name: user.name ?? existing?.name ?? null,
+        email: user.email ?? existing?.email ?? null,
+        loginMethod: user.loginMethod ?? existing?.loginMethod ?? null,
+        role: user.role ?? existing?.role ?? "user",
+        createdAt: existing?.createdAt ?? new Date(),
+        updatedAt: new Date(),
+        lastSignedIn: user.lastSignedIn ?? existing?.lastSignedIn ?? new Date(),
+      };
+      _memUsers.set(user.openId, merged);
+      return;
+    }
     console.warn("[Database] Cannot upsert user: database not available");
     return;
   }
@@ -80,6 +105,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) {
+    if (!ENV.isProduction) {
+      return _memUsers.get(openId);
+    }
     console.warn("[Database] Cannot get user: database not available");
     return undefined;
   }

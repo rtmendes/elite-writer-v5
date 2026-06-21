@@ -39,10 +39,14 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  const secure = isSecureRequest(req);
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    // SameSite=None requires Secure; over plain-http localhost the browser
+    // silently drops such a cookie (login appears to succeed but no session).
+    // Fall back to Lax there so local dev sessions actually stick.
+    sameSite: secure ? "none" : "lax",
+    secure,
   };
 }
