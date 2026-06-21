@@ -1,6 +1,9 @@
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "elite-writer-v5",
-  cookieSecret: process.env.JWT_SECRET ?? "",
+  // Dev gets a fixed placeholder so JWT signing works offline; prod must set a
+  // real JWT_SECRET (empty there fails loudly, by design). This is a local dev
+  // constant, not a real secret.
+  cookieSecret: process.env.JWT_SECRET ?? (process.env.NODE_ENV === "production" ? "" : "dev-insecure-jwt-secret"),
   databaseUrl: process.env.DATABASE_URL ?? "",
   // Direct API keys (standalone deployment - no Manus/Forge dependency)
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",

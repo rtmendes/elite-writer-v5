@@ -6,6 +6,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import type { Express, Request, Response } from "express";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import { ENV } from "./env";
 
 export function registerOAuthRoutes(app: Express) {
   // POST /api/auth/login — Email/password login
@@ -26,7 +27,11 @@ export function registerOAuthRoutes(app: Express) {
       res.json({ success: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
     } catch (error: any) {
       console.error("[Auth] Login failed:", error.message);
-      res.status(401).json({ error: "Invalid credentials" });
+      // In dev, surface the real reason (e.g. "User creation failed" when no DB)
+      // instead of masking every failure as a wrong password — that masking is
+      // what made a missing-database look like a bad credential for hours.
+      const message = ENV.isProduction ? "Invalid credentials" : (error.message || "Invalid credentials");
+      res.status(401).json({ error: message });
     }
   });
 
