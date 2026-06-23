@@ -16,6 +16,7 @@ import { getDb } from "../db";
 import { articles } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { loadDatabases, loadRows, fieldByName } from "../_core/proactiveAgents";
+import { fetchPlatformAgentData } from "../lib/supabase-agents";
 
 // Static description of the proactive jobs + their cadence (mirrors armInProcessLoop
 // in proactiveAgents.ts). Surfaced read-only so the user can SEE the agents that run.
@@ -174,6 +175,13 @@ export const agenticRouter = router({
       jobs: PROACTIVE_JOBS_META,
       lastActivityAt: rows[0]?.createdAt ?? null,
     };
+  }),
+
+  // Live platform agent registry from the self-hosted Command Center Supabase
+  // (supabase.insightprofit.live). READ-ONLY bridge — proves REAL production
+  // agent data alongside this app's local AI Ledger (activity, above).
+  platformAgents: protectedProcedure.query(async () => {
+    return fetchPlatformAgentData();
   }),
 
   // ─── Autonomous Research → Draft Pipeline ─────────────────
