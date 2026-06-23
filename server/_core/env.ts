@@ -33,6 +33,9 @@ export const ENV = {
   // Supabase (for KB vector search / legacy data)
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  // Lower-privilege public key for READ-ONLY platform agent registry reads
+  // (supabase-agents.ts). Preferred over the service key for the read bridge.
+  supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
   // R2 object storage (cover images & media — keeps base64 out of the DB)
   r2AccountId: process.env.R2_ACCOUNT_ID ?? "",
   r2AccessKeyId: process.env.R2_ACCESS_KEY_ID ?? "",

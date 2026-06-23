@@ -189,10 +189,39 @@ export async function slackAlert(message: string) {
 
 const LEDGER_COLORS = ["purple", "teal", "blue", "orange", "green", "yellow", "pink", "gray", "red"];
 
-async function recordLedger(taskLabel: string, model: string, tokensIn: number, tokensOut: number, cost: number, context: string) {
+/** Ensure the "AI Ledger" workspace database exists. The proactive loop records
+ *  every agent run here; without it recordLedger silently no-ops, so a fresh
+ *  deploy (or local DB) would log nothing. Mirrors ensureModelWatchDb so the
+ *  ledger self-creates with the exact fields recordLedger writes. */
+async function ensureLedgerDb(): Promise<WsDatabase> {
   const databases = await loadDatabases();
-  const ledger = databases.find((d) => d.name === "AI Ledger");
-  if (!ledger) return;
+  const existing = databases.find((d) => d.name === "AI Ledger");
+  if (existing) return existing;
+  const now = Date.now();
+  const ledger = {
+    id: uid(),
+    name: "AI Ledger",
+    icon: "🧾",
+    description: "Every proactive-agent LLM call, budget-capped and cost-accounted. One row per run: which task, which model, tokens in/out, and the dollar cost.",
+    fields: [
+      { id: uid(), name: "Entry", type: "text", width: 320 },
+      { id: uid(), name: "Task", type: "select", width: 160, options: [] as WsSelectOption[] },
+      { id: uid(), name: "Model", type: "text", width: 220 },
+      { id: uid(), name: "Tokens in", type: "number", width: 110 },
+      { id: uid(), name: "Tokens out", type: "number", width: 110 },
+      { id: uid(), name: "Cost", type: "number", width: 100 },
+      { id: uid(), name: "Date", type: "text", width: 110 },
+    ],
+    views: [{ id: uid(), name: "All", type: "table", filters: [], sorts: [] }],
+    createdAt: now,
+    updatedAt: now,
+  } as unknown as WsDatabase;
+  await saveDatabase(ledger);
+  return ledger;
+}
+
+async function recordLedger(taskLabel: string, model: string, tokensIn: number, tokensOut: number, cost: number, context: string) {
+  const ledger = await ensureLedgerDb();
   const taskField = fieldByName(ledger, "Task");
   let taskOpt = taskField?.options?.find((o) => o.name === taskLabel);
   if (taskField && !taskOpt) {

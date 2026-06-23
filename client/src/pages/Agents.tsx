@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { AgentActivity } from '@/components/agents/AgentActivity';
+import { PlatformAgents } from '@/components/agents/PlatformAgents';
 import {
   MessageSquare, Users, Send, Search, Clock, Zap, X, Check,
   Loader2, Sparkles, FileText, MoreHorizontal, Trash2, MessagesSquare,
@@ -399,8 +400,11 @@ export default function Agents() {
         </div>
       )}
 
-      {/* Agent Activity — read-only proof the proactive agents are alive */}
+      {/* Agent Activity — read-only proof THIS app's proactive agents are alive (local AI Ledger) */}
       <AgentActivity />
+
+      {/* Platform Agents — live registry from supabase.insightprofit.live (real production agent data) */}
+      <PlatformAgents />
 
       {/* ─── Toolbar: Search + Filter + Sort + View ─── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
