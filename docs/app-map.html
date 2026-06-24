@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Elite Writer v5 — App Map, Flows & Wiring Status</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --panel:#11172a; --panel2:#0e1424; --line:#1e2740;
+    --ink:#e8edfb; --mut:#93a0c2; --mut2:#6b779a;
+    --violet:#8b7bf6; --violet2:#a78bfa; --blue:#5aa2ff; --cyan:#43d4e0;
+    --green:#3ad07f; --amber:#f0b441; --red:#f0617b; --pink:#f06fb8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#16203a 0%,transparent 60%),var(--bg);
+    color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;padding:28px 30px 50px}
+  h1{font-size:26px;margin:0 0 2px;letter-spacing:-.3px}
+  h1 .v{background:linear-gradient(90deg,var(--violet2),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:16px}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 22px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:120px}
+  .stat .n{font-size:22px;font-weight:700}
+  .stat .l{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:0 0 22px;color:var(--mut);font-size:12px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid transparent;white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%}
+  .ok{background:rgba(58,208,127,.12);color:var(--green);border-color:rgba(58,208,127,.3)}
+  .ok .dot{background:var(--green)}
+  .partial{background:rgba(240,180,65,.12);color:var(--amber);border-color:rgba(240,180,65,.3)}
+  .partial .dot{background:var(--amber)}
+  .none{background:rgba(240,97,123,.12);color:var(--red);border-color:rgba(240,97,123,.3)}
+  .none .dot{background:var(--red)}
+  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:start}
+  .section{background:linear-gradient(180deg,var(--panel) 0%,var(--panel2) 100%);border:1px solid var(--line);border-radius:16px;padding:14px 14px 16px}
+  .section h2{margin:2px 4px 12px;font-size:15px;display:flex;align-items:center;gap:8px}
+  .section h2 .bar{width:4px;height:16px;border-radius:3px}
+  .s1 .bar{background:var(--violet2)} .s2 .bar{background:var(--blue)} .s3 .bar{background:var(--cyan)}
+  .card{background:#0c1322;border:1px solid var(--line);border-radius:11px;padding:9px 11px;margin-bottom:8px}
+  .card .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .card .name{font-weight:650;font-size:13.5px}
+  .card .path{color:var(--mut2);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+  .card .desc{color:var(--mut);font-size:11.5px;margin-top:3px}
+  .card .api{color:var(--violet);font-size:10.5px;margin-top:5px;font-family:ui-monospace,Menlo,monospace}
+  .flow{margin:26px 0 6px}
+  .flowrow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .step{background:#0c1322;border:1px solid var(--line);border-radius:11px;padding:9px 12px;min-width:120px;flex:1}
+  .step .t{font-weight:650;font-size:12.5px}
+  .step .d{color:var(--mut);font-size:10.5px;margin-top:2px}
+  .arrow{display:flex;align-items:center;color:var(--violet2);font-size:20px;padding:0 6px}
+  .h2big{font-size:18px;margin:30px 0 6px;display:flex;align-items:center;gap:9px}
+  .h2big .bar{width:5px;height:20px;border-radius:3px;background:linear-gradient(180deg,var(--pink),var(--violet2))}
+  table{width:100%;border-collapse:collapse;margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);font-size:12.5px;vertical-align:top}
+  th{background:#0c1322;color:var(--mut);text-transform:uppercase;font-size:10.5px;letter-spacing:.6px}
+  td code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--cyan)}
+  tr:last-child td{border-bottom:none}
+  .note{color:var(--mut);font-size:12px;margin-top:8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+  .panelbox{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;padding:16px}
+  .panelbox h3{margin:0 0 8px;font-size:14px}
+  ul.tight{margin:6px 0 0;padding-left:18px;color:var(--mut)}
+  ul.tight li{margin:4px 0;font-size:12.5px}
+  .tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:10px;font-weight:600;background:#16203a;color:var(--mut);margin-left:6px}
+  .foot{color:var(--mut2);font-size:11px;margin-top:26px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body>
+  <h1>Elite Writer <span class="v">v5</span> — Application Map, Flows &amp; Wiring Status</h1>
+  <div class="sub">32 routes · 3 navigation sections · ~40 tRPC routers · LLM (OpenAI/Anthropic) + News (NewsAPI/GNews/MediaStack) live. Generated from source on 2026-06-24.</div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">31</div><div class="l">Sidebar pages</div></div>
+    <div class="stat"><div class="n">3</div><div class="l">Nav sections</div></div>
+    <div class="stat"><div class="n">~40</div><div class="l">tRPC routers</div></div>
+    <div class="stat"><div class="n">45</div><div class="l">DB tables</div></div>
+    <div class="stat"><div class="n">22</div><div class="l">AI-powered features</div></div>
+    <div class="stat"><div class="n">4</div><div class="l">News/intel sources</div></div>
+  </div>
+
+  <div class="legend">
+    <strong style="color:var(--ink)">Backend wiring:</strong>
+    <span class="pill ok"><span class="dot"></span>Wired (UI ↔ tRPC ↔ DB/AI)</span>
+    <span class="pill partial"><span class="dot"></span>Partial (UI exists, sync/persist gaps)</span>
+    <span class="pill none"><span class="dot"></span>Not wired / orphaned</span>
+  </div>
+
+  <div class="cols">
+    <!-- SECTION 1 -->
+    <div class="section s1">
+      <h2><span class="bar"></span>Writing Studio <span class="tag">create</span></h2>
+
+      <div class="card"><div class="top"><span class="name">Dashboard</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/</div><div class="desc">Overview &amp; metrics across the pipeline.</div><div class="api">data.* aggregates</div></div>
+
+      <div class="card"><div class="top"><span class="name">Intelligence</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/giststack</div><div class="desc">Content curation, trends &amp; news summaries.</div><div class="api">news · intelligence · ai.summarize</div></div>
+
+      <div class="card"><div class="top"><span class="name">Feed Sources</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/sources</div><div class="desc">YouTube, Reddit, RSS &amp; newsletter sources.</div><div class="api">sources · feeds</div></div>
+
+      <div class="card"><div class="top"><span class="name">Pulse Pipeline</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/pulse</div><div class="desc">AI stories → matched brands &amp; publications.</div><div class="api">pulse (AI)</div></div>
+
+      <div class="card"><div class="top"><span class="name">Ideas</span><span class="pill partial"><span class="dot"></span></span></div>
+        <div class="path">/ideas</div><div class="desc">Article idea Kanban (manual + AI generate).</div><div class="api">data.ideas · ai.ideas <span style="color:var(--amber)">(AI ideas not persisted)</span></div></div>
+
+      <div class="card"><div class="top"><span class="name">Research</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/research</div><div class="desc">Web/academic source gathering &amp; briefs.</div><div class="api">research · researchHub · brave · perplexity</div></div>
+
+      <div class="card"><div class="top"><span class="name">Writer</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/writer · /writer/:id</div><div class="desc">Plate AI editor: draft, rewrite, score, viz, product panel.</div><div class="api">ai · agentic · productCreation · give</div></div>
+
+      <div class="card"><div class="top"><span class="name">Workspace</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/workspace</div><div class="desc">Notion-style pages, databases &amp; boards; agent task router.</div><div class="api">workspace (Dexie + DB sync)</div></div>
+
+      <div class="card"><div class="top"><span class="name">Queue</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/queue</div><div class="desc">Pre-written article production pipeline.</div><div class="api">queue (AI)</div></div>
+
+      <div class="card"><div class="top"><span class="name">Agents</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/agents</div><div class="desc">AI editorial team: chat, assignments, live registry.</div><div class="api">agents · supabase bridge</div></div>
+
+      <div class="card"><div class="top"><span class="name">Task Center</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/tasks</div><div class="desc">Run proactive agent jobs &amp; one-off tasks.</div><div class="api">taskCenter (AI jobs)</div></div>
+    </div>
+
+    <!-- SECTION 2 -->
+    <div class="section s2">
+      <h2><span class="bar"></span>Publish &amp; Distribute <span class="tag">ship</span></h2>
+
+      <div class="card"><div class="top"><span class="name">Publications</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/publications</div><div class="desc">174+ publication DB w/ pay, editors, SOPs.</div><div class="api">publications · data.publications</div></div>
+
+      <div class="card"><div class="top"><span class="name">Pitches</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/pitches</div><div class="desc">Pitch generation &amp; tracking.</div><div class="api">ai.pitch · data.pitches</div></div>
+
+      <div class="card"><div class="top"><span class="name">Social Engine</span><span class="pill partial"><span class="dot"></span></span></div>
+        <div class="path">/social</div><div class="desc">Multi-platform post generation &amp; scoring.</div><div class="api">social <span style="color:var(--amber)">(brandContext loaded but not used)</span></div></div>
+
+      <div class="card"><div class="top"><span class="name">Trending</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/trending</div><div class="desc">Trending topic discovery board.</div><div class="api">trending (CRUD)</div></div>
+
+      <div class="card"><div class="top"><span class="name">Content Studio</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/content-studio</div><div class="desc">Multi-platform content authoring.</div><div class="api">studio (CRUD)</div></div>
+
+      <div class="card"><div class="top"><span class="name">Video Scripts</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/video-scripts</div><div class="desc">VSL, TikTok, YouTube, UGC scripts.</div><div class="api">videoScripts (AI)</div></div>
+
+      <div class="card"><div class="top"><span class="name">Calendar</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/content-calendar</div><div class="desc">Content scheduling calendar.</div><div class="api">calendar</div></div>
+
+      <div class="card"><div class="top"><span class="name">Insights</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/content-insights</div><div class="desc">Smart content curation &amp; signals.</div><div class="api">sources · intelligence</div></div>
+
+      <div class="card"><div class="top"><span class="name">AI Interviews</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/interviews</div><div class="desc">Guided Q&amp;A expertise extraction.</div><div class="api">interviews (AI)</div></div>
+    </div>
+
+    <!-- SECTION 3 -->
+    <div class="section s3">
+      <h2><span class="bar"></span>Growth &amp; Operations <span class="tag">scale</span></h2>
+
+      <div class="card"><div class="top"><span class="name">Brand Voice</span><span class="pill partial"><span class="dot"></span></span></div>
+        <div class="path">/brand-voice</div><div class="desc">Voice/tone/audience profiles (brand_contexts).</div><div class="api">brandContext CRUD <span style="color:var(--amber)">(autoResearch: no UI)</span></div></div>
+
+      <div class="card"><div class="top"><span class="name">Brands</span><span class="pill none"><span class="dot"></span></span></div>
+        <div class="path">/brands</div><div class="desc">Brand &amp; product engine: avatar, products, funnels, $200K math.</div><div class="api">data.brands.create only <span style="color:var(--red)">(update/delete/products local-only)</span></div></div>
+
+      <div class="card"><div class="top"><span class="name">Library</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/library</div><div class="desc">Content &amp; image asset library.</div><div class="api">library</div></div>
+
+      <div class="card"><div class="top"><span class="name">Documentation AI</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/documentation</div><div class="desc">Generate docs &amp; SOPs.</div><div class="api">documentation (AI)</div></div>
+
+      <div class="card"><div class="top"><span class="name">Knowledge Hub</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/knowledge-hub</div><div class="desc">GitBook-style reading view over the KB.</div><div class="api">kb</div></div>
+
+      <div class="card"><div class="top"><span class="name">GEO Suite</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/geo</div><div class="desc">AI visibility analysis + content humanizer.</div><div class="api">geo · humanizer (AI)</div></div>
+
+      <div class="card"><div class="top"><span class="name">Strategy</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/strategy</div><div class="desc">Keyword research &amp; content strategy.</div><div class="api">strategy (AI + brave)</div></div>
+
+      <div class="card"><div class="top"><span class="name">Pipeline</span><span class="pill partial"><span class="dot"></span></span></div>
+        <div class="path">/pipeline</div><div class="desc">One-click article production.</div><div class="api">bridges.fullPipeline <span style="color:var(--amber)">(brand/product IDs not passed)</span></div></div>
+
+      <div class="card"><div class="top"><span class="name">Planning Board</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/planning-board</div><div class="desc">Draggable org &amp; data-flow map.</div><div class="api">local viz</div></div>
+
+      <div class="card"><div class="top"><span class="name">Financial</span><span class="pill partial"><span class="dot"></span></span></div>
+        <div class="path">/financial</div><div class="desc">Revenue tracking; $100K content / $100K product goals.</div><div class="api">data.earnings <span style="color:var(--amber)">(Zustand-heavy)</span></div></div>
+
+      <div class="card"><div class="top"><span class="name">Settings</span><span class="pill ok"><span class="dot"></span></span></div>
+        <div class="path">/settings</div><div class="desc">LLM/news API keys, cost routing, usage.</div><div class="api">system · localStorage · server env</div></div>
+    </div>
+  </div>
+
+  <!-- PRIMARY FLOW -->
+  <div class="flow">
+    <h2 class="h2big"><span class="bar"></span>Core content-to-cash flow</h2>
+    <div class="flowrow">
+      <div class="step"><div class="t">1 · Intelligence</div><div class="d">News + feeds + Pulse surface trending stories</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="t">2 · Ideas</div><div class="d">AI generates &amp; scores article ideas</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="t">3 · Research</div><div class="d">Web/academic sources + briefs</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="t">4 · Writer</div><div class="d">Plate editor: draft · rewrite · score · viz</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="t">5 · Publications</div><div class="d">Match + AI pitch to 174+ outlets</div></div>
+      <div class="arrow">→</div>
+      <div class="step"><div class="t">6 · Distribute</div><div class="d">Social · video · calendar</div></div>
+      <div class="arrow">→</div>
+      <div class="step" style="border-color:var(--pink)"><div class="t" style="color:var(--pink)">7 · Monetize ⚠</div><div class="d">Brands · products · funnels (partly wired)</div></div>
+    </div>
+  </div>
+
+  <!-- BRAND / PRODUCT ENTERPRISE WIRING -->
+  <h2 class="h2big"><span class="bar"></span>Brand Entity &amp; Product Offers — Enterprise wiring gaps</h2>
+  <div class="note">This is the section flagged for wiring into the enterprise tech stack. Backend (tRPC + MySQL) largely exists; the UI is mostly Zustand/localStorage and several powerful server capabilities have <strong>no UI caller</strong>. There are also <strong>3–4 parallel brand/product models</strong> that don't share one source of truth.</div>
+
+  <table>
+    <thead><tr><th>Capability</th><th>Backend (tRPC + table)</th><th>UI</th><th>Status</th><th>Gap to wire</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Brand entity</strong></td><td><code>data.brands</code> → <code>brands</code></td><td>Brands.tsx</td><td><span class="pill partial"><span class="dot"></span>partial</span></td><td>Only <code>create</code> persists; <code>update</code>/<code>delete</code> &amp; nested products stay in Zustand/localStorage. Hydration drops avatar/products/goals.</td></tr>
+      <tr><td><strong>Brand voice / lens</strong></td><td><code>brandContext.*</code> → <code>brand_contexts</code></td><td>BrandVoice.tsx</td><td><span class="pill partial"><span class="dot"></span>partial</span></td><td>Manual CRUD wired. <code>autoResearch</code> (Brave + LLM brand profile) has no button. No link to <code>brands.brandId</code>.</td></tr>
+      <tr><td><strong>Product offers (manual)</strong></td><td><code>data.products</code> → <code>products</code></td><td>Brands.tsx builder</td><td><span class="pill none"><span class="dot"></span>not wired</span></td><td><code>createProductDb</code> declared but never called; <code>list</code>/<code>delete</code> have no UI; no <code>update</code> procedure.</td></tr>
+      <tr><td><strong>Product offers (AI)</strong></td><td><code>productCreation.*</code> → <code>products</code></td><td>Writer · ProductPanel</td><td><span class="pill partial"><span class="dot"></span>partial</span></td><td>ebook/course/leadMagnet persist a draft row; emailSequence &amp; analyzeOpportunities don't save; results never shown in Brands.</td></tr>
+      <tr><td><strong>Marketing funnels</strong></td><td><code>funnels.*</code> → <code>funnels</code></td><td>—</td><td><span class="pill none"><span class="dot"></span>orphaned</span></td><td>Full AI create/optimize/score CRUD exists; <strong>no page calls it</strong>. Brands funnel tab is static UX only.</td></tr>
+      <tr><td><strong>Pipeline enrichment</strong></td><td><code>bridges.enrichWithProducts · strategyToQueue · fullPipeline</code></td><td>Pipeline.tsx (partial)</td><td><span class="pill partial"><span class="dot"></span>partial</span></td><td>Accepts <code>brandContextId</code> + <code>productIds</code>; the Pipeline UI never passes them, so articles aren't brand/offer-aware.</td></tr>
+      <tr><td><strong>Data visualization (GIVE)</strong></td><td><code>give.visualize · embed · score</code></td><td>Writer · DataVizPanel</td><td><span class="pill ok"><span class="dot"></span>wired</span></td><td>4-agent viz pipeline works in the editor (Visual-Capitalist-style infographics).</td></tr>
+      <tr><td><strong>Enterprise SSO / billing / white-label</strong></td><td>—</td><td>—</td><td><span class="pill none"><span class="dot"></span>roadmap</span></td><td>PRD V3 roadmap only; Google OAuth scaffolding exists (<code>google</code> router) but SSO/billing not built.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="grid2" style="margin-top:18px">
+    <div class="panelbox">
+      <h3>The 4 parallel brand/product models (need unifying)</h3>
+      <ul class="tight">
+        <li><strong>Zustand <code>Brand</code></strong> — avatar, nested <code>DigitalProduct[]</code>, revenue goals (localStorage). Drives Brands.tsx, Writer pickers, Financial.</li>
+        <li><strong><code>brands</code> table</strong> — name/niche/website/color only. Create-synced from Brands.tsx.</li>
+        <li><strong><code>brand_contexts</code> table</strong> — voice/tone/audience/keywords (BrandVoice.tsx). Optional <code>brandId</code> link unused.</li>
+        <li><strong>Workspace Dexie brands</strong> — 10 internal brands w/ "backend offer" + monthly goal for agent matching (<code>workspace/intel.ts</code>).</li>
+      </ul>
+    </div>
+    <div class="panelbox">
+      <h3>Recommended wiring sequence (to enterprise stack)</h3>
+      <ul class="tight">
+        <li>Pick <strong>one</strong> canonical model: extend <code>brands</code> to embed offer + funnel + avatar, or formalize the link <code>brand_contexts.brandId → brands.id</code>.</li>
+        <li>Wire Brands.tsx to <code>data.brands.update/delete</code> + <code>data.products.create/list/delete</code> (stubs already imported).</li>
+        <li>Add a <strong>Funnels UI</strong> on Brands/Financial that calls the orphaned <code>funnels.*</code> router.</li>
+        <li>Add an <strong>"Auto-research brand"</strong> button → <code>brandContext.autoResearch</code>.</li>
+        <li>Pass <code>brandContextId</code> + <code>productIds</code> from Pipeline &amp; Social into <code>bridges.*</code>/<code>social.generate</code> so output is brand- and offer-aware.</li>
+        <li>Fix hydration to merge <code>products</code> + <code>brand_contexts</code> into the Zustand brand engine (no more divergent duplicates).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="foot">Elite Writer v5 · App map generated from <code>client/src/App.tsx</code>, <code>client/src/components/AppLayout.tsx</code>, <code>server/routers.ts</code> &amp; <code>drizzle/schema.ts</code>. Status reflects code review of UI↔tRPC↔DB wiring, not runtime availability of API keys.</div>
+</body>
+</html>
