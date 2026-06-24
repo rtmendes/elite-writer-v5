@@ -23,8 +23,20 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { syncArticleToPipeline } from "../lib/supabase-sync";
+import { getPublicationIntel } from "../../shared/publication-intelligence";
 
 const GIVE_API_BASE = "https://give.insightprofit.live";
+
+/** Compact publication intelligence brief for the one-click pipeline prompts. */
+function pubIntelBrief(targetPublication?: string): string {
+  const intel = targetPublication ? getPublicationIntel(targetPublication) : null;
+  if (!intel) return "";
+  const parts: string[] = [];
+  if (intel.targetAudience) parts.push(`Audience: ${intel.targetAudience}`);
+  if (intel.keywordFilter?.length) parts.push(`Preferred themes: ${intel.keywordFilter.join(", ")}`);
+  if (intel.scoringAlgorithm) parts.push(`What ${intel.name} rewards: ${intel.scoringAlgorithm}`);
+  return parts.length ? `\n${intel.name} editorial intelligence:\n${parts.join("\n")}` : "";
+}
 
 // ─── Publication Template Definitions ────────────────────────
 // Maps publication slug → structural template (formatting, section order, tone rules)
@@ -926,6 +938,7 @@ Rules:
       }
 
       const pubTemplate = input.targetPublication ? PUBLICATION_TEMPLATES[input.targetPublication] : null;
+      const pubIntel = pubIntelBrief(input.targetPublication);
 
       steps.push({ step: "context", status: "complete", detail: `Brand: ${brandContext ? "loaded" : "none"}, Products: ${input.productIds?.length || 0}, Template: ${pubTemplate?.name || "none"}` });
 
@@ -946,7 +959,7 @@ Rules:
             { role: "system", content: "Senior research analyst. Return ONLY valid JSON." },
             {
               role: "user",
-              content: `Research for publication-grade article:\n\nTopic: ${input.topic}\n${input.targetPublication ? `Target: ${pubTemplate?.name}` : ""}\n\nReturn JSON:\n{"keyFacts":["..."],"statistics":[{"stat":"...","source":"...","year":"..."}],"expertQuotes":[{"name":"...","title":"...","quote":"..."}],"uniqueAngle":"...","suggestedSources":["..."]}`,
+              content: `Research for publication-grade article:\n\nTopic: ${input.topic}\n${input.targetPublication ? `Target: ${pubTemplate?.name}` : ""}${pubIntel}\n\nReturn JSON:\n{"keyFacts":["..."],"statistics":[{"stat":"...","source":"...","year":"..."}],"expertQuotes":[{"name":"...","title":"...","quote":"..."}],"uniqueAngle":"...","suggestedSources":["..."]}`,
             },
           ],
           response_format: { type: "json_object" },
@@ -964,7 +977,7 @@ Rules:
 
       // ─── Step 3: Draft with full context ────────────────
       const systemPrompt = `You are a senior journalist writing for ${pubTemplate?.name || "a top-tier publication"}.
-${pubTemplate ? `Structure: ${pubTemplate.structure.join(" → ")}\nTone: ${pubTemplate.toneRules}\nFormat: ${pubTemplate.formatNotes}` : ""}
+${pubTemplate ? `Structure: ${pubTemplate.structure.join(" → ")}\nTone: ${pubTemplate.toneRules}\nFormat: ${pubTemplate.formatNotes}` : ""}${pubIntel}
 ${brandContext ? `\n${brandContext}` : ""}
 ${productContext ? `\nProducts to naturally reference:\n${productContext}` : ""}
 No AI clichés. US English. Every sentence earns its place.`;
