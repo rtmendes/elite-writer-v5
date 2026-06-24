@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { trpc } from '@/lib/trpc';
 import { PUBLICATIONS, CATEGORIES, getPublicationTier, type Publication } from '@/lib/publications-data';
+import { getPublicationIntel, type PublicationIntel } from '../../../shared/publication-intelligence';
 
 type ViewMode = 'gallery' | 'list';
 type SortDir = 'asc' | 'desc';
@@ -133,15 +134,25 @@ export default function Publications() {
   // (reader_resonance + editor_alignment) and AI drafting context
   const [intelAvatar, setIntelAvatar] = useState('');
   const [intelEditorPrefs, setIntelEditorPrefs] = useState('');
+  // Canonical editorial intelligence for the selected outlet (audience, editor
+  // likes, keyword filter, news sources, per-publication scoring algorithm).
+  const selectedIntel: PublicationIntel | null = useMemo(
+    () => (selectedPub ? getPublicationIntel(selectedPub.id) || getPublicationIntel(selectedPub.name) : null),
+    [selectedPub],
+  );
   const intelQuery = trpc.publications.list.useQuery(
     { search: selectedPub?.name ?? '', limit: 1 },
     { enabled: !!selectedPub }
   );
   useEffect(() => {
     const row = intelQuery.data?.[0] as { audienceAvatar?: string | null; editorPreferences?: string | null } | undefined;
-    setIntelAvatar(row?.audienceAvatar ?? '');
-    setIntelEditorPrefs(row?.editorPreferences ?? '');
-  }, [intelQuery.data, selectedPub?.id]);
+    // Seed the editable fields from the DB; fall back to the canonical sheet
+    // intelligence so the editor's documented preferences are there by default.
+    const intelEditor = [selectedIntel?.editorLikes, selectedIntel?.editorStyle, selectedIntel?.writingStyle]
+      .filter(Boolean).join(' • ');
+    setIntelAvatar(row?.audienceAvatar ?? selectedIntel?.targetAudience ?? '');
+    setIntelEditorPrefs(row?.editorPreferences ?? intelEditor ?? '');
+  }, [intelQuery.data, selectedPub?.id, selectedIntel]);
   const intelUpsert = trpc.publications.upsert.useMutation();
   const saveIntel = async () => {
     if (!selectedPub) return;
@@ -553,6 +564,37 @@ export default function Publications() {
                 <div>
                   <span className="text-muted-foreground text-xs block mb-1">Notes</span>
                   <p className="text-sm">{selectedPub.notes}</p>
+                </div>
+              )}
+              {selectedIntel && (selectedIntel.scoringAlgorithm || selectedIntel.keywordFilter?.length || selectedIntel.newsSources?.length) && (
+                <div className="rounded-md border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-2">
+                  <span className="text-xs font-semibold text-cyan-400 block">Editorial intelligence — drives scoring, matching &amp; research</span>
+                  {selectedIntel.scoringAlgorithm && (
+                    <div>
+                      <span className="text-muted-foreground text-xs block mb-1">Scoring algorithm</span>
+                      <p className="text-xs leading-relaxed">{selectedIntel.scoringAlgorithm}</p>
+                    </div>
+                  )}
+                  {!!selectedIntel.keywordFilter?.length && (
+                    <div>
+                      <span className="text-muted-foreground text-xs block mb-1">Keyword filter — what this outlet wants</span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedIntel.keywordFilter.slice(0, 16).map((k, i) => (
+                          <Badge key={i} variant="outline" className="text-[10px] border-cyan-500/30 text-cyan-300">{k}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {!!selectedIntel.newsSources?.length && (
+                    <div>
+                      <span className="text-muted-foreground text-xs block mb-1">News sources to mine</span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedIntel.newsSources.map((s, i) => (
+                          <Badge key={i} variant="outline" className="text-[10px]">{s}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="rounded-md border border-purple-500/20 bg-purple-500/5 p-3 space-y-2">

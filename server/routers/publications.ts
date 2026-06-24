@@ -10,7 +10,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { getDb } from "../db";
 import { publications, type InsertPublication } from "../../drizzle/schema";
-import { getPublicationIntel, intelKeywords } from "../../shared/publication-intelligence";
+import { PUBLICATION_INTEL, getPublicationIntel, intelKeywords } from "../../shared/publication-intelligence";
 
 export const publicationsRouter = router({
   // List all publications with optional filters
@@ -126,6 +126,60 @@ export const publicationsRouter = router({
 
       return { success: true };
     }),
+
+  // Import the canonical per-publication editorial intelligence (target audience,
+  // editor likes, keyword filter, news sources, scoring algorithm) into the
+  // publications table. Idempotent: updates by slug, never clobbering manually
+  // entered audience/editor/guidelines; always refreshes structured templateData.
+  importIntel: protectedProcedure.mutation(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database unavailable");
+    let created = 0;
+    let updated = 0;
+    for (const intel of PUBLICATION_INTEL) {
+      const editorPrefs = [intel.editorLikes, intel.editorStyle, intel.writingStyle].filter(Boolean).join(" • ");
+      const topics = intelKeywords(intel);
+      const templateData = {
+        scoringAlgorithm: intel.scoringAlgorithm ?? null,
+        keywordFilter: intel.keywordFilter ?? [],
+        newsSources: intel.newsSources ?? [],
+        businessTopics: intel.businessTopics ?? [],
+        targetAudience: intel.targetAudience ?? null,
+        editorLikes: intel.editorLikes ?? null,
+        editorStyle: intel.editorStyle ?? null,
+        writingStyle: intel.writingStyle ?? null,
+        source: "publications-that-pay-sheet",
+      };
+      const existing = await db.select().from(publications).where(eq(publications.slug, intel.slug)).limit(1);
+      if (existing.length > 0) {
+        const cur = existing[0];
+        const setObj: Record<string, unknown> = { templateData };
+        if (!cur.audienceAvatar && intel.targetAudience) setObj.audienceAvatar = intel.targetAudience;
+        if (!cur.editorPreferences && editorPrefs) setObj.editorPreferences = editorPrefs;
+        if (!cur.guidelines && intel.scoringAlgorithm) setObj.guidelines = intel.scoringAlgorithm;
+        const curTopics = Array.isArray(cur.topics) ? (cur.topics as string[]) : [];
+        if (curTopics.length === 0 && topics.length) setObj.topics = topics;
+        await db.update(publications).set(setObj).where(eq(publications.slug, intel.slug));
+        updated++;
+      } else {
+        await db.insert(publications).values({
+          userId: ctx.user.id,
+          slug: intel.slug,
+          name: intel.name,
+          category: intel.businessTopics?.[0] ?? null,
+          acceptsFreelance: 1,
+          tier: 2,
+          topics,
+          guidelines: intel.scoringAlgorithm ?? null,
+          audienceAvatar: intel.targetAudience ?? null,
+          editorPreferences: editorPrefs || null,
+          templateData,
+        });
+        created++;
+      }
+    }
+    return { success: true, created, updated, total: PUBLICATION_INTEL.length };
+  }),
 
   // Seed publications database with curated list
   seed: protectedProcedure
