@@ -109,6 +109,100 @@ export function resolveModelSlug(model?: string): string {
   return MODEL_ALIASES[m] ?? `anthropic/${m}`;
 }
 
+/**
+ * Direct-Anthropic model resolution.
+ *
+ * The app's public/OpenRouter slugs use DOTS and an `anthropic/` prefix
+ * (e.g. `anthropic/claude-sonnet-4.6`), and routers may pass non-Anthropic
+ * slugs (the free default `openai/gpt-oss-120b:free`) or legacy bare names
+ * (`claude-sonnet-4`). The direct Anthropic REST API only accepts dash-style
+ * ids the account actually serves (e.g. `claude-sonnet-4-6`), so sending a
+ * raw slug 404s with `model: <slug>`. These helpers normalize ANY input to a
+ * valid, account-served id so the Anthropic fallback never errors on the model
+ * name. This does NOT change provider priority — Anthropic stays a fallback.
+ */
+const ANTHROPIC_DEFAULTS = {
+  standard: "claude-sonnet-4-6",
+  cheap: "claude-haiku-4-5",
+  opus: "claude-opus-4-8",
+} as const;
+
+// Cached catalog of model ids the Anthropic account actually serves. Warmed
+// out-of-band (see warmAnthropicModels, called at server startup) so the
+// request/resolve path stays synchronous and never makes an extra API call.
+let _anthropicModelIds: string[] = [];
+let _anthropicModelsAt = 0;
+const ANTHROPIC_MODELS_TTL_MS = 30 * 60_000;
+
+/**
+ * Best-effort refresh of the Anthropic model catalog. Non-blocking and safe to
+ * call repeatedly (TTL-guarded). On any failure it keeps the previous cache and
+ * the resolver falls back to static normalization.
+ */
+export async function warmAnthropicModels(): Promise<void> {
+  if (!ENV.anthropicApiKey) return;
+  if (_anthropicModelIds.length && Date.now() - _anthropicModelsAt < ANTHROPIC_MODELS_TTL_MS) return;
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
+      headers: { "x-api-key": ENV.anthropicApiKey, "anthropic-version": "2023-06-01" },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { data?: Array<{ id?: string }> };
+      const ids = (data.data ?? []).map(m => m.id).filter((id): id is string => !!id);
+      if (ids.length) {
+        _anthropicModelIds = ids;
+        _anthropicModelsAt = Date.now();
+      }
+    }
+  } catch {
+    // Keep prior cache (or none) — resolver uses static mapping as a safe default.
+  }
+}
+
+/** Test/diagnostic hook: seed the cached catalog directly. */
+export function _setAnthropicModelIds(ids: string[]): void {
+  _anthropicModelIds = ids;
+  _anthropicModelsAt = ids.length ? Date.now() : 0;
+}
+
+/** Normalize an app/OpenRouter slug to a base dash-style Anthropic id. */
+function normalizeAnthropicSlug(model?: string): string {
+  let m = (model ?? "").trim();
+  if (m.startsWith("anthropic/")) m = m.slice("anthropic/".length);
+  // Non-Anthropic (or empty / free default) request falling back to Claude.
+  if (!m.toLowerCase().startsWith("claude")) return ANTHROPIC_DEFAULTS.standard;
+  m = m.replace(/\./g, "-"); // claude-sonnet-4.6 -> claude-sonnet-4-6
+  // Family / legacy bare names with no concrete version -> current ids.
+  if (/^claude-sonnet(-4)?$/.test(m)) return ANTHROPIC_DEFAULTS.standard;
+  if (/^claude-opus(-4)?$/.test(m)) return ANTHROPIC_DEFAULTS.opus;
+  if (/^claude-haiku(-4)?$/.test(m)) return ANTHROPIC_DEFAULTS.cheap;
+  return m;
+}
+
+/**
+ * Resolve any model slug to a valid direct-Anthropic model id (synchronous, no
+ * network). When the live catalog is cached (warmed at startup) the normalized
+ * id is verified against it and, if absent, repaired to the closest match in
+ * the same family (e.g. `claude-haiku-4-5` -> `claude-haiku-4-5-20251001`),
+ * else a sonnet, else the first served model. With no catalog it returns the
+ * static normalization, which is correct for the common sonnet/opus defaults.
+ */
+export function resolveAnthropicModel(model?: string): string {
+  const base = normalizeAnthropicSlug(model);
+  const available = _anthropicModelIds;
+  if (available.length === 0) return base;
+  if (available.includes(base)) return base;
+  const family = base.split("-").slice(0, 3).join("-"); // e.g. claude-haiku-4
+  const generic = base.split("-").slice(0, 2).join("-"); // e.g. claude-haiku
+  return (
+    available.find(id => id.startsWith(family)) ??
+    available.find(id => id.startsWith(generic)) ??
+    available.find(id => id.includes("sonnet")) ??
+    available[0] ??
+    base
+  );
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // Budget gate (ported from elite-writer-app gateway): refuses the call when
   // AI_DAILY_BUDGET_USD is exhausted; past the soft threshold (80% by default)
@@ -159,18 +253,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     }
   }
 
-  // Step 3: Anthropic direct (last resort for paid APIs — balance may be low)
+  // Step 3: Anthropic direct (last resort for paid APIs — balance may be low).
+  // invokeAnthropic normalizes the slug to a valid, account-served model id.
   if (ENV.anthropicApiKey) {
     try {
-      let anthropicModel = model;
-      if (model.startsWith("anthropic/")) {
-        anthropicModel = model.replace("anthropic/", "");
-      } else if (model.includes("/")) {
-        // Non-Anthropic model (incl. the free default) but OpenRouter/OpenAI failed — use default Claude
-        anthropicModel = "claude-sonnet-4";
-      }
-      const anRes = await invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model: anthropicModel });
-      recordUsage(anRes.model || anthropicModel, anRes.usage);
+      const anRes = await invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model });
+      recordUsage(anRes.model || model, anRes.usage);
       return anRes;
     } catch (err: any) {
       console.warn(`[LLM] Anthropic failed (${err?.message?.slice(0, 100)}), falling back...`);
@@ -189,6 +277,8 @@ async function invokeAnthropic(
   messages: Message[],
   opts: { maxTokens: number; wantsJson: boolean; temperature: number; model: string }
 ): Promise<InvokeResult> {
+  // Map any app/OpenRouter slug to a valid direct-Anthropic model id.
+  const model = resolveAnthropicModel(opts.model);
   // Separate system message from conversation messages
   let systemPrompt = "";
   const conversationMessages: Array<{ role: string; content: string }> = [];
@@ -213,7 +303,7 @@ async function invokeAnthropic(
   }
 
   const payload: Record<string, unknown> = {
-    model: opts.model,
+    model,
     max_tokens: opts.maxTokens,
     temperature: opts.temperature,
     messages: conversationMessages,
@@ -246,7 +336,7 @@ async function invokeAnthropic(
   return {
     id: data.id || "msg_" + Date.now(),
     created: Math.floor(Date.now() / 1000),
-    model: data.model || opts.model,
+    model: data.model || model,
     choices: [{
       index: 0,
       message: { role: "assistant", content: contentText },
@@ -445,9 +535,9 @@ export async function* streamLLM(params: InvokeParams): AsyncGenerator<string> {
     }
   }
 
-  // Anthropic streaming fallback
+  // Anthropic streaming fallback — normalize to a valid account-served id.
   const anthropicPayload: Record<string, unknown> = {
-    model: params.model ?? "claude-sonnet-4",
+    model: resolveAnthropicModel(params.model),
     max_tokens: maxTokens,
     temperature,
     messages: conversationMessages,

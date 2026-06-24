@@ -9,7 +9,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { streamLLM } from "./llm";
+import { streamLLM, warmAnthropicModels } from "./llm";
 import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -176,6 +176,9 @@ async function startServer() {
 
   server.listen(port, "0.0.0.0", () => {
     console.log(`🚀 Elite Writer V5 running on http://0.0.0.0:${port}/`);
+    // Warm the Anthropic model catalog so the direct-Anthropic fallback always
+    // resolves a valid, account-served model id (non-blocking, best-effort).
+    void warmAnthropicModels();
     initProactiveAgents();
     console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
     console.log(`   Database: ${process.env.DATABASE_URL ? "configured" : "NOT configured"}`);

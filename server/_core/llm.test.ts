@@ -265,3 +265,39 @@ describe('resolveModelSlug', () => {
     expect(resolveModelSlug(undefined)).toBe('openai/gpt-oss-120b:free');
   });
 });
+
+describe('resolveAnthropicModel', () => {
+  afterEach(async () => {
+    // Reset the cached catalog so other suites see the default (empty) state.
+    const { _setAnthropicModelIds } = await import('./llm');
+    _setAnthropicModelIds([]);
+  });
+
+  it('normalizes dotted/prefixed slugs to dash-style ids (no catalog)', async () => {
+    const { resolveAnthropicModel, _setAnthropicModelIds } = await import('./llm');
+    _setAnthropicModelIds([]);
+    expect(resolveAnthropicModel('anthropic/claude-sonnet-4.6')).toBe('claude-sonnet-4-6');
+    expect(resolveAnthropicModel('anthropic/claude-opus-4.8')).toBe('claude-opus-4-8');
+    expect(resolveAnthropicModel('anthropic/claude-haiku-4.5')).toBe('claude-haiku-4-5');
+  });
+
+  it('maps legacy bare names and non-Anthropic slugs to a valid default', async () => {
+    const { resolveAnthropicModel, _setAnthropicModelIds } = await import('./llm');
+    _setAnthropicModelIds([]);
+    // The old buggy default + the free tier slug must not reach Anthropic verbatim.
+    expect(resolveAnthropicModel('claude-sonnet-4')).toBe('claude-sonnet-4-6');
+    expect(resolveAnthropicModel('openai/gpt-oss-120b:free')).toBe('claude-sonnet-4-6');
+    expect(resolveAnthropicModel(undefined)).toBe('claude-sonnet-4-6');
+  });
+
+  it('repairs to the closest account-served id when the catalog is known', async () => {
+    const { resolveAnthropicModel, _setAnthropicModelIds } = await import('./llm');
+    _setAnthropicModelIds(['claude-sonnet-4-6', 'claude-opus-4-8', 'claude-haiku-4-5-20251001']);
+    // Exact undated id served -> kept.
+    expect(resolveAnthropicModel('anthropic/claude-sonnet-4.6')).toBe('claude-sonnet-4-6');
+    // Undated haiku not served -> repaired to the dated id in the same family.
+    expect(resolveAnthropicModel('anthropic/claude-haiku-4.5')).toBe('claude-haiku-4-5-20251001');
+    // Unknown family -> falls back to a served sonnet.
+    expect(resolveAnthropicModel('anthropic/claude-mystery-9')).toBe('claude-sonnet-4-6');
+  });
+});
