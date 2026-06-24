@@ -18,6 +18,7 @@ import { uploadDataUrl } from "../_core/storage";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { AGENT_PERSONAS } from "./agents";
+import { PUBLICATION_INTEL, getPublicationIntel, intelKeywords } from "../../shared/publication-intelligence";
 import { estimateCost, recordCentralCost } from "../_core/proactiveAgents";
 
 const SYNC_TABLES = { pages: "wsPages", databases: "wsDatabases", rows: "wsRows" } as const;
@@ -173,28 +174,44 @@ async function fetchPitchHistory(): Promise<string> {
   }
 }
 
+// Append each outlet's editorial intelligence (preferred keywords + audience)
+// so the matching/drafting agent keys on what the outlet actually wants.
+function intelSuffix(name: unknown): string {
+  const intel = getPublicationIntel(typeof name === "string" ? name : "");
+  if (!intel) return "";
+  const kw = intelKeywords(intel).slice(0, 10).join(", ");
+  const aud = intel.targetAudience ? ` | audience: ${intel.targetAudience}` : "";
+  return `${kw ? ` | prefers: ${kw}` : ""}${aud}`;
+}
+
 async function fetchPublicationsList(): Promise<string> {
   try {
     const db = await getDb();
-    if (!db) return "";
-    const rows = await db.execute(sql.raw(
-      "SELECT name, category, payRange, tier, topics FROM publications WHERE acceptsFreelance = 1 ORDER BY tier ASC LIMIT 250",
-    ));
-    const list = (rows as unknown as [Array<Record<string, unknown>>])[0] ?? [];
-    return list
-      .map((p) => {
-        let topics = "";
-        try {
-          const t = typeof p.topics === "string" ? JSON.parse(p.topics) : p.topics;
-          if (Array.isArray(t)) topics = t.slice(0, 5).join(", ");
-        } catch { /* topics is optional context */ }
-        return `${p.name ?? ""} | ${p.category ?? ""} | ${p.payRange ?? ""} | tier ${p.tier ?? "?"} | ${topics}`;
-      })
-      .join("\n");
+    if (db) {
+      const rows = await db.execute(sql.raw(
+        "SELECT name, category, payRange, tier, topics FROM publications WHERE acceptsFreelance = 1 ORDER BY tier ASC LIMIT 250",
+      ));
+      const list = (rows as unknown as [Array<Record<string, unknown>>])[0] ?? [];
+      if (list.length) {
+        return list
+          .map((p) => {
+            let topics = "";
+            try {
+              const t = typeof p.topics === "string" ? JSON.parse(p.topics) : p.topics;
+              if (Array.isArray(t)) topics = t.slice(0, 5).join(", ");
+            } catch { /* topics is optional context */ }
+            return `${p.name ?? ""} | ${p.category ?? ""} | ${p.payRange ?? ""} | tier ${p.tier ?? "?"} | ${topics}${intelSuffix(p.name)}`;
+          })
+          .join("\n");
+      }
+    }
   } catch (err) {
     console.warn("[workspace] publications query failed:", err instanceof Error ? err.message : err);
-    return "";
   }
+  // Fallback: the canonical editorial-intelligence catalog (works without a DB).
+  return PUBLICATION_INTEL
+    .map(p => `${p.name} | ${p.businessTopics?.slice(0, 3).join(", ") ?? ""} |  | tier ? |  ${intelSuffix(p.name)}`)
+    .join("\n");
 }
 
 const syncRecord = z.object({
