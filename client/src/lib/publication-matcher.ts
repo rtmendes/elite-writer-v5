@@ -5,6 +5,7 @@
 import { PUBLICATIONS, type Publication, getPublicationTier, matchPublications } from './publications-data';
 import { getPublicationSOP, type PublicationSOP } from './publication-sops';
 import { CURATED_FEEDS, type CuratedFeed } from './curated-feeds';
+import { getPublicationIntel, intelKeywords } from '../../../shared/publication-intelligence';
 
 export interface PublicationMatch {
   publication: Publication;
@@ -152,14 +153,24 @@ export function matchArticleToPublications(
     }
   }
   
+  const fullLower = fullText.toLowerCase();
   return PUBLICATIONS.map(pub => {
     let matchScore = 0;
     const pubTopics = (pub.topics + ' ' + pub.category + ' ' + pub.name).toLowerCase();
     const topicHits = keywords.filter(w => pubTopics.includes(w));
     const sop = getPublicationSOP(pub.id);
-    
+
+    // Canonical editorial intelligence: match the article against the
+    // publication's own keyword filter + business topics (the strongest signal).
+    const intel = getPublicationIntel(pub.id) || getPublicationIntel(pub.name);
+    const intelKw = intel ? intelKeywords(intel) : [];
+    const kwHits = intelKw.filter(k => fullLower.includes(k));
+
     // 1. Topic keyword alignment (0-35 pts)
     matchScore += Math.min(35, topicHits.length * 8);
+
+    // 1b. Publication keyword-filter alignment (0-25 pts) — what the outlet wants
+    matchScore += Math.min(25, kwHits.length * 7);
     
     // 2. Category match (0-20 pts)
     if (pub.category.toLowerCase() === category.toLowerCase()) {
@@ -190,12 +201,16 @@ export function matchArticleToPublications(
     else if ((pub.pay_max ?? 0) >= 1500) matchScore += 6;
     else if ((pub.pay_max ?? 0) >= 500) matchScore += 3;
     
+    const reasons = generateWhyItFits(pub, topicHits, category, newsPeg, sop);
+    const whyItFits = kwHits.length
+      ? `Matches ${pub.name}'s preferred topics (${kwHits.slice(0, 3).join(', ')}) · ${reasons}`
+      : reasons;
     return {
       publication: pub,
       tier: getPublicationTier(pub),
       matchScore: Math.min(100, matchScore),
-      whyItFits: generateWhyItFits(pub, topicHits, category, newsPeg, sop),
-      topicAlignment: topicHits.slice(0, 5),
+      whyItFits,
+      topicAlignment: [...new Set([...kwHits, ...topicHits])].slice(0, 5),
       suggestedAngle: suggestAngle(title, pub, sop),
       payRange: pub.pay_structure || 'Unlisted',
       acceptanceRate: pub.acceptance_rate ? `${pub.acceptance_rate}%` : 'N/A',

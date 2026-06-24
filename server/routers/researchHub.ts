@@ -33,8 +33,20 @@ import {
   type InsertResearchReference,
 } from "../../drizzle/schema";
 import { academicSearch } from "../lib/academic-search";
+import { getPublicationIntel, type PublicationIntel } from "../../shared/publication-intelligence";
 
 const KB_CATEGORY = "Research";
+
+/** Build a publication-steering brief from canonical editorial intelligence. */
+function publicationResearchBrief(intel: PublicationIntel | null): string {
+  if (!intel) return "";
+  const parts: string[] = [`TARGET PUBLICATION: ${intel.name}`];
+  if (intel.targetAudience) parts.push(`Audience to serve: ${intel.targetAudience}`);
+  if (intel.keywordFilter?.length) parts.push(`Angle the research toward these themes: ${intel.keywordFilter.join(", ")}`);
+  if (intel.newsSources?.length) parts.push(`Prioritize evidence from sources like: ${intel.newsSources.join(", ")}`);
+  if (intel.scoringAlgorithm) parts.push(`What this outlet rewards: ${intel.scoringAlgorithm}`);
+  return `\n\n${parts.join("\n")}`;
+}
 
 // A normalized citation candidate from any gather source.
 type Source = {
@@ -270,11 +282,17 @@ export const researchHubRouter = router({
         depth: z.enum(["standard", "deep"]).default("standard"),
         scope: z.enum(["all", "scholarly", "web", "kb", "video"]).default("all"),
         saveToKb: z.boolean().default(true),
+        targetPublication: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const sop = await skillBlockFor("deepresearch");
       const wantQuestions = input.depth === "deep" ? 6 : 4;
+      // Publication-aware steering: angle sub-questions + synthesis toward the
+      // target outlet's audience, preferred themes and source types.
+      const pubBrief = publicationResearchBrief(
+        input.targetPublication ? getPublicationIntel(input.targetPublication) : null,
+      );
 
       // 1. Plan sub-questions (cheap free call, JSON out).
       const plan = await invokeLLM({
@@ -286,7 +304,7 @@ export const researchHubRouter = router({
           { role: "system", content: `You decompose a research topic into focused sub-questions.${sop}` },
           {
             role: "user",
-            content: `Topic: "${input.topic}"\n\nReturn JSON: {"subquestions": string[]} with exactly ${wantQuestions} specific, non-overlapping sub-questions that together fully cover the topic.`,
+            content: `Topic: "${input.topic}"${pubBrief}\n\nReturn JSON: {"subquestions": string[]} with exactly ${wantQuestions} specific, non-overlapping sub-questions that together fully cover the topic${pubBrief ? " for the target publication's audience and preferred angles" : ""}.`,
           },
         ],
       });
@@ -332,7 +350,7 @@ export const researchHubRouter = router({
             {
               role: "user",
               content:
-                `Topic: ${input.topic}\n\nSub-questions to address:\n${subquestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\n` +
+                `Topic: ${input.topic}${pubBrief}\n\nSub-questions to address:\n${subquestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\n` +
                 `Numbered sources (cite inline as [n]):\n\n${numberSources(sources)}\n\n` +
                 `Write a markdown report: a "## Executive Summary" (3–5 sentences), one "## " section per sub-question with cited analysis, a "## Open Questions" section, and a final "## References" numbered list matching the citation numbers (title — source — url).`,
             },

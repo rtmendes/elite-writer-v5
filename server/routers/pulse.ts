@@ -21,6 +21,7 @@ import {
   pulseStories, articles, ideas, brands, publications,
   type InsertPulseStory,
 } from "../../drizzle/schema";
+import { getPublicationIntel, intelKeywords } from "../../shared/publication-intelligence";
 
 // ─── Urgency mapping ─────────────────────────────────────
 function mapUrgency(emoji: string): "breaking" | "this_week" | "evergreen" {
@@ -332,7 +333,11 @@ AVAILABLE BRANDS:
 ${userBrands.map(b => `- ${b.name} (${b.niche || "general"}): ${b.description || ""}`).join("\n")}
 
 TOP PUBLICATIONS (sample):
-${pubs.slice(0, 30).map(p => `- ${p.name} (${p.category || "general"}, pay: ${p.payRange || "unknown"})`).join("\n")}
+${pubs.slice(0, 30).map(p => {
+  const intel = getPublicationIntel(p.name);
+  const kw = intel ? intelKeywords(intel).slice(0, 8).join(", ") : "";
+  return `- ${p.name} (${p.category || "general"}, pay: ${p.payRange || "unknown"})${kw ? ` | prefers: ${kw}` : ""}`;
+}).join("\n")}
 
 Return JSON:
 {

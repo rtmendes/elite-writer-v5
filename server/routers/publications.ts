@@ -10,6 +10,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { getDb } from "../db";
 import { publications, type InsertPublication } from "../../drizzle/schema";
+import { getPublicationIntel, intelKeywords } from "../../shared/publication-intelligence";
 
 export const publicationsRouter = router({
   // List all publications with optional filters
@@ -257,9 +258,16 @@ Return JSON:
         return { matches: [], message: "No publications in database. Run seed first." };
       }
 
-      const pubList = allPubs.map(p =>
-        `- ${p.name} (${p.category}, Tier ${p.tier}, ${p.payRange || "pay unknown"}) Topics: ${(p.topics as string[] || []).join(", ")}`
-      ).join("\n");
+      const pubList = allPubs.map(p => {
+        const intel = getPublicationIntel(p.name);
+        const topics = (p.topics as string[] || []).join(", ");
+        // Augment each candidate with its editorial intelligence (preferred
+        // keywords + audience) so matching keys on what the outlet actually
+        // wants, not just name/category.
+        const kw = intel ? intelKeywords(intel).slice(0, 12).join(", ") : "";
+        const aud = intel?.targetAudience ? ` | Audience: ${intel.targetAudience}` : "";
+        return `- ${p.name} (${p.category}, Tier ${p.tier}, ${p.payRange || "pay unknown"}) Topics: ${topics}${kw ? ` | Prefers: ${kw}` : ""}${aud}`;
+      }).join("\n");
 
       const lengthLine = input.wordCount
         ? `This draft is ~${input.wordCount} words; use it with each publication's pay range to estimate concrete earnings.`

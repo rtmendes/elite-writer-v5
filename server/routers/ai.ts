@@ -6,6 +6,7 @@ import { skillBlockFor } from "../_core/skills";
 import { getDb } from "../db";
 import { publications, aiUsage } from "../../drizzle/schema";
 import { sql } from "drizzle-orm";
+import { getPublicationIntel } from "../../shared/publication-intelligence";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GAP #2 + #3: Publication SOP data for server-side AI scoring & drafting
@@ -129,8 +130,13 @@ export const aiRouter = router({
       })
     )
     .mutation(async ({ input }) => {
+      // Canonical per-publication editorial intelligence (audience, what the
+      // editor likes, keyword filter, and the publication's own scoring
+      // algorithm) sourced from the Publications That Pay sheet.
+      const intel = input.targetPublication ? getPublicationIntel(input.targetPublication) : null;
+
       // Reader avatar + editor preferences: explicit input wins, then the
-      // publications table, then the static SOP audience entry, then inference.
+      // publications table, then the canonical intel, then the static SOP, then inference.
       let audienceAvatar = input.audienceAvatar || "";
       let editorPreferences = input.editorPreferences || "";
       if (input.targetPublication && (!audienceAvatar || !editorPreferences)) {
@@ -150,11 +156,22 @@ export const aiRouter = router({
         } catch {
           /* publications lookup is best-effort */
         }
+        if (!audienceAvatar && intel?.targetAudience) audienceAvatar = intel.targetAudience;
+        if (!editorPreferences) {
+          const ep = [intel?.editorLikes, intel?.editorStyle, intel?.writingStyle].filter(Boolean).join(" • ");
+          if (ep) editorPreferences = ep;
+        }
         if (!audienceAvatar) {
           const sop = PUBLICATION_INSTRUCTIONS[input.targetPublication.toLowerCase()];
           if (sop?.audience) audienceAvatar = sop.audience;
         }
       }
+      // The publication's own scoring algorithm becomes the decisive rubric for
+      // editor_alignment / publication_fit — this is the per-publication
+      // "Scoring Algorithm" intelligence from the sheet.
+      const scoringAlgoBlock = intel?.scoringAlgorithm
+        ? `\n\nPUBLICATION SCORING ALGORITHM for ${intel.name} (apply as the decisive rubric for editor_alignment and publication_fit — reward what it rewards, penalize what it excludes):\n${intel.scoringAlgorithm}${intel.keywordFilter?.length ? `\nPreferred topics/keywords: ${intel.keywordFilter.join(", ")}` : ""}`
+        : "";
       const readerBlock = audienceAvatar
         ? `\n\nTHE READER (avatar — judge reader_resonance against THIS person):\n${audienceAvatar}`
         : "\n\nTHE READER: no avatar provided — infer the publication's typical reader and judge reader_resonance against that profile.";
@@ -165,7 +182,7 @@ export const aiRouter = router({
         messages: [
           {
             role: "system",
-            content: `You are a Bloomberg-caliber editorial scoring engine. Score articles on 13 dimensions used by top-tier publications. Apply publication-specific standards when a target publication is specified. Return ONLY valid JSON with no markdown formatting.${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ''}${readerBlock}${editorBlock}` + (await skillBlockFor("scorer")),
+            content: `You are a Bloomberg-caliber editorial scoring engine. Score articles on 13 dimensions used by top-tier publications. Apply publication-specific standards when a target publication is specified. Return ONLY valid JSON with no markdown formatting.${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ''}${scoringAlgoBlock}${readerBlock}${editorBlock}` + (await skillBlockFor("scorer")),
           },
           {
             role: "user",
