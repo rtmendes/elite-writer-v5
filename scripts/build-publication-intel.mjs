@@ -143,9 +143,9 @@ export function getPublicationIntel(nameOrSlug?: string | null): PublicationInte
   return partial ?? null;
 }
 
-/** Flattened keyword set (keyword filter + business topics) for topic matching. */
+/** Flattened, de-duplicated keyword set (keyword filter + business topics). */
 export function intelKeywords(intel: PublicationIntel): string[] {
-  return [...(intel.keywordFilter ?? []), ...(intel.businessTopics ?? [])];
+  return [...new Set([...(intel.keywordFilter ?? []), ...(intel.businessTopics ?? [])])];
 }
 
 export const PUBLICATION_INTEL_COUNT = PUBLICATION_INTEL.length;
