@@ -28,6 +28,7 @@ export const publicationsRouter = router({
       const conditions: any[] = [];
       if (input.category) conditions.push(eq(publications.category, input.category));
       if (input.tier) conditions.push(eq(publications.tier, input.tier));
+      if (input.search) conditions.push(like(publications.name, `%${input.search}%`));
 
       let query = db.select().from(publications);
       if (conditions.length > 0) {
