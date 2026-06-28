@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import { initProactiveAgents } from "./proactiveAgents";
+import { initAgentRegistry } from "../lib/agent-registry";
 import { registerOpportunityRoutes } from "./opportunitiesApi";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -177,8 +178,13 @@ async function startServer() {
   server.listen(port, "0.0.0.0", () => {
     console.log(`🚀 Elite Writer V5 running on http://0.0.0.0:${port}/`);
     initProactiveAgents();
+    initAgentRegistry().then((r) => {
+      if (r.configured) console.log(`   Agent registry: ${r.gbUpserted} gb.agents + ${r.aiAgentsUpserted} ai_agents synced`);
+      else if (r.error) console.log(`   Agent registry: ${r.error}`);
+    }).catch(() => {});
     console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
     console.log(`   Database: ${process.env.DATABASE_URL ? "configured" : "NOT configured"}`);
+    console.log(`   Redis queue: ${process.env.REDIS_URL ? "configured (BullMQ)" : "optional — setInterval fallback"}`);
     console.log(`   Anthropic: ${process.env.ANTHROPIC_API_KEY ? "configured" : "NOT configured"}`);
   });
 }
