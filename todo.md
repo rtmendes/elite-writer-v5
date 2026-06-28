@@ -14,5 +14,5 @@
 - [x] Write vitest tests — 13 tests passing (AI router: 3, auth: 1, data router: 9)
 
 ## Requires User Action
-- [ ] End-to-end persistence test (create → reload → verify data survives) — requires user to log in and test the authenticated flow
+- [x] End-to-end persistence test (create → reload → verify) — `server/pipeline.persistence.test.ts`
 - [ ] Teable integration — deferred per user decision, can be added later as a sync layer
