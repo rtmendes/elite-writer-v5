@@ -152,6 +152,10 @@ async function startServer() {
     }
   });
 
+  // Vercel webhook → auto-wire new projects to Infisical
+  const { default: webhooksRouter } = await import("../routers/webhooks");
+  app.use("/api/webhooks", webhooksRouter);
+
   // tRPC API
   app.use(
     "/api/trpc",
