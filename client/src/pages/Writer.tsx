@@ -44,6 +44,7 @@ import {
 import { useAuth } from '@/_core/hooks/useAuth';
 import { useRealtimeDoc } from '@/hooks/useRealtimeDoc';
 import { cn } from '@/lib/utils';
+import { OfferPageLinker } from '@/components/writer/OfferPageLinker';
 
 // ─── Research Panel (Sidebar) ───────────────────────────────
 function ResearchPanel({ title, onInsertContent }: {
@@ -1272,32 +1273,17 @@ ${editorHtml}
             />
           </TabsContent>
 
-          {/* PageForge sub-tab — alternate publishing surface */}
-          <TabsContent value="pageforge" className="p-4 space-y-2 mt-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-primary" />
-                <span className="text-xs font-medium">PageForge</span>
-              </div>
-              <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1" asChild>
-                <a href="https://pageforge.vercel.app/?embed=1" target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-3 h-3" /> Open
-                </a>
-              </Button>
+          {/* Offer Page — shareable sales page for saved products */}
+          <TabsContent value="pageforge" className="p-4 space-y-3 mt-0">
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-primary" />
+              <span className="text-xs font-medium">Offer Page</span>
             </div>
             <p className="text-[10px] text-muted-foreground">
-              Build and publish a standalone page for this article. If the embed below is blank, your draft may
-              still be opened in a new tab with the button above.
+              Each saved product gets a public shareable sales page. Generate a product on the Products tab first,
+              then copy the link below to share with buyers.
             </p>
-            <div className="rounded-md border border-border overflow-hidden bg-muted/20" style={{ height: 'calc(100vh - 220px)', minHeight: 320 }}>
-              <iframe
-                src="https://pageforge.vercel.app/?embed=1"
-                title="PageForge"
-                className="w-full h-full"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                loading="lazy"
-              />
-            </div>
+            <OfferPageLinker articleId={dbArticleId} />
           </TabsContent>
         </Tabs>
       </TabsContent>

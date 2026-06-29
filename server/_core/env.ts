@@ -50,6 +50,9 @@ export const ENV = {
   adminPasswordHash: process.env.ADMIN_PASSWORD_HASH ?? "",
   ownerBypassToken: process.env.OWNER_BYPASS_TOKEN ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
+  stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   isProduction: process.env.NODE_ENV === "production",
   // Affine (optional)
   affineWorkspaceUrl: process.env.AFFINE_WORKSPACE_URL ?? "",

@@ -38,6 +38,8 @@ import TaskCenter from "./pages/TaskCenter";
 import KnowledgeHub from "./pages/KnowledgeHub";
 import PlanningBoard from "./pages/PlanningBoard";
 import NotFound from "@/pages/NotFound";
+import OfferPage from "./pages/OfferPage";
+
 function Router() {
   // Page-scoped error boundary, keyed by route: one page's render crash shows
   // an inline error with the nav still alive, and resets on navigation —
@@ -46,6 +48,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      {/* Public offer page — no auth wrapper */}
+      <Route path="/offer/:id" component={OfferPage} />
       <Route>
         <AppLayout>
           <ErrorBoundary key={location}>

@@ -35,7 +35,62 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  
+
+  // Stripe webhook MUST receive raw body for signature verification.
+  // Register BEFORE express.json() so it gets the raw Buffer.
+  app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), async (req, res) => {
+    const { ENV: e } = await import("./env");
+    if (!e.stripeSecretKey) { res.status(503).json({ error: "Stripe not configured" }); return; }
+
+    let event: any;
+    try {
+      const Stripe = require("stripe");
+      const stripe = new Stripe(e.stripeSecretKey, { apiVersion: "2024-12-18.acacia" });
+      const sig = req.headers["stripe-signature"];
+      event = e.stripeWebhookSecret
+        ? stripe.webhooks.constructEvent(req.body, sig, e.stripeWebhookSecret)
+        : JSON.parse(req.body.toString());
+    } catch (err: any) {
+      console.error("[Stripe webhook] signature error:", err.message);
+      res.status(400).json({ error: err.message });
+      return;
+    }
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const productId = session.metadata?.productId;
+      const productName = session.metadata?.productName ?? "Unknown product";
+      const amountTotal = session.amount_total; // cents
+      if (productId && amountTotal) {
+        try {
+          const { getDb } = await import("../db");
+          const { earnings, products } = await import("../../drizzle/schema");
+          const { eq } = await import("drizzle-orm");
+          const db = await getDb();
+          if (db) {
+            const [product] = await db.select({ userId: products.userId })
+              .from(products).where(eq(products.id, Number(productId))).limit(1);
+            if (product) {
+              await db.insert(earnings).values({
+                userId: product.userId,
+                type: "product",
+                source: `stripe:${session.id}`,
+                amount: String((amountTotal / 100).toFixed(2)),
+                description: `Stripe sale — ${productName}`,
+                date: new Date(),
+              });
+              console.log(`[Stripe] Sale recorded: $${(amountTotal / 100).toFixed(2)} for product ${productId}`);
+            }
+          }
+        } catch (dbErr: any) {
+          console.error("[Stripe webhook] DB insert error:", dbErr.message);
+        }
+      }
+    }
+
+    res.json({ received: true });
+  });
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -66,6 +121,7 @@ async function startServer() {
         newsapi: Boolean(process.env.NEWSAPI_KEY || process.env.GNEWS_KEY),
         slack: Boolean(process.env.SLACK_WEBHOOK_URL),
         exa: Boolean(process.env.EXA_API_KEY),
+        stripe: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY),
         supabaseRealtime: Boolean(process.env.VITE_SUPABASE_URL && process.env.VITE_SUPABASE_ANON_KEY),
         imageGen: Boolean(
           process.env.OPENAI_API_KEY ||

@@ -444,4 +444,16 @@ Return JSON:
 
       return { success: true, sequence, usage: result.usage };
     }),
+
+  listByArticle: protectedProcedure
+    .input(z.object({ articleId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db
+        .select({ id: products.id, name: products.name, type: products.type, price: products.price, status: products.status })
+        .from(products)
+        .where(and(eq(products.userId, ctx.user.id), eq(products.articleId, input.articleId)))
+        .orderBy(desc(products.updatedAt));
+    }),
 });
