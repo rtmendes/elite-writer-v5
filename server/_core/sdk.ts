@@ -69,6 +69,23 @@ class SDKServer {
     return { token, user };
   }
 
+  /** Issue a session for the admin email without a password check (owner bypass). */
+  async issueBypassSession(email: string): Promise<{ token: string; user: User }> {
+    const openId = "admin_" + crypto.createHash("md5").update(email).digest("hex").slice(0, 16);
+    await db.upsertUser({
+      openId,
+      name: email.split("@")[0],
+      email,
+      loginMethod: "password",
+      role: "admin",
+      lastSignedIn: new Date(),
+    });
+    const user = await db.getUserByOpenId(openId);
+    if (!user) throw ForbiddenError("User creation failed");
+    const token = await this.createSessionToken(openId, { name: user.name || email });
+    return { token, user };
+  }
+
   async createSessionToken(
     openId: string,
     options: { expiresInMs?: number; name?: string } = {}

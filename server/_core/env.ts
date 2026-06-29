@@ -48,6 +48,7 @@ export const ENV = {
   appUrl: process.env.APP_URL ?? "https://elitewriter.insightprofit.live",
   adminEmail: process.env.ADMIN_EMAIL ?? "",
   adminPasswordHash: process.env.ADMIN_PASSWORD_HASH ?? "",
+  ownerBypassToken: process.env.OWNER_BYPASS_TOKEN ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
   // Affine (optional)

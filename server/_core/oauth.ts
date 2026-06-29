@@ -55,6 +55,26 @@ export function registerOAuthRoutes(app: Express) {
     res.json({ hash: sdk.generatePasswordHash(password) });
   });
 
+  // GET /api/auth/bypass?token=… — Owner one-click login (token from OWNER_BYPASS_TOKEN)
+  app.get("/api/auth/bypass", async (req: Request, res: Response) => {
+    const provided = String(req.query.token ?? "");
+    const expected = ENV.ownerBypassToken;
+
+    if (!expected || !provided || provided !== expected) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    try {
+      const { token } = await sdk.issueBypassSession(ENV.adminEmail);
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      res.redirect(302, "/");
+    } catch (err: any) {
+      res.status(500).json({ error: "Bypass failed" });
+    }
+  });
+
   // Legacy: Keep /api/oauth/callback for compatibility, redirect to login
   app.get("/api/oauth/callback", (_req: Request, res: Response) => {
     res.redirect(302, "/login");
