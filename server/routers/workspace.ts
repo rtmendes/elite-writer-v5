@@ -55,22 +55,22 @@ async function ensureTables() {
 const TASKS = ["score_idea", "research_brief", "match_publications", "create_offer", "humanize", "tighten", "expand", "headlines", "continue", "proofread"] as const;
 type AgentTask = (typeof TASKS)[number];
 
-// Cheapest capable model per task (OpenRouter slugs; invokeLLM routes them).
-// House policy: ALL tasks ride FREE models — quality comes from the expert
-// SOPs ("Agent Skills & SOPs" database) injected into every system prompt.
-// Long-form prose rides freeBig (550B, 1M ctx); invokeLLM's free-fallback
-// ladder degrades to haiku cents only if the whole free pool is busy.
+// Model assignment per task tier:
+//   fast     = Gemini 2.5 Flash (paid, ~2s TTFT) — drafting, research, humanize, expand, continue
+//   standard = Claude Sonnet 4.6 — final publish-grade proofread pass
+//   cheap    = Claude Haiku — scoring, headlines (cheap structured output)
+// input.model overrides all defaults when set from Settings → Models panel.
 const TASK_MODELS: Record<AgentTask, { model: string; maxTokens: number; persona?: keyof typeof AGENT_PERSONAS }> = {
-  score_idea: { model: TIER.free, maxTokens: 2000, persona: "scorer" },
-  match_publications: { model: TIER.free, maxTokens: 3000, persona: "analyst" },
-  research_brief: { model: TIER.freeBig, maxTokens: 8000, persona: "deepresearch" },
-  create_offer: { model: TIER.freeBig, maxTokens: 8000, persona: "editor" },
-  humanize: { model: TIER.freeBig, maxTokens: 32000, persona: "rewriter" },
-  tighten: { model: TIER.freeBig, maxTokens: 32000, persona: "editor" },
-  expand: { model: TIER.freeBig, maxTokens: 32000, persona: "drafter" },
-  headlines: { model: TIER.free, maxTokens: 4000, persona: "outliner" },
-  continue: { model: TIER.freeBig, maxTokens: 32000, persona: "continuator" },
-  proofread: { model: TIER.free, maxTokens: 6000, persona: "proofreader" },
+  score_idea:         { model: TIER.cheap,    maxTokens: 2000,  persona: "scorer" },
+  match_publications: { model: TIER.cheap,    maxTokens: 3000,  persona: "analyst" },
+  research_brief:     { model: TIER.fast,     maxTokens: 8000,  persona: "deepresearch" },
+  create_offer:       { model: TIER.fast,     maxTokens: 8000,  persona: "editor" },
+  humanize:           { model: TIER.fast,     maxTokens: 32000, persona: "rewriter" },
+  tighten:            { model: TIER.fast,     maxTokens: 32000, persona: "editor" },
+  expand:             { model: TIER.fast,     maxTokens: 32000, persona: "drafter" },
+  headlines:          { model: TIER.cheap,    maxTokens: 4000,  persona: "outliner" },
+  continue:           { model: TIER.fast,     maxTokens: 32000, persona: "continuator" },
+  proofread:          { model: TIER.standard, maxTokens: 6000,  persona: "proofreader" },
 };
 
 
@@ -496,7 +496,7 @@ OFFER TIE-IN: <where and how a backend offer is woven in, naturally>
 BRIEF AND RESEARCH:
 ${input.brief}` },
         ],
-        model: TIER.freeBig,
+        model: TIER.fast,
         maxTokens: 6000,
       });
       const text = result.choices?.[0]?.message?.content?.trim() ?? "";
@@ -549,7 +549,7 @@ ${input.outline}
 RESEARCH:
 ${input.research || "(use the outline; mark anything needing reporting as [TK: ...])"}` },
         ],
-        model: TIER.freeBig,
+        model: TIER.fast,
         maxTokens: 16000,
       });
       const text = result.choices?.[0]?.message?.content?.trim() ?? "";

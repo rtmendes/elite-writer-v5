@@ -23,18 +23,26 @@ export interface RouteConfig {
   label: string;
 }
 
-// OpenRouter slugs — the server routes them through its provider chain.
+// OpenRouter slugs — mirrors server TASK_MODELS defaults (fast paid tier).
+// Settings → Models panel overrides these via ew_model_tiers in localStorage.
 export const DEFAULT_ROUTES: Record<AgentTask, RouteConfig> = {
-  score_idea: { model: "anthropic/claude-haiku-4.5", label: "Score idea" },
-  match_publications: { model: "anthropic/claude-haiku-4.5", label: "Match publications" },
-  research_brief: { model: "anthropic/claude-sonnet-4.6", label: "Research brief" },
-  create_offer: { model: "anthropic/claude-opus-4.8", label: "Create offer" },
-  humanize: { model: "anthropic/claude-opus-4.8", label: "Humanize" },
-  tighten: { model: "anthropic/claude-opus-4.8", label: "Tighten" },
-  expand: { model: "anthropic/claude-opus-4.8", label: "Expand" },
-  headlines: { model: "anthropic/claude-opus-4.8", label: "Headlines" },
-  continue: { model: "anthropic/claude-opus-4.8", label: "Continue draft" },
-  proofread: { model: "anthropic/claude-sonnet-4.6", label: "Proofread" },
+  score_idea:         { model: "anthropic/claude-haiku-4.5",    label: "Score idea" },
+  match_publications: { model: "anthropic/claude-haiku-4.5",    label: "Match publications" },
+  research_brief:     { model: "google/gemini-2.5-flash",       label: "Research brief" },
+  create_offer:       { model: "google/gemini-2.5-flash",       label: "Create offer" },
+  humanize:           { model: "google/gemini-2.5-flash",       label: "Humanize" },
+  tighten:            { model: "google/gemini-2.5-flash",       label: "Tighten" },
+  expand:             { model: "google/gemini-2.5-flash",       label: "Expand" },
+  headlines:          { model: "anthropic/claude-haiku-4.5",    label: "Headlines" },
+  continue:           { model: "google/gemini-2.5-flash",       label: "Continue draft" },
+  proofread:          { model: "anthropic/claude-sonnet-4.6",   label: "Proofread" },
+};
+
+// Tier → tasks mapping, used to apply Settings → Models overrides
+const TIER_TASKS: Record<string, AgentTask[]> = {
+  fast:     ["research_brief", "create_offer", "humanize", "tighten", "expand", "continue"],
+  standard: ["proofread"],
+  cheap:    ["score_idea", "match_publications", "headlines"],
 };
 
 export const MODEL_CHOICES = [
@@ -47,8 +55,19 @@ export const MODEL_CHOICES = [
 
 export function getRoutes(): Record<AgentTask, RouteConfig> {
   try {
-    const saved = JSON.parse(localStorage.getItem("ew_agent_routes") ?? "{}");
+    // 1. Start with defaults
     const merged = { ...DEFAULT_ROUTES } as Record<AgentTask, RouteConfig>;
+    // 2. Apply tier overrides from Settings → Models panel
+    const settings = JSON.parse(localStorage.getItem("elite-writer-settings") ?? "{}");
+    const tiers: Record<string, string> = settings?.models ?? {};
+    for (const [tier, tasks] of Object.entries(TIER_TASKS)) {
+      const model = tiers[tier];
+      if (model) {
+        for (const task of tasks as AgentTask[]) merged[task] = { ...merged[task], model };
+      }
+    }
+    // 3. Per-task overrides (from the workspace agent panel) win over tier
+    const saved = JSON.parse(localStorage.getItem("ew_agent_routes") ?? "{}");
     for (const k of Object.keys(merged) as AgentTask[]) {
       if (saved[k]?.model) merged[k] = { ...merged[k], model: saved[k].model };
     }

@@ -312,12 +312,48 @@ export async function generateImage(
   const piapiResult = await generateImagePiAPI(options);
   if (piapiResult) return piapiResult;
 
-  // 6. Legacy Forge (if configured)
+  // 6. OpenRouter FLUX (free, no extra key — uses OPENROUTER_API_KEY)
+  const fluxResult = await generateImageOpenRouter(options);
+  if (fluxResult) return fluxResult;
+
+  // 7. Legacy Forge (if configured)
   if (ENV.forgeApiKey && ENV.forgeApiUrl) {
     return generateImageForge(options);
   }
 
-  throw new Error("No image generation provider available. Configure OPENAI_API_KEY, GEMINI_API_KEY, or PIAPI_KEY.");
+  throw new Error("No image generation provider available. Configure OPENAI_API_KEY, GEMINI_API_KEY, PIAPI_KEY, or OPENROUTER_API_KEY.");
+}
+
+async function generateImageOpenRouter(options: GenerateImageOptions): Promise<GenerateImageResponse | null> {
+  if (!ENV.openrouterApiKey) return null;
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${ENV.openrouterApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "black-forest-labs/flux-1-schnell:free",
+        prompt: options.prompt,
+        n: 1,
+        size: options.size === "1024x1536" ? "1024x1536" : options.size === "1024x1024" ? "1024x1024" : "1536x1024",
+      }),
+    });
+    if (!res.ok) {
+      console.warn("[imageGen] OpenRouter FLUX error:", res.status);
+      return null;
+    }
+    const data = await res.json() as { data?: Array<{ url?: string; b64_json?: string }> };
+    const item = data?.data?.[0];
+    if (!item) return null;
+    if (item.url) return { url: item.url, source: "openrouter-flux" };
+    if (item.b64_json) return { b64Json: item.b64_json, url: `data:image/png;base64,${item.b64_json}`, source: "openrouter-flux" };
+    return null;
+  } catch (e: any) {
+    console.warn("[imageGen] OpenRouter FLUX error:", e?.message);
+    return null;
+  }
 }
 
 async function generateImageForge(options: GenerateImageOptions): Promise<GenerateImageResponse> {

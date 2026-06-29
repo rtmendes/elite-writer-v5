@@ -92,6 +92,9 @@ export const TIER = {
   freeBig: "nvidia/nemotron-3-ultra-550b-a55b:free",
   cheap: "anthropic/claude-haiku-4.5",
   standard: "anthropic/claude-sonnet-4.6",
+  // Fast paid models — target 5–10s drafts at low cost
+  fast: "google/gemini-2.5-flash",            // ~2s TTFT, excellent prose
+  fastAlt: "deepseek/deepseek-chat-v3-0324",  // fallback fast paid
 } as const;
 
 /** When a :free model is rate-limited or down, walk this ladder before

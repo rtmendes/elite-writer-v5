@@ -24,8 +24,9 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
   Settings, Bot, ShieldCheck, FileDown, Sparkles, LayoutTemplate,
-  Save, RotateCcw, Thermometer, Gauge, Languages, Ban,
+  Save, RotateCcw, Thermometer, Gauge, Languages, Ban, Cpu,
 } from 'lucide-react';
+import { trpc } from '@/lib/trpc';
 
 // ─── Settings Types ─────────────────────────────────────────
 
@@ -38,6 +39,14 @@ export type WriterSettings = {
     maxTokens: number;
     autoResearch: boolean;
     researchModel: string;
+  };
+  // Per-tier model overrides (Settings → Models panel)
+  // Empty string = use server default for that tier
+  models: {
+    fast: string;      // draft, research, humanize, expand, continue
+    standard: string;  // publish-grade proofread pass
+    cheap: string;     // scoring, headlines
+    pipeline: string;  // queue.generateArticle main model
   };
   // Content Filters
   filters: {
@@ -75,6 +84,12 @@ const DEFAULT_SETTINGS: WriterSettings = {
     autoResearch: false,
     researchModel: 'deepseek-r1',
   },
+  models: {
+    fast: '',      // '' = use server default (google/gemini-2.5-flash)
+    standard: '',  // '' = use server default (anthropic/claude-sonnet-4.6)
+    cheap: '',     // '' = use server default (anthropic/claude-haiku-4.5)
+    pipeline: '',  // '' = use server default (google/gemini-2.5-flash)
+  },
   filters: {
     enforceUsEnglish: true,
     maxSlopAllowed: 3,
@@ -106,7 +121,7 @@ export function loadSettings(): WriterSettings {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      return { ...DEFAULT_SETTINGS, ...parsed, ai: { ...DEFAULT_SETTINGS.ai, ...parsed.ai }, filters: { ...DEFAULT_SETTINGS.filters, ...parsed.filters }, exports: { ...DEFAULT_SETTINGS.exports, ...parsed.exports }, scoring: { ...DEFAULT_SETTINGS.scoring, ...parsed.scoring } };
+      return { ...DEFAULT_SETTINGS, ...parsed, ai: { ...DEFAULT_SETTINGS.ai, ...parsed.ai }, models: { ...DEFAULT_SETTINGS.models, ...parsed.models }, filters: { ...DEFAULT_SETTINGS.filters, ...parsed.filters }, exports: { ...DEFAULT_SETTINGS.exports, ...parsed.exports }, scoring: { ...DEFAULT_SETTINGS.scoring, ...parsed.scoring } };
     }
   } catch {}
   return DEFAULT_SETTINGS;
@@ -122,6 +137,7 @@ export function SettingsModal({ onSettingsChange }: { onSettingsChange?: (settin
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<WriterSettings>(loadSettings);
   const [newPhrase, setNewPhrase] = useState('');
+  const { data: orModels = [] } = trpc.ai.listModels.useQuery(undefined, { enabled: open, staleTime: 3600_000 });
 
   const update = <K extends keyof WriterSettings>(
     section: K,
@@ -173,9 +189,12 @@ export function SettingsModal({ onSettingsChange }: { onSettingsChange?: (settin
         </DialogHeader>
 
         <Tabs defaultValue="ai" className="mt-4">
-          <TabsList className="w-full grid grid-cols-5">
+          <TabsList className="w-full grid grid-cols-6">
             <TabsTrigger value="ai" className="text-xs gap-1">
               <Bot className="w-3.5 h-3.5" /> AI
+            </TabsTrigger>
+            <TabsTrigger value="models" className="text-xs gap-1">
+              <Cpu className="w-3.5 h-3.5" /> Models
             </TabsTrigger>
             <TabsTrigger value="filters" className="text-xs gap-1">
               <ShieldCheck className="w-3.5 h-3.5" /> Filters
@@ -458,6 +477,52 @@ export function SettingsModal({ onSettingsChange }: { onSettingsChange?: (settin
               />
               <p className="text-xs text-muted-foreground">Start auto-scoring after this many words</p>
             </div>
+          </TabsContent>
+
+          {/* ═══ Models ═══ */}
+          <TabsContent value="models" className="space-y-5 mt-4">
+            <p className="text-xs text-muted-foreground">
+              Pick the model for each tier. Leave blank to use the server default.
+              Choices persist across sessions and override all task defaults.
+            </p>
+
+            {([
+              { key: 'fast' as const,     label: 'Draft / Research / Humanize / Expand', hint: 'Default: google/gemini-2.5-flash (~5–10s)' },
+              { key: 'standard' as const, label: 'Publish-grade Proofread',               hint: 'Default: anthropic/claude-sonnet-4.6' },
+              { key: 'cheap' as const,    label: 'Scoring / Headlines',                   hint: 'Default: anthropic/claude-haiku-4.5' },
+              { key: 'pipeline' as const, label: 'Full Pipeline (queue)',                 hint: 'Default: google/gemini-2.5-flash' },
+            ] as const).map(({ key, label, hint }) => (
+              <div key={key} className="space-y-1.5">
+                <Label className="text-sm font-medium">{label}</Label>
+                <p className="text-[10px] text-muted-foreground">{hint}</p>
+                <Select
+                  value={settings.models[key] || '__default__'}
+                  onValueChange={v => update('models', key, v === '__default__' ? '' : v)}
+                >
+                  <SelectTrigger className="text-xs">
+                    <SelectValue placeholder="Server default" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    <SelectItem value="__default__" className="text-xs text-muted-foreground">
+                      Server default
+                    </SelectItem>
+                    {orModels.length === 0 && (
+                      <SelectItem value="__loading__" disabled className="text-xs">
+                        Loading models…
+                      </SelectItem>
+                    )}
+                    {orModels.map(m => (
+                      <SelectItem key={m.id} value={m.id} className="text-xs">
+                        {m.name}
+                        {Number(m.pricing.prompt) === 0 && (
+                          <Badge variant="secondary" className="ml-2 text-[10px] px-1 py-0">free</Badge>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
           </TabsContent>
 
           {/* ═══ Presets ═══ */}

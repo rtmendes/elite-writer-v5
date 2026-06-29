@@ -123,7 +123,7 @@ Return JSON:
       targetPublication: z.string().optional(),
       template: z.string().optional(),
       brandVoice: z.string().optional(),
-      model: z.string().default("claude-sonnet"),
+      model: z.string().default("gemini-flash"),
       wordCount: z.number().default(2000),
       saveToDb: z.boolean().default(true),
     }))

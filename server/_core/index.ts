@@ -129,7 +129,8 @@ async function startServer() {
             process.env.PIAPI_KEY ||
             process.env.RUNWARE_API_KEY ||
             process.env.FAL_AI_API_KEY ||
-            process.env.STABILITY_AI_KEY,
+            process.env.STABILITY_AI_KEY ||
+            process.env.OPENROUTER_API_KEY,
         ),
       },
     });

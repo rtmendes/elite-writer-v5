@@ -83,7 +83,33 @@ function getPublicationInstructions(pubId: string): string {
   return `\n\n=== PUBLICATION-SPECIFIC INSTRUCTIONS: ${pubId.toUpperCase()} ===\nAudience: ${pub.audience}\nFormat Requirements: ${pub.format}\nTone: ${pub.tone}\nQuality Gates: ${pub.filters}\n===\n\nApply these publication-specific standards strictly when scoring and generating content.`;
 }
 
+// Cache OpenRouter model list in-process for 1h so the Settings panel is snappy
+let _orModelsCache: { ts: number; models: Array<{ id: string; name: string; contextLength: number; pricing: { prompt: string; completion: string } }> } | null = null;
+
 export const aiRouter = router({
+  // Fetch live OpenRouter model list — used by Settings → Models panel
+  listModels: publicProcedure.query(async () => {
+    if (_orModelsCache && Date.now() - _orModelsCache.ts < 3600_000) return _orModelsCache.models;
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/models", {
+        headers: { "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY || ""}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) throw new Error(`OpenRouter models ${res.status}`);
+      const json = await res.json() as { data: Array<{ id: string; name: string; context_length: number; pricing: { prompt: string; completion: string } }> };
+      const models = (json.data || []).map(m => ({
+        id: m.id,
+        name: m.name || m.id,
+        contextLength: m.context_length || 0,
+        pricing: { prompt: m.pricing?.prompt || "0", completion: m.pricing?.completion || "0" },
+      }));
+      _orModelsCache = { ts: Date.now(), models };
+      return models;
+    } catch {
+      return _orModelsCache?.models ?? [];
+    }
+  }),
+
   // Score an article against publication standards
   // Server-side AI spend (last 7 days, per day + per model) — feeds dashboards
   usage: publicProcedure.query(async () => {

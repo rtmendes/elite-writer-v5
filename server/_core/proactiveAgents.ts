@@ -714,11 +714,12 @@ async function ensureModelWatchDb(): Promise<WsDatabase | null> {
         { id: uid(), name: "Paid Ref", color: "#f59e0b" },
       ] },
       { id: uid(), name: "Score", type: "number", width: 90 },
-      { id: uid(), name: "Verdict", type: "select", width: 120, options: [
+      { id: uid(), name: "Verdict", type: "select", width: 150, options: [
         { id: uid(), name: "OK", color: "#10b981" },
         { id: uid(), name: "WATCH", color: "#f59e0b" },
         { id: uid(), name: "UPGRADE", color: "#ef4444" },
         { id: uid(), name: "REF", color: "#a3a3a3" },
+        { id: uid(), name: "RECOMMENDED SWITCH", color: "#8b5cf6" },
       ] },
       { id: uid(), name: "Notes", type: "longtext", width: 420 },
     ],
@@ -814,6 +815,104 @@ ${sample}`,
   }
 }
 
+// ── Weekly new-model recommender ────────────────────────────────────────────
+// Runs once per week. Fetches OpenRouter's live model list, identifies models
+// released in the past 7 days, benchmarks them against the current fast-tier
+// pick (Gemini 2.5 Flash), and writes a "RECOMMENDED SWITCH" row for any that
+// score ≥1.5 points higher. Never auto-switches — operator approves.
+const CURRENT_FAST_MODEL = "google/gemini-2.5-flash";
+
+async function modelRecommenderJob() {
+  const databases = await loadDatabases();
+  const ledger = databases.find((d) => d.name === "AI Ledger");
+  if (ledger) {
+    const recent = (await loadRows(ledger.id)).some(
+      (r) => r.createdAt > Date.now() - 6 * 24 * 3600e3 && JSON.stringify(r.values).includes("model-recommender"),
+    );
+    if (recent) return; // ≤1 run per ~6 days
+  }
+
+  // Fetch OpenRouter model list
+  let newModels: Array<{ id: string; name: string }> = [];
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/models", {
+      headers: { "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY || ""}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) { console.warn("[recommender] OpenRouter model fetch failed:", res.status); return; }
+    const json = await res.json() as { data: Array<{ id: string; name: string; created?: number }> };
+    const weekAgo = Date.now() / 1000 - 7 * 86400;
+    newModels = (json.data || []).filter(m => m.created && m.created > weekAgo).slice(0, 8);
+  } catch (e: any) {
+    console.warn("[recommender] model list fetch error:", e?.message);
+    return;
+  }
+
+  if (newModels.length === 0) {
+    console.log("[recommender] no new models this week");
+    return;
+  }
+
+  const watch = await ensureModelWatchDb();
+  if (!watch) return;
+  const f = (n: string) => fieldByName(watch, n);
+  const fDate = f("Date"), fModel = f("Model"), fTier = f("Tier"), fScore = f("Score"), fVerdict = f("Verdict"), fNotes = f("Notes");
+  if (!fDate || !fModel || !fScore) return;
+
+  // Score current pick as baseline (may be cached from modelWatchJob — use fresh)
+  const baselineSample = await agentCall("Recommender baseline", "drafter", CURRENT_FAST_MODEL, WATCH_PROBE, "model-recommender baseline", 2500);
+  let baselineScore = 0;
+  if (baselineSample) {
+    const judged = await agentCall("Recommender judge baseline", "scorer", TIER.free, `Score this draft (1-10). Return STRICT JSON only: {"score": <number>}\n\nDRAFT:\n${baselineSample}`, "model-recommender judge", 400);
+    try { baselineScore = Number(JSON.parse((judged ?? "").replace(/^```(json)?|```$/gm, "").trim()).score) || 0; } catch { /**/ }
+  }
+
+  const now = Date.now();
+  const today = new Date().toISOString().slice(0, 10);
+  const newTierOption = fTier?.options?.find(o => o.name === "Free-Big"); // closest badge for "New"
+  const recVerdictOption = fVerdict?.options?.find(o => o.name === "RECOMMENDED SWITCH");
+  const okVerdictOption  = fVerdict?.options?.find(o => o.name === "OK");
+
+  for (const m of newModels) {
+    const sample = await agentCall(`Recommender probe ${m.id}`, "drafter", m.id, WATCH_PROBE, "model-recommender probe", 2500);
+    if (!sample) continue;
+    const judged = await agentCall(`Recommender judge ${m.id}`, "scorer", TIER.free, `Score this draft (1-10). Return STRICT JSON only: {"score": <number>, "slop": ["<weakness>"]}\n\nDRAFT:\n${sample}`, "model-recommender judge", 500);
+    let score = 0; let slop: string[] = [];
+    try {
+      const p = JSON.parse((judged ?? "").replace(/^```(json)?|```$/gm, "").trim());
+      score = Number(p.score) || 0;
+      slop = Array.isArray(p.slop) ? p.slop.slice(0, 3) : [];
+    } catch { /**/ }
+
+    const isRecommended = baselineScore > 0 && score - baselineScore >= 1.5;
+    const verdict = isRecommended ? "RECOMMENDED SWITCH" : "OK";
+    const verdictOption = isRecommended ? recVerdictOption : okVerdictOption;
+    const notes = [
+      `vs current (${CURRENT_FAST_MODEL}): ${baselineScore > 0 ? `${score.toFixed(1)} vs ${baselineScore.toFixed(1)} (+${(score - baselineScore).toFixed(1)})` : `${score.toFixed(1)}`}`,
+      ...(slop.length ? slop : []),
+    ].join(" | ");
+
+    await saveRow({
+      id: uid(), dbId: watch.id,
+      values: {
+        [fDate.id]: today,
+        [fModel.id]: `🆕 ${m.name || m.id}`,
+        ...(fTier && newTierOption ? { [fTier.id]: newTierOption.id } : {}),
+        [fScore.id]: score,
+        ...(fVerdict && verdictOption ? { [fVerdict.id]: verdictOption.id } : {}),
+        ...(fNotes ? { [fNotes.id]: notes } : {}),
+      },
+      sortOrder: now, createdAt: now, updatedAt: now,
+    } as WsRow);
+
+    if (isRecommended) {
+      void slackAlert(`🆕 Model Recommender: ${m.name || m.id} scored ${score.toFixed(1)} vs current ${CURRENT_FAST_MODEL} at ${baselineScore.toFixed(1)} — RECOMMENDED SWITCH. Review "Model Quality Watch" to approve.`);
+      console.log(`[recommender] RECOMMENDED SWITCH: ${m.id} (${score} vs ${baselineScore})`);
+    }
+  }
+  console.log(`[recommender] benchmarked ${newModels.length} new models`);
+}
+
 // ── Daily feed refresh (4am ET) + retention purge ───────────────────────────
 function currentEtHour(): number {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }).format(new Date()));
@@ -856,7 +955,7 @@ async function safely(name: string, job: () => Promise<void>) {
 }
 
 // Dispatch map so the durable queue worker (queue.ts) can run the same jobs.
-export type ProactiveJobName = "scout" | "scorer" | "guardian" | "followup" | "opportunities" | "modelwatch" | "sourcesrefresh";
+export type ProactiveJobName = "scout" | "scorer" | "guardian" | "followup" | "opportunities" | "modelwatch" | "sourcesrefresh" | "modelrecommender";
 export const PROACTIVE_JOBS: Record<ProactiveJobName, () => Promise<void>> = {
   scout: () => safely("scout", scoutJob),
   scorer: () => safely("scorer", scorerJob),
@@ -865,6 +964,7 @@ export const PROACTIVE_JOBS: Record<ProactiveJobName, () => Promise<void>> = {
   opportunities: () => safely("opportunities", opportunityJob),
   modelwatch: () => safely("modelwatch", modelWatchJob),
   sourcesrefresh: () => safely("sourcesrefresh", sourcesRefreshJob),
+  modelrecommender: () => safely("modelrecommender", modelRecommenderJob),
 };
 
 export function initProactiveAgents() {
@@ -910,6 +1010,7 @@ function armInProcessLoop() {
     void safely("opportunities", opportunityJob);
     void safely("modelwatch", modelWatchJob);
     void safely("sourcesrefresh", sourcesRefreshJob); // self-gates to 4am ET + retention every pass
+    void safely("modelrecommender", modelRecommenderJob); // self-gates to ≤1/6 days
   }, 60 * 60_000);
 
   setInterval(() => {

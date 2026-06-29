@@ -535,6 +535,7 @@ export default function Writer() {
   // AI Draft via backend
   const handleAiDraft = async () => {
     if (!title.trim()) { toast.error('Add a title first'); return; }
+    const toastId = toast.loading('Writing draft — routing to best available model…');
     try {
       const tmpl = TEMPLATES.find(t => t.id === selectedTemplate);
       const brand = BRAND_VOICES.find(b => b.id === selectedVoice);
@@ -549,10 +550,10 @@ export default function Writer() {
       if (result.success && result.text) {
         setContent(prev => prev ? prev + '\n\n---\n\n' + result.text : result.text);
         const tokens = result.usage?.total_tokens || 0;
-        toast.success(`Draft generated (${tokens} tokens)`);
+        toast.success(`Draft generated (${tokens} tokens)`, { id: toastId });
       }
     } catch (err: any) {
-      toast.error('AI draft failed: ' + (err.message || 'Unknown error'));
+      toast.error('AI draft failed: ' + (err.message || 'Unknown error'), { id: toastId });
     }
   };
 
@@ -680,16 +681,16 @@ export default function Writer() {
   const handleFullPipeline = async () => {
     if (!title.trim()) { toast.error('Add a title first'); return; }
     setPipelineRunning(true);
+    const toastId = toast.loading('Full pipeline running: research → draft → proof → score (30–60s)…');
     try {
       const tmpl = TEMPLATES.find(t => t.id === selectedTemplate);
       const brand = BRAND_VOICES.find(b => b.id === selectedVoice);
-      toast.info('🔍 Full pipeline: researching → drafting → proofing → scoring...');
       const result = await fullPipelineMutation.mutateAsync({
         title: title.trim(),
         targetPublication: selectedPub?.name,
         template: tmpl?.name,
         brandVoice: brand?.name,
-        model: writerSettings.ai?.defaultModel || 'claude-sonnet',
+        model: writerSettings.models?.pipeline || writerSettings.ai?.defaultModel || 'gemini-flash',
         wordCount: template?.wordCountRange[1] || 2000,
         saveToDb: true,
       });
@@ -697,10 +698,10 @@ export default function Writer() {
         setEditorHtml(parseContentToHtml(result.content));
         if (result.headline && result.headline !== title) setTitle(result.headline);
         if (result.articleId) setDbArticleId(result.articleId);
-        toast.success(`✅ Full pipeline complete — ${result.wordCount} words, score: ${result.score}/10`);
+        toast.success(`✅ Full pipeline complete — ${result.wordCount} words, score: ${result.score}/10`, { id: toastId });
       }
     } catch (err: any) {
-      toast.error('Pipeline failed: ' + (err.message || 'Unknown error'));
+      toast.error('Pipeline failed: ' + (err.message || 'Unknown error'), { id: toastId });
     } finally {
       setPipelineRunning(false);
     }
