@@ -8,6 +8,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL
+        - VITE_SUPABASE_ANON_KEY
     container_name: elite-writer-v5
     restart: unless-stopped
     env_file:

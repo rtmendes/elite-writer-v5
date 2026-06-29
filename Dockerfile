@@ -15,6 +15,12 @@ COPY patches/ ./patches/
 # Install all dependencies (including devDependencies for build)
 RUN pnpm install --frozen-lockfile 2>/dev/null || pnpm install
 
+# Build-time env vars for Vite (baked into the client bundle at build time)
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+
 # Copy source code
 COPY . .
 
