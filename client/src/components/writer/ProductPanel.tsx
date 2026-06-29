@@ -22,9 +22,10 @@ interface ProductPanelProps {
   title: string;
   content: string;
   brandVoice?: string;
+  articleId?: number;
 }
 
-export function ProductPanel({ title, content, brandVoice }: ProductPanelProps) {
+export function ProductPanel({ title, content, brandVoice, articleId }: ProductPanelProps) {
   const [activeTab, setActiveTab] = useState('analyze');
   const [leadMagnetType, setLeadMagnetType] = useState<string>('checklist');
   const [opportunities, setOpportunities] = useState<any>(null);
@@ -61,6 +62,7 @@ export function ProductPanel({ title, content, brandVoice }: ProductPanelProps) 
         articleTitle: title,
         articleContent: content,
         brandVoice,
+        articleId,
       });
       if (result.success) {
         setProductResult({ type: 'ebook', ...result });
@@ -78,6 +80,7 @@ export function ProductPanel({ title, content, brandVoice }: ProductPanelProps) 
       const result = await genCourse.mutateAsync({
         articleTitle: title,
         articleContent: content,
+        articleId,
       });
       if (result.success) {
         setProductResult({ type: 'course', ...result });
@@ -97,6 +100,7 @@ export function ProductPanel({ title, content, brandVoice }: ProductPanelProps) 
         articleContent: content,
         type: leadMagnetType as any,
         brandVoice,
+        articleId,
       });
       if (result.success) {
         setProductResult({ type: 'leadMagnet', ...result });

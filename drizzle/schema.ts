@@ -145,6 +145,7 @@ export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   brandId: int("brandId"),
+  articleId: int("articleId"),
   name: varchar("name", { length: 200 }).notNull(),
   type: varchar("type", { length: 100 }),
   price: decimal("price", { precision: 10, scale: 2 }),

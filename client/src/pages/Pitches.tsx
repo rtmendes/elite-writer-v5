@@ -89,14 +89,23 @@ export default function Pitches() {
   const updatePitchDb = trpc.data.pitches.update.useMutation();
   const deletePitchDb = trpc.data.pitches.delete.useMutation();
   const [pitchIdMap] = useState<Map<string, number>>(() => new Map());
+  const [sourceArticleId, setSourceArticleId] = useState<number | null>(null);
 
-  // Handle URL params from Publications page
+  // Handle URL params from Writer (pub, subject, articleId, pitchAngle)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pubId = params.get('pub');
     if (pubId) {
       handleSelectPub(pubId);
       setShowNew(true);
+    }
+    const subjectParam = params.get('subject');
+    if (subjectParam) setSubject(subjectParam);
+    const articleIdParam = params.get('articleId');
+    if (articleIdParam) setSourceArticleId(Number(articleIdParam));
+    const pitchAngleParam = params.get('pitchAngle');
+    if (pitchAngleParam) setBody(prev => prev || pitchAngleParam);
+    if (pubId || subjectParam || pitchAngleParam) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);

@@ -139,8 +139,13 @@ export function CreativePanel({ title, content, articleId, onInsertContent, targ
   };
 
   const insertImageMarkdown = (url: string, alt: string) => {
-    onInsertContent(`\n\n![${alt}](${url.startsWith('data:') ? 'generated-image' : url})\n\n`);
-    toast.success('Image reference inserted');
+    // data: URLs mean R2 was unavailable — insert an img tag so the browser renders
+    // the inline blob. For R2 URLs (http/https) use standard markdown syntax.
+    const content = url.startsWith('data:')
+      ? `\n\n<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:8px;" />\n\n`
+      : `\n\n![${alt}](${url})\n\n`;
+    onInsertContent(content);
+    toast.success('Image inserted');
   };
 
   const insertEmbedBlock = (html: string, caption: string) => {
