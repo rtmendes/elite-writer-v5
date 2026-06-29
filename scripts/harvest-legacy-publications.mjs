@@ -16,8 +16,9 @@ function parseLegacyPubs(js) {
   const blocks = js.split(/\n    \{/).slice(1);
   return blocks.map((block) => {
     const get = (key) => {
-      const m = block.match(new RegExp(`${key}: '([^']*)'`));
-      return m ? m[1] : null;
+      // Handle both plain values and backslash-escaped quotes inside single-quoted strings
+      const m = block.match(new RegExp(`${key}: '((?:[^'\\\\]|\\\\.)*)'`));
+      return m ? m[1].replace(/\\'/g, "'") : null;
     };
     const num = (key) => {
       const m = block.match(new RegExp(`${key}: ([\\d.]+|null)`));
@@ -71,9 +72,11 @@ function slugify(name) {
 }
 
 function toTsEntry(p) {
-  const editors = p.editors.map((e) => `{ name: '${e.name.replace(/'/g, "\\'")}', email: '${e.email ?? ''}', role: ${e.role ? `'${e.role.replace(/'/g, "\\'")}'` : 'null'} }`).join(', ');
+  // Use double-quoted strings so apostrophes need no escaping and can never cause unterminated string literals
+  const dq = (s) => `"${(s ?? '').replace(/"/g, '\\"')}"`;
+  const editors = p.editors.map((e) => `{ name: ${dq(e.name)}, email: ${dq(e.email ?? '')}, role: ${e.role ? dq(e.role) : 'null'} }`).join(', ');
   const tags = p.source_tags.length ? `[${p.source_tags.map((t) => `'${t}'`).join(', ')}]` : '[]';
-  return `  { id: '${p.id}', name: '${p.name.replace(/'/g, "\\'")}', category: '${(p.category ?? 'All Topics').replace(/'/g, "\\'")}', traffic_monthly: '${(p.traffic_monthly ?? '').replace(/'/g, "\\'")}', submission_url: '${(p.submission_url ?? '#').replace(/'/g, "\\'")}', topics: '${(p.topics ?? '').replace(/'/g, "\\'")}', editors: [${editors}], pay_min: ${p.pay_min ?? 'null'}, pay_max: ${p.pay_max ?? 'null'}, pay_video_min: ${p.pay_video_min ?? 'null'}, pay_video_max: ${p.pay_video_max ?? 'null'}, acceptance_rate: ${p.acceptance_rate ?? 'null'}, avg_response_days: ${p.avg_response_days ?? 'null'}, article_styles: ${p.article_styles ? `'${p.article_styles.replace(/'/g, "\\'")}'` : 'null'}, notes: ${p.notes ? `'${p.notes.replace(/'/g, "\\'")}'` : 'null'}, source_tags: ${tags}, pay_structure: '${(p.pay_structure ?? '').replace(/'/g, "\\'")}' }`;
+  return `  { id: '${p.id}', name: ${dq(p.name)}, category: ${dq(p.category ?? 'All Topics')}, traffic_monthly: ${dq(p.traffic_monthly ?? '')}, submission_url: ${dq(p.submission_url ?? '#')}, topics: ${dq(p.topics ?? '')}, editors: [${editors}], pay_min: ${p.pay_min ?? 'null'}, pay_max: ${p.pay_max ?? 'null'}, pay_video_min: ${p.pay_video_min ?? 'null'}, pay_video_max: ${p.pay_video_max ?? 'null'}, acceptance_rate: ${p.acceptance_rate ?? 'null'}, avg_response_days: ${p.avg_response_days ?? 'null'}, article_styles: ${p.article_styles ? dq(p.article_styles) : 'null'}, notes: ${p.notes ? dq(p.notes) : 'null'}, source_tags: ${tags}, pay_structure: ${dq(p.pay_structure ?? '')} }`;
 }
 
 const legacy = parseLegacyPubs(readFileSync(LEGACY, 'utf8'));
