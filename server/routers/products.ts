@@ -9,12 +9,24 @@
  * - Webinar scripts and slide outlines
  */
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { ENV } from "../_core/env";
 import { getDb } from "../db";
 import { products, articles } from "../../drizzle/schema";
+
+// Migrate existing installs: add articleId column if missing (idempotent).
+let _migrated = false;
+async function ensureArticleIdColumn() {
+  if (_migrated) return;
+  _migrated = true;
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.execute(sql.raw("ALTER TABLE `products` ADD COLUMN IF NOT EXISTS `articleId` INT NULL"));
+  } catch { /* already present or unsupported syntax */ }
+}
 
 const PRODUCT_TYPES = [
   "ebook",
@@ -92,8 +104,10 @@ Return JSON:
       chapterCount: z.number().min(3).max(15).default(7),
       brandVoice: z.string().optional(),
       targetAudience: z.string().optional(),
+      articleId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await ensureArticleIdColumn();
       // Step 1: Generate eBook structure
       const structureResult = await invokeLLM({
         messages: [
@@ -184,6 +198,7 @@ Format in markdown with appropriate subheadings.`,
         const [res] = await db.insert(products).values({
           userId: ctx.user.id,
           brandId: null,
+          articleId: input.articleId ?? null,
           name: structure.title || `${input.articleTitle} — eBook`,
           type: "ebook",
           price: structure.suggestedPrice || "19.99",
@@ -214,8 +229,10 @@ Format in markdown with appropriate subheadings.`,
       moduleCount: z.number().min(3).max(12).default(6),
       courseType: z.enum(["video", "text", "hybrid"]).default("hybrid"),
       targetAudience: z.string().optional(),
+      articleId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await ensureArticleIdColumn();
       const result = await invokeLLM({
         messages: [
           {
@@ -277,6 +294,7 @@ Return JSON:
         const [res] = await db.insert(products).values({
           userId: ctx.user.id,
           brandId: null,
+          articleId: input.articleId ?? null,
           name: courseData.title || `${input.articleTitle} — Course`,
           type: "course",
           price: courseData.suggestedPrice || "97.00",
@@ -296,8 +314,10 @@ Return JSON:
       articleContent: z.string(),
       type: z.enum(["checklist", "template", "worksheet", "swipe_file", "toolkit", "cheat_sheet"]).default("checklist"),
       brandVoice: z.string().optional(),
+      articleId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await ensureArticleIdColumn();
       const typeDescriptions: Record<string, string> = {
         checklist: "a comprehensive, actionable checklist that readers can immediately use",
         template: "fill-in-the-blank templates that save readers hours of work",
@@ -356,6 +376,7 @@ Return JSON:
         const [res] = await db.insert(products).values({
           userId: ctx.user.id,
           brandId: null,
+          articleId: input.articleId ?? null,
           name: leadMagnet.title || `${input.articleTitle} — ${input.type}`,
           type: input.type,
           price: "0.00",

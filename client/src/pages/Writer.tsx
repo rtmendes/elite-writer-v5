@@ -708,8 +708,17 @@ export default function Writer() {
   const handleCreatePitch = () => {
     if (!selectedPub) { toast.error('Select a target publication first'); return; }
     handleSave();
-    navigate('/pitches');
-    toast.info('Navigate to Pitches to create your pitch');
+    // Build URL params so Pitches pre-fills pub, subject, pitch angle — zero re-typing.
+    const params = new URLSearchParams();
+    params.set('pub', selectedPub.id);
+    if (title) params.set('subject', `Pitch: ${title} for ${selectedPub.name}`);
+    if (dbArticleId) params.set('articleId', String(dbArticleId));
+    // Include AI-generated pitch angle if available for this publication
+    const aiAngle = aiMatches?.find(
+      m => m.publicationName.toLowerCase() === selectedPub.name.toLowerCase()
+    )?.pitchAngle;
+    if (aiAngle) params.set('pitchAngle', aiAngle);
+    navigate(`/pitches?${params.toString()}`);
   };
 
   const insertTemplate = () => {
@@ -1259,6 +1268,7 @@ ${editorHtml}
               title={title}
               content={content}
               brandVoice={BRAND_VOICES.find(b => b.id === selectedVoice)?.name}
+              articleId={dbArticleId ?? undefined}
             />
           </TabsContent>
 

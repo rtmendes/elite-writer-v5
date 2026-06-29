@@ -19,6 +19,7 @@ import { ENV } from "../_core/env";
 import { getDb } from "../db";
 import { recordCentralCost } from "../_core/proactiveAgents";
 import { generatedImages } from "../../drizzle/schema";
+import { uploadDataUrl } from "../_core/storage";
 
 // Rough per-image cost (USD) by provider source, so every paid image
 // generation lands in the central record_cost_event ledger (cost-tracking
@@ -256,6 +257,17 @@ Return JSON:
         input.articleTitle || input.type,
       );
 
+      // Upload base64 to R2; fall back to data URL if R2 not configured.
+      let storedUrl = imageUrl;
+      if (imageUrl.startsWith("data:")) {
+        try {
+          const r2Url = await uploadDataUrl(imageUrl, "article-images");
+          if (r2Url) storedUrl = r2Url;
+        } catch (e) {
+          console.warn("[creative] R2 upload failed, keeping data URL:", (e as Error).message);
+        }
+      }
+
       // Store in DB
       const db = await getDb();
       if (db) {
@@ -263,7 +275,7 @@ Return JSON:
           await db.insert(generatedImages).values({
             userId: ctx.user.id,
             prompt: finalPrompt,
-            imageUrl: imageUrl.startsWith("data:") ? "(base64)" : imageUrl,
+            imageUrl: storedUrl.startsWith("data:") ? storedUrl.slice(0, 200) : storedUrl,
             model: source,
             style: input.style,
             articleId: input.articleId,
@@ -274,7 +286,8 @@ Return JSON:
         }
       }
 
-      return { success: true, imageUrl, source, type: input.type, promptUsed: finalPrompt };
+      // Return the durable URL (R2 or data URL) so the client inserts the real path.
+      return { success: true, imageUrl: storedUrl, source, type: input.type, promptUsed: finalPrompt };
     }),
 
   // ─── Edit/Vary Existing Image ─────────────────────────────
