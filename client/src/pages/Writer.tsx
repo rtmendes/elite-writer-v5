@@ -42,6 +42,15 @@ import {
   parseContentToHtml,
 } from '@/components/writer/PlateWriterEditor';
 import { useAuth } from '@/_core/hooks/useAuth';
+import {
+  PipelineProgress,
+  INITIAL_STAGES,
+  stageActivate,
+  stageDone,
+  stageReset,
+  stageAllDone,
+  type PipelineStageState,
+} from '@/components/writer/PipelineProgress';
 import { useRealtimeDoc } from '@/hooks/useRealtimeDoc';
 import { cn } from '@/lib/utils';
 import { OfferPageLinker } from '@/components/writer/OfferPageLinker';
@@ -541,6 +550,7 @@ export default function Writer() {
       const brand = BRAND_VOICES.find(b => b.id === selectedVoice);
       const result = await draftMutation.mutateAsync({
         topic: title,
+        templateId: selectedTemplate || undefined,
         template: tmpl?.name,
         brandVoice: brand?.name,
         targetPublication: selectedPub?.name,
@@ -677,9 +687,37 @@ export default function Writer() {
   // ─── Full Pipeline: Title → Research → Draft → Proof → Score → Save ────────
   const fullPipelineMutation = trpc.queue.generateArticle.useMutation();
   const [pipelineRunning, setPipelineRunning] = useState(false);
+  const [pipelineStages, setPipelineStages] = useState<PipelineStageState[]>(INITIAL_STAGES);
+  const [pipelineEverRan, setPipelineEverRan] = useState(false);
+
+  // Advance pipeline progress bar through time-based stages while running
+  useEffect(() => {
+    if (!pipelineRunning) return;
+    // stage schedule: [stageId, subStep, delayMs after previous]
+    const schedule: Array<[Parameters<typeof stageActivate>[1], string, number]> = [
+      ['topic',    'Confirming topic & angle…', 0],
+      ['research', 'Pulling sources…',           2000],
+      ['brief',    'Building outline…',           18000],
+      ['draft',    'Writing draft…',              30000],
+      ['enhance',  'Proofing & enhancing…',       55000],
+      ['score',    'Scoring article…',            70000],
+      ['package',  'Packaging output…',           80000],
+    ];
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let elapsed = 0;
+    for (const [id, subStep, delay] of schedule) {
+      elapsed += delay;
+      timers.push(setTimeout(() => {
+        setPipelineStages(prev => stageActivate(prev, id, subStep));
+      }, elapsed));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [pipelineRunning]);
 
   const handleFullPipeline = async () => {
     if (!title.trim()) { toast.error('Add a title first'); return; }
+    setPipelineEverRan(true);
+    setPipelineStages(stageReset(INITIAL_STAGES));
     setPipelineRunning(true);
     const toastId = toast.loading('Full pipeline running: research → draft → proof → score (30–60s)…');
     try {
@@ -689,6 +727,7 @@ export default function Writer() {
         title: title.trim(),
         targetPublication: selectedPub?.name,
         template: tmpl?.name,
+        templateId: selectedTemplate || undefined,
         brandVoice: brand?.name,
         model: writerSettings.models?.pipeline || writerSettings.ai?.defaultModel || 'gemini-flash',
         wordCount: template?.wordCountRange[1] || 2000,
@@ -698,7 +737,8 @@ export default function Writer() {
         setEditorHtml(parseContentToHtml(result.content));
         if (result.headline && result.headline !== title) setTitle(result.headline);
         if (result.articleId) setDbArticleId(result.articleId);
-        toast.success(`✅ Full pipeline complete — ${result.wordCount} words, score: ${result.score}/10`, { id: toastId });
+        setPipelineStages(prev => stageAllDone(prev));
+      toast.success(`✅ Full pipeline complete — ${result.wordCount} words, score: ${result.score}/10`, { id: toastId });
       }
     } catch (err: any) {
       toast.error('Pipeline failed: ' + (err.message || 'Unknown error'), { id: toastId });
@@ -1563,6 +1603,12 @@ ${editorHtml}
             </div>
           </div>
         </div>
+
+        {/* Pipeline progress bar — shown while pipeline runs or after first run */}
+        <PipelineProgress
+          stages={pipelineStages}
+          visible={pipelineEverRan || pipelineRunning}
+        />
 
         {/* Title */}
         <div className={cn("px-6 pt-6 pb-2", focusMode && "pt-8")}>

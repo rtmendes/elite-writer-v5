@@ -7,6 +7,41 @@ import { getDb } from "../db";
 import { publications, aiUsage } from "../../drizzle/schema";
 import { sql } from "drizzle-orm";
 import { getPublicationIntel } from "../../shared/publication-intelligence";
+import { getSopPromptBlock } from "./templateSops";
+
+// ── Format pass: break any paragraph > 150 words at a sentence boundary ──────
+function enforceFormatting(md: string): string {
+  const MAX_WORDS = 150;
+  return md
+    .split(/\n\n/)
+    .map((block) => {
+      const isHeading = /^#{1,6}\s/.test(block.trim());
+      const isList    = /^[-*+\d]/.test(block.trim());
+      const isCode    = /^```/.test(block.trim());
+      const isQuote   = /^>/.test(block.trim());
+      if (isHeading || isList || isCode || isQuote) return block;
+      const words = block.trim().split(/\s+/);
+      if (words.length <= MAX_WORDS) return block;
+      // Split at sentence boundaries to stay ≤ MAX_WORDS per paragraph
+      const sentences = block.trim().match(/[^.!?]+[.!?]+["']?(?:\s|$)/g) ?? [block.trim()];
+      const chunks: string[] = [];
+      let current: string[] = [];
+      let count = 0;
+      for (const s of sentences) {
+        const sw = s.trim().split(/\s+/).length;
+        if (count + sw > MAX_WORDS && current.length > 0) {
+          chunks.push(current.join(" ").trim());
+          current = [];
+          count = 0;
+        }
+        current.push(s.trim());
+        count += sw;
+      }
+      if (current.length > 0) chunks.push(current.join(" ").trim());
+      return chunks.join("\n\n");
+    })
+    .join("\n\n");
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GAP #2 + #3: Publication SOP data for server-side AI scoring & drafting
@@ -269,7 +304,8 @@ Return JSON with this exact structure:
     .input(
       z.object({
         topic: z.string(),
-        template: z.string().optional(),
+        templateId: z.string().optional(),   // matches template_sops.templateId
+        template: z.string().optional(),     // human-readable template name (display only)
         brandVoice: z.string().optional(),
         targetPublication: z.string().optional(),
         outline: z.string().optional(),
@@ -277,41 +313,60 @@ Return JSON with this exact structure:
       })
     )
     .mutation(async ({ input }) => {
+      const sopBlock = await getSopPromptBlock(input.templateId);
       const result = await invokeLLM({
         model: TIER.fast,
         messages: [
           {
             role: "system",
-            content: `You are an elite journalist and content strategist who writes for top-tier publications like Bloomberg, Forbes, Harvard Business Review, and The Atlantic. Write in a professional, authoritative voice with data-driven insights, compelling narratives, and expert-level analysis.${input.brandVoice ? ` Write in this brand voice: ${input.brandVoice}` : ""}${input.targetPublication ? getPublicationInstructions(input.targetPublication) : ""}` + (await skillBlockFor("drafter")),
+            content: [
+              `You are an elite journalist and content strategist who writes for top-tier publications like Bloomberg, Forbes, Harvard Business Review, and The Atlantic.`,
+              `Write in a professional, authoritative voice with data-driven insights, compelling narratives, and expert-level analysis.`,
+              input.brandVoice ? `Brand voice: ${input.brandVoice}` : "",
+              input.targetPublication ? getPublicationInstructions(input.targetPublication) : "",
+              sopBlock,
+              await skillBlockFor("drafter"),
+              `
+MANDATORY FORMAT RULES — follow without exception:
+1. Output in clean markdown only — no HTML.
+2. Begin with the article headline as a single # H1 line.
+3. Use ## H2 for every major section (follow the SOP section order when provided).
+4. Use ### H3 for sub-sections.
+5. Keep every prose paragraph to ≤ 150 words. After 150 words, start a new paragraph.
+6. Use bullet or numbered lists where the SOP or content calls for enumeration.
+7. Pull-quotes: wrap a key sentence in a blockquote: > "Quote here."
+8. Methodology / callout boxes: wrap in a blockquote with a bold label:
+   > **Methodology:** ...
+   > **Note:** ...
+9. Image and chart placeholders: use [IMAGE: brief description] or [CHART: brief description]
+   exactly at the visual slots specified in the SOP (or after major data-heavy sections).
+10. No AI slop: never use "delve", "leverage", "game-changer", "seamlessly", "in today's rapidly evolving", "it's important to note".
+11. US English only.
+12. End with a ## Conclusion section.`,
+            ].filter(Boolean).join("\n\n"),
           },
           {
             role: "user",
-            content: `Write a complete article draft.
-
-Topic: ${input.topic}
-${input.template ? `Template/Style: ${input.template}` : ""}
-${input.targetPublication ? `Target Publication: ${input.targetPublication}` : ""}
-${input.outline ? `Outline:\n${input.outline}` : ""}
-Target Word Count: ${input.wordCount || 1500}
-
-Write a publication-ready article with:
-- A compelling headline
-- A strong hook/lede paragraph
-- Well-structured sections with subheadings
-- Data points and expert insights (cite sources where relevant)
-- A powerful conclusion with a call to action
-- SEO-optimized for the topic
-
-Return the full article in markdown format.`,
+            content: [
+              `Write a complete, fully-structured article draft.`,
+              `Topic: ${input.topic}`,
+              input.template ? `Template style: ${input.template}` : "",
+              input.targetPublication ? `Target publication: ${input.targetPublication}` : "",
+              input.outline ? `Outline to follow:\n${input.outline}` : "",
+              `Target word count: ${input.wordCount || 1500} words`,
+              ``,
+              `Follow all format rules and the SOP section order. Output publication-ready markdown.`,
+            ].filter(Boolean).join("\n"),
           },
         ],
-        maxTokens: 4096,
+        maxTokens: 6000,
       });
 
-      const text =
+      const raw =
         typeof result.choices[0]?.message?.content === "string"
           ? result.choices[0].message.content
           : "";
+      const text = enforceFormatting(raw);
       return { success: true, text, usage: result.usage };
     }),
 

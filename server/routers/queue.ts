@@ -16,6 +16,7 @@ import { getDb } from "../db";
 import { articles, researchNotes } from "../../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { syncArticleToPipeline } from "../lib/supabase-sync";
+import { getSopPromptBlock } from "./templateSops";
 
 // ─── OpenRouter Models (shared with agentic) ────────────
 
@@ -122,6 +123,7 @@ Return JSON:
       topic: z.string().optional(),
       targetPublication: z.string().optional(),
       template: z.string().optional(),
+      templateId: z.string().optional(),
       brandVoice: z.string().optional(),
       model: z.string().default("gemini-flash"),
       wordCount: z.number().default(2000),
@@ -187,9 +189,26 @@ Return JSON:
 
       // Step 3: Write full article
       steps.push("drafting");
+      const sopBlock = await getSopPromptBlock(input.templateId);
+      const FORMAT_RULES = `
+MANDATORY FORMAT RULES:
+1. Output clean markdown only — no HTML.
+2. Headline as # H1. Major sections as ## H2. Sub-sections as ### H3.
+3. Every prose paragraph ≤ 150 words. Start a new paragraph after 150 words.
+4. Use bullet or numbered lists for enumeration.
+5. Pull-quotes: > "Key sentence."
+6. Callout/methodology boxes: > **Methodology:** ...
+7. Image/chart placeholders: [IMAGE: description] or [CHART: description] at the SOP's visual slots.
+8. No AI slop: no "delve", "leverage", "game-changer", "seamlessly", "in today's rapidly evolving".
+9. US English only. End with ## Conclusion.`;
       const draftContent = await callModel(input.model, [
-        { role: "system", content: `You are a senior journalist writing for ${input.targetPublication || "a top-tier publication"}. Write publication-ready prose. No AI clichés. No "delve into", "in today's rapidly evolving", "game-changer", "leverage", "seamlessly". Use concrete data, vivid details, and authoritative tone. US English only.` },
-        { role: "user", content: `Write a complete article.
+        { role: "system", content: [
+          `You are a senior journalist writing for ${input.targetPublication || "a top-tier publication"}.`,
+          `Write publication-ready prose with data-driven insights and authoritative tone.`,
+          sopBlock,
+          FORMAT_RULES,
+        ].filter(Boolean).join("\n") },
+        { role: "user", content: `Write a complete, fully-structured article.
 
 Headline: ${outline.headline || input.title}
 ${outline.subheadline ? `Subheadline: ${outline.subheadline}` : ""}
@@ -208,7 +227,7 @@ Close: ${outline.closingStrategy || "End with actionable insight"}
 Target: ${input.wordCount} words
 SEO: ${(outline.seoKeywords || []).join(", ")}
 
-Write in markdown with ## headings. Include specific data with inline citations. Vary sentence rhythm. No filler phrases.` },
+Follow all format rules and the SOP section order. Output publication-ready markdown.` },
       ], { maxTokens: Math.min(input.wordCount * 2, 16384), temp: 0.75 });
 
       steps.push("draft_done");

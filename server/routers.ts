@@ -39,6 +39,7 @@ import { documentationRouter } from "./routers/documentation";
 import { taskCenterRouter } from "./routers/taskCenter";
 import { acceleratorRouter } from "./routers/accelerator";
 import { stripeRouter } from "./routers/stripe";
+import { templateSopsRouter } from "./routers/templateSops";
 
 export const appRouter = router({
   system: systemRouter,
@@ -107,6 +108,7 @@ export const appRouter = router({
   taskCenter: taskCenterRouter,
   accelerator: acceleratorRouter,
   stripe: stripeRouter,
+  templateSops: templateSopsRouter,
 });
 
 export type AppRouter = typeof appRouter;

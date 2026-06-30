@@ -1042,3 +1042,24 @@ export const wsRows = mysqlTable("wsRows", {
   updatedAt: bigint("updatedAt", { mode: "number" }).notNull().default(0),
   deleted: boolean("deleted").notNull().default(false),
 });
+
+// Template SOPs — one per writing template, editable in-app.
+// The Drafter injects the active SOP into its system prompt so output
+// follows the section order, word targets, evidence rules, etc.
+export const templateSops = mysqlTable("template_sops", {
+  id: int("id").autoincrement().primaryKey(),
+  templateId: varchar("templateId", { length: 80 }).notNull().unique(),
+  name: varchar("name", { length: 200 }).notNull(),
+  purpose: text("purpose"),
+  sections: json("sections"), // [{heading, h_level, wordTarget, notes}]
+  tone: text("tone"),
+  hookPattern: text("hookPattern"),
+  evidenceRules: text("evidenceRules"),
+  visualSlots: json("visualSlots"), // [{afterSection, type, description}]
+  ctaClose: text("ctaClose"),
+  seoPattern: text("seoPattern"),
+  publicationFit: text("publicationFit"),
+  isSeeded: boolean("isSeeded").notNull().default(true),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
+});
