@@ -257,25 +257,33 @@ Return JSON:
         input.articleTitle || input.type,
       );
 
-      // Upload base64 to R2; fall back to data URL if R2 not configured.
+      // Upload to R2 to get a durable public URL.
+      // FLUX returns a direct URL (no upload needed). Other providers return base64.
       let storedUrl = imageUrl;
       if (imageUrl.startsWith("data:")) {
         try {
           const r2Url = await uploadDataUrl(imageUrl, "article-images");
-          if (r2Url) storedUrl = r2Url;
+          if (r2Url) {
+            storedUrl = r2Url;
+          } else {
+            // R2 not configured — data URL is returned to client for immediate use
+            // but NOT stored in DB (truncated base64 is useless). Log the gap.
+            console.warn("[creative] R2 not configured; image will not persist across sessions.");
+          }
         } catch (e) {
-          console.warn("[creative] R2 upload failed, keeping data URL:", (e as Error).message);
+          console.warn("[creative] R2 upload failed:", (e as Error).message);
         }
       }
 
-      // Store in DB
+      // Store in DB only if we have a real URL (not a data blob)
+      const durableUrl = storedUrl.startsWith("data:") ? null : storedUrl;
       const db = await getDb();
-      if (db) {
+      if (db && durableUrl) {
         try {
           await db.insert(generatedImages).values({
             userId: ctx.user.id,
             prompt: finalPrompt,
-            imageUrl: storedUrl.startsWith("data:") ? storedUrl.slice(0, 200) : storedUrl,
+            imageUrl: durableUrl,
             model: source,
             style: input.style,
             articleId: input.articleId,
@@ -286,7 +294,7 @@ Return JSON:
         }
       }
 
-      // Return the durable URL (R2 or data URL) so the client inserts the real path.
+      // Always return full URL to client (durable R2 URL or temporary data URL).
       return { success: true, imageUrl: storedUrl, source, type: input.type, promptUsed: finalPrompt };
     }),
 

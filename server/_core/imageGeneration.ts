@@ -268,8 +268,8 @@ export async function generateImagePiAPI(
 }
 
 /**
- * Master image generation function — tries providers in priority order.
- * GPT-image-2 first (newest, best quality), then GPT-image-1, DALL-E 3, Gemini, PiAPI.
+ * Master image generation function.
+ * FREE-FIRST: OpenRouter FLUX (free) → paid providers as upgrade path.
  * Pass options.model to force a specific provider.
  */
 export async function generateImage(
@@ -292,36 +292,39 @@ export async function generateImage(
     // Fall through to chain if forced model fails
   }
 
-  // 1. GPT Image 2 (newest, best quality — released Apr 21 2026)
-  const gpt2Result = await generateImageGPT2(options);
-  if (gpt2Result) return gpt2Result;
+  // FREE-FIRST (per policy): OpenRouter FLUX runs before paid providers.
+  // Paid providers only reached if FLUX is unavailable (no OpenRouter key).
 
-  // 2. GPT Image 1 (previous gen)
-  const openaiResult = await generateImageOpenAI(options);
-  if (openaiResult) return openaiResult;
-
-  // 3. DALL-E 3 legacy
-  const dalleResult = await generateImageDallE3(options);
-  if (dalleResult) return dalleResult;
-
-  // 4. Gemini native
-  const geminiResult = await generateImageGemini(options);
-  if (geminiResult) return geminiResult;
-
-  // 5. PiAPI
-  const piapiResult = await generateImagePiAPI(options);
-  if (piapiResult) return piapiResult;
-
-  // 6. OpenRouter FLUX (free, no extra key — uses OPENROUTER_API_KEY)
+  // 1. OpenRouter FLUX :free — reliable, no image-scope requirement
   const fluxResult = await generateImageOpenRouter(options);
   if (fluxResult) return fluxResult;
 
-  // 7. Legacy Forge (if configured)
+  // 2. GPT Image 2 (highest quality — requires openai image scope)
+  const gpt2Result = await generateImageGPT2(options);
+  if (gpt2Result) return gpt2Result;
+
+  // 3. GPT Image 1
+  const openaiResult = await generateImageOpenAI(options);
+  if (openaiResult) return openaiResult;
+
+  // 4. DALL-E 3
+  const dalleResult = await generateImageDallE3(options);
+  if (dalleResult) return dalleResult;
+
+  // 5. Gemini native
+  const geminiResult = await generateImageGemini(options);
+  if (geminiResult) return geminiResult;
+
+  // 6. PiAPI
+  const piapiResult = await generateImagePiAPI(options);
+  if (piapiResult) return piapiResult;
+
+  // 7. Legacy Forge
   if (ENV.forgeApiKey && ENV.forgeApiUrl) {
     return generateImageForge(options);
   }
 
-  throw new Error("No image generation provider available. Configure OPENAI_API_KEY, GEMINI_API_KEY, PIAPI_KEY, or OPENROUTER_API_KEY.");
+  throw new Error("No image generation provider available. Configure OPENROUTER_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or PIAPI_KEY.");
 }
 
 async function generateImageOpenRouter(options: GenerateImageOptions): Promise<GenerateImageResponse | null> {

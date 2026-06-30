@@ -78,7 +78,7 @@ export function CreativePanel({ title, content, articleId, onInsertContent, targ
         toast.success(`Image generated via ${result.source}`);
       }
     } catch (err: any) {
-      toast.error('Image generation failed: ' + (err.message || 'Unknown error'));
+      toast.error('Image generation failed: ' + (err.message || 'Unknown error'), { duration: 8000 });
     }
   };
 
@@ -138,14 +138,18 @@ export function CreativePanel({ title, content, articleId, onInsertContent, targ
     }
   };
 
-  const insertImageMarkdown = (url: string, alt: string) => {
-    // data: URLs mean R2 was unavailable — insert an img tag so the browser renders
-    // the inline blob. For R2 URLs (http/https) use standard markdown syntax.
-    const content = url.startsWith('data:')
-      ? `\n\n<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:8px;" />\n\n`
-      : `\n\n![${alt}](${url})\n\n`;
-    onInsertContent(content);
-    toast.success('Image inserted');
+  const insertImageMarkdown = (url: string, alt: string, caption?: string) => {
+    if (url.startsWith('data:')) {
+      // R2 unavailable — still insert so user isn't blocked, but warn
+      const block = `\n\n<figure>\n<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:8px;" />${caption ? `\n<figcaption style="text-align:center;font-size:0.8rem;color:#9ca3af">${caption}</figcaption>` : ''}\n</figure>\n\n`;
+      onInsertContent(block);
+      toast.success('Image inserted (temporary — configure R2 for persistence)', { duration: 6000 });
+    } else {
+      const captionMd = caption ? `\n*${caption}*` : '';
+      const block = `\n\n![${alt}](${url})${captionMd}\n\n`;
+      onInsertContent(block);
+      toast.success('Image inserted');
+    }
   };
 
   const insertEmbedBlock = (html: string, caption: string) => {
@@ -253,7 +257,7 @@ export function CreativePanel({ title, content, articleId, onInsertContent, targ
                 <Button
                   size="sm" variant="outline"
                   className="flex-1 h-7 text-[10px] gap-1"
-                  onClick={() => insertImageMarkdown(generatedImage, title)}
+                  onClick={() => insertImageMarkdown(generatedImage, title, imagePrompt.slice(0, 100) || title)}
                 >
                   <Plus className="w-3 h-3" /> Insert
                 </Button>

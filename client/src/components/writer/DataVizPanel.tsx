@@ -11,6 +11,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -44,6 +45,52 @@ const QUICK_PROMPTS = [
   { label: "Data Dashboard", prompt: "Multi-metric dashboard with KPI cards, trend line, and breakdown pie chart", icon: Gauge },
 ];
 
+// ── Extract key stats from article text ─────────────────────────────────────
+function extractArticleStats(text: string): Array<{ label: string; value: string; source: string }> {
+  const stats: Array<{ label: string; value: string; source: string }> = [];
+  // Match patterns like "X% of Y" or "grew by X%" or "N million/billion" etc.
+  const patterns = [
+    /(\d+(?:\.\d+)?)\s*%\s+(?:of\s+)?([a-zA-Z][^,.]{3,40})/g,
+    /([a-zA-Z][^,.]{3,30})\s+(?:grew?|increased?|decreased?|rose?|fell?|dropped?)\s+(?:by\s+)?(\d+(?:\.\d+)?\s*%)/gi,
+    /(\$[\d,.]+(?:\s*(?:million|billion|trillion|M|B|T))?)\s+(?:in\s+|for\s+)?([a-zA-Z][^,.]{3,40})/g,
+    /(\d+(?:\.\d+)?)\s*(?:million|billion|trillion)\s+([a-zA-Z][^,.]{3,40})/gi,
+  ];
+  const seen = new Set<string>();
+  for (const re of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null && stats.length < 8) {
+      const val = m[1], label = m[2]?.trim().slice(0, 50);
+      if (!label || seen.has(label.toLowerCase())) continue;
+      seen.add(label.toLowerCase());
+      stats.push({ label, value: val, source: 'Article' });
+    }
+  }
+  return stats;
+}
+
+// ── Generate a minimal fallback SVG bar chart ────────────────────────────────
+function buildFallbackSvg(
+  stats: Array<{ label: string; value: string }>,
+  chartTitle: string
+): string {
+  const nums = stats.map(s => parseFloat(s.value.replace(/[^0-9.]/g, '')) || 0);
+  const max = Math.max(...nums, 1);
+  const W = 480, H = 280, PAD = 48, BAR_GAP = 8;
+  const barW = Math.max(16, Math.floor((W - PAD * 2 - BAR_GAP * (stats.length - 1)) / Math.max(stats.length, 1)));
+  const bars = stats.map((s, i) => {
+    const h = Math.round(((nums[i] || 0) / max) * (H - PAD * 2));
+    const x = PAD + i * (barW + BAR_GAP);
+    const y = H - PAD - h;
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="3" fill="#6366f1" opacity="0.85"/>
+<text x="${x + barW / 2}" y="${H - PAD + 14}" text-anchor="middle" font-size="9" fill="#9ca3af">${s.label.slice(0, 12)}</text>
+<text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="9" fill="#e5e7eb" font-weight="600">${s.value}</text>`;
+  }).join('\n');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;background:#111;border-radius:8px">
+<text x="${W / 2}" y="22" text-anchor="middle" font-size="13" fill="#f3f4f6" font-weight="600" font-family="system-ui">${chartTitle.slice(0, 60)}</text>
+${bars}
+</svg>`;
+}
+
 export function DataVizPanel({ title, content, onInsertContent }: DataVizPanelProps) {
   const [prompt, setPrompt] = useState('');
   const [dataInput, setDataInput] = useState('');
@@ -52,12 +99,19 @@ export function DataVizPanel({ title, content, onInsertContent }: DataVizPanelPr
   const [result, setResult] = useState<VizResult | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [history, setHistory] = useState<VizResult[]>([]);
+  const [caption, setCaption] = useState('');
+  const [source, setSource] = useState('');
+  // Data-clarity step
+  const [clarityStep, setClarityStep] = useState<'idle' | 'confirming'>('idle');
+  const [extractedStats, setExtractedStats] = useState<Array<{ label: string; value: string; source: string }>>([]);
+  const [pendingPrompt, setPendingPrompt] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const visualizeMutation = trpc.give.visualize.useMutation();
   const embedMutation = trpc.give.embed.useMutation();
   const scoreMutation = trpc.give.score.useMutation();
 
+  // Step 1: extract stats → show data-clarity panel → wait for confirm
   const handleGenerate = useCallback(async (overridePrompt?: string) => {
     const p = overridePrompt || prompt;
     if (!p.trim()) {
@@ -65,23 +119,38 @@ export function DataVizPanel({ title, content, onInsertContent }: DataVizPanelPr
       return;
     }
 
+    // Data-clarity: extract key stats first, show confirmation panel
+    if (clarityStep === 'idle') {
+      const stats = extractArticleStats(content);
+      setExtractedStats(stats);
+      setPendingPrompt(p);
+      setClarityStep('confirming');
+      return;
+    }
+  }, [prompt, content, clarityStep]);
+
+  // Step 2: user confirmed → actually generate
+  const handleConfirmedGenerate = useCallback(async () => {
+    const p = pendingPrompt;
+    setClarityStep('idle');
     setIsGenerating(true);
     setGenerationPhase('Routing');
 
-    // Build context from article
     const contextPrompt = title || content
       ? `${p}\n\nContext from article:\nTitle: ${title}\nContent excerpt: ${content.slice(0, 2000)}`
       : p;
 
-    // Parse optional data input
     let parsedData: any = {};
     if (dataInput.trim()) {
       try {
         parsedData = JSON.parse(dataInput);
       } catch {
-        // Treat as description if not valid JSON
         parsedData = { raw: dataInput };
       }
+    }
+    // Inject extracted stats into data payload if available
+    if (extractedStats.length > 0) {
+      parsedData = { ...parsedData, articleStats: extractedStats };
     }
 
     try {
@@ -97,22 +166,39 @@ export function DataVizPanel({ title, content, onInsertContent }: DataVizPanelPr
 
       setGenerationPhase('Creating embed');
 
-      // Get embed URL
-      const embedResult = await embedMutation.mutateAsync({
-        code: vizResult.code,
-        data: parsedData,
-      });
+      let embedUrl: string | undefined;
+      let iframeCode: string | undefined;
+
+      try {
+        const embedResult = await embedMutation.mutateAsync({
+          code: vizResult.code,
+          data: parsedData,
+        });
+        embedUrl = embedResult.embedUrl ?? undefined;
+        iframeCode = embedResult.iframeCode ?? undefined;
+      } catch (embedErr: any) {
+        // GIVE down — use native SVG chart as fallback
+        console.warn('[DataVizPanel] GIVE embed failed, using native fallback:', embedErr.message);
+        toast.info('GIVE engine unavailable — using native chart', { duration: 4000 });
+        const fallbackSvg = buildFallbackSvg(
+          extractedStats.length > 0 ? extractedStats : [{ label: 'Data', value: '—' }],
+          title || p
+        );
+        // Treat SVG as inline code instead of iframe
+        embedUrl = undefined;
+        iframeCode = `<figure style="margin:1.5rem 0">${fallbackSvg}<figcaption style="text-align:center;font-size:0.8rem;color:#9ca3af;margin-top:0.5rem">${caption || p.slice(0, 80)}</figcaption></figure>`;
+      }
 
       const newResult: VizResult = {
         code: vizResult.code,
         decision: vizResult.decision,
         metadata: vizResult.metadata,
-        embedUrl: embedResult.embedUrl ?? undefined,
-        iframeCode: embedResult.iframeCode ?? undefined,
+        embedUrl,
+        iframeCode,
       };
 
       setResult(newResult);
-      setHistory(prev => [newResult, ...prev.slice(0, 9)]); // Keep last 10
+      setHistory(prev => [newResult, ...prev.slice(0, 9)]);
       setPreviewOpen(true);
 
       const timeStr = vizResult.metadata?.totalTime
@@ -120,12 +206,12 @@ export function DataVizPanel({ title, content, onInsertContent }: DataVizPanelPr
         : '';
       toast.success(`Visualization created${timeStr ? ` in ${timeStr}` : ''} — $0.008`);
     } catch (err: any) {
-      toast.error('Generation failed: ' + (err.message || 'Unknown error'));
+      toast.error('Generation failed: ' + (err.message || 'Unknown error'), { duration: 8000 });
     } finally {
       setIsGenerating(false);
       setGenerationPhase('');
     }
-  }, [prompt, dataInput, title, content, visualizeMutation, embedMutation]);
+  }, [pendingPrompt, title, content, dataInput, extractedStats, caption, visualizeMutation, embedMutation]);
 
   const handleScore = useCallback(async () => {
     if (!result?.code) {
@@ -145,14 +231,20 @@ export function DataVizPanel({ title, content, onInsertContent }: DataVizPanelPr
   }, [result, prompt, scoreMutation]);
 
   const handleInsertEmbed = useCallback(() => {
-    if (!result?.embedUrl) {
-      toast.error('No embed URL available');
+    if (!result?.embedUrl && !result?.iframeCode) {
+      toast.error('No visualization to insert');
       return;
     }
-    const iframe = `\n\n<iframe src="${result.embedUrl}" width="100%" height="500" frameborder="0" style="border-radius: 12px; background: #0A0A0B;"></iframe>\n\n`;
-    onInsertContent(iframe);
-    toast.success('Visualization embedded in article');
-  }, [result, onInsertContent]);
+    const captionLine = caption.trim() ? `\n*${caption.trim()}${source.trim() ? ` — Source: ${source.trim()}` : ''}*` : '';
+    let html: string;
+    if (result.embedUrl) {
+      html = `\n\n<figure>\n<iframe src="${result.embedUrl}" width="100%" height="500" frameborder="0" style="border-radius:12px;background:#0A0A0B;"></iframe>${captionLine ? `\n<figcaption style="text-align:center;font-size:0.8rem;color:#9ca3af;margin-top:0.5rem">${caption.trim()}${source.trim() ? ` — Source: ${source.trim()}` : ''}</figcaption>` : ''}\n</figure>\n\n`;
+    } else {
+      html = `\n\n${result.iframeCode}${captionLine}\n\n`;
+    }
+    onInsertContent(html);
+    toast.success('Visualization inserted');
+  }, [result, caption, source, onInsertContent]);
 
   const handleCopyEmbed = useCallback(() => {
     if (result?.iframeCode) {
@@ -232,12 +324,44 @@ export function DataVizPanel({ title, content, onInsertContent }: DataVizPanelPr
         </details>
       </div>
 
+      {/* Data-clarity confirmation panel */}
+      {clarityStep === 'confirming' && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="p-2.5 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3 h-3 text-amber-400" />
+              <span className="text-[10px] font-semibold text-amber-400">Data I'll visualize</span>
+            </div>
+            {extractedStats.length > 0 ? (
+              <div className="space-y-0.5">
+                {extractedStats.map((s, i) => (
+                  <div key={i} className="flex items-center justify-between text-[10px]">
+                    <span className="text-muted-foreground truncate max-w-[160px]">{s.label}</span>
+                    <span className="font-mono font-semibold text-amber-300">{s.value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">No stats extracted — will visualize based on prompt only.</p>
+            )}
+            <div className="flex gap-1.5">
+              <Button size="sm" className="flex-1 h-7 text-[10px] gap-1 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleConfirmedGenerate}>
+                <Sparkles className="w-3 h-3" /> Confirm & Generate
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => setClarityStep('idle')}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Generate button */}
       <Button
         size="sm"
         className="w-full h-9 text-xs gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
         onClick={() => handleGenerate()}
-        disabled={isGenerating || !prompt.trim()}
+        disabled={isGenerating || !prompt.trim() || clarityStep === 'confirming'}
       >
         {isGenerating ? (
           <>
@@ -251,6 +375,22 @@ export function DataVizPanel({ title, content, onInsertContent }: DataVizPanelPr
           </>
         )}
       </Button>
+
+      {/* Caption + source */}
+      <div className="flex gap-1.5">
+        <Input
+          placeholder="Caption (optional)"
+          value={caption}
+          onChange={e => setCaption(e.target.value)}
+          className="text-[10px] h-7 flex-1"
+        />
+        <Input
+          placeholder="Source"
+          value={source}
+          onChange={e => setSource(e.target.value)}
+          className="text-[10px] h-7 w-24"
+        />
+      </div>
 
       {/* Quick prompts */}
       <div className="space-y-1">
