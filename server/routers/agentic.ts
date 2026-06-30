@@ -556,6 +556,64 @@ Return JSON:
       };
     }),
 
+  // ─── Agentic Continue — detect stage and run next step ───────────────────
+  agenticContinue: protectedProcedure
+    .input(z.object({
+      topic: z.string(),
+      content: z.string(),
+      templateId: z.string().optional(),
+      targetPublication: z.string().optional(),
+      model: z.string().default("gemini-flash"),
+    }))
+    .mutation(async ({ input }) => {
+      const words = input.content.trim().split(/\s+/).filter(Boolean).length;
+      const hasHeadings = /^#{2,3}\s/m.test(input.content);
+      const paragraphs = (input.content.match(/\n\n[^#\n]/g) || []).length;
+
+      type Stage = "empty" | "outline" | "partial" | "full";
+      let stage: Stage;
+      if (words < 30) stage = "empty";
+      else if (hasHeadings && paragraphs < 3) stage = "outline";
+      else if (words < 700) stage = "partial";
+      else stage = "full";
+
+      let action = "";
+      let continuation = "";
+
+      if (stage === "empty") {
+        const result = await invokeWithModel(input.model, [
+          { role: "system", content: `You are a senior editorial writer. Create a professional article outline.${input.targetPublication ? ` Target: ${input.targetPublication}.` : ""}` },
+          { role: "user", content: `Create a detailed article outline for: "${input.topic}"\n\nInclude: compelling headline, hook (2 sentences), 4-6 H2 sections with key points, closing strategy. Use markdown headings.` },
+        ], { maxTokens: 1200, temperature: 0.7 });
+        action = "Generated outline";
+        continuation = extractText(result);
+      } else if (stage === "outline") {
+        const result = await invokeWithModel(input.model, [
+          { role: "system", content: `You are a skilled writer drafting from an outline. Write professionally, match the outline's structure.${input.targetPublication ? ` Publication: ${input.targetPublication}.` : ""}` },
+          { role: "user", content: `Draft the first section of this article from the outline below. Write 300-400 words of actual prose (not bullet points). Start immediately after the first H2 heading.\n\nOUTLINE:\n${input.content}` },
+        ], { maxTokens: 800, temperature: 0.75 });
+        action = "Drafted first section";
+        continuation = extractText(result);
+      } else if (stage === "partial") {
+        const tail = input.content.slice(-3000);
+        const result = await invokeWithModel(input.model, [
+          { role: "system", content: `You are a skilled writer continuing an article in progress. Match the existing tone and style exactly. Do not repeat content already written.${input.targetPublication ? ` Publication: ${input.targetPublication}.` : ""}` },
+          { role: "user", content: `Continue this article naturally. Write the next 300-400 words, picking up exactly where it left off. Continue the argument, then move to the next section if appropriate.\n\nARTICLE SO FAR (last portion):\n${tail}` },
+        ], { maxTokens: 800, temperature: 0.75 });
+        action = "Continued draft";
+        continuation = extractText(result);
+      } else {
+        const result = await invokeWithModel(input.model, [
+          { role: "system", content: "You are a senior editor. Identify the 3 most impactful improvements for this article. Be specific with quotes and suggested rewrites." },
+          { role: "user", content: `Review this article and give 3 targeted enhancement suggestions (stronger hook, sharper evidence, better close):\n\n${input.content.slice(0, 5000)}` },
+        ], { maxTokens: 600, temperature: 0.6 });
+        action = "Enhancement suggestions";
+        continuation = extractText(result);
+      }
+
+      return { stage, action, continuation };
+    }),
+
   // ─── Continue Writing (AI Autocomplete) ───────────────────
   continueWriting: protectedProcedure
     .input(z.object({

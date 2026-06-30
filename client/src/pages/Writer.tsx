@@ -64,7 +64,7 @@ function ResearchPanel({ title, onInsertContent }: {
   const [deepQuery, setDeepQuery] = useState('');
   const [deepModel, setDeepModel] = useState('deepseek-r1');
   const [deepResult, setDeepResult] = useState<any>(null);
-  const perplexityMutation = trpc.research.perplexity.useMutation();
+  const gatherMutation = trpc.research.gather.useMutation();
 
   // Available research notes from the Research page
   const researchNotes = state.research || [];
@@ -73,18 +73,15 @@ function ResearchPanel({ title, onInsertContent }: {
     const query = deepQuery.trim() || title;
     if (!query) { toast.error('Enter a research topic or add a title'); return; }
     try {
-      const result = await perplexityMutation.mutateAsync({
-        query: `Conduct deep, publication-grade research on: ${query}. Include specific statistics, named sources, recent developments (2025-2026), and contrarian angles. Focus on data that would satisfy Bloomberg/WSJ editorial standards.`,
-        model: 'sonar-pro',
-        focusArea: 'investigative journalism research',
-        maxTokens: 6000,
-      });
+      const result = await gatherMutation.mutateAsync({ topic: query });
       if (result.success) {
         setDeepResult(result);
-        toast.success(`Deep research complete (${result.citations?.length || 0} citations)`);
+        const succeeded = result.sourcesLog.filter((l: any) => l.status === 'ok' && (l.count ?? 1) > 0).length;
+        const skipped = result.sourcesLog.filter((l: any) => l.status === 'skipped').length;
+        toast.success(`Research complete — ${succeeded} sources, ${skipped} skipped`);
       }
     } catch (err: any) {
-      toast.error('Research failed: ' + (err.message || 'Try again'));
+      toast.error('Research failed: ' + (err.message || 'Try again'), { duration: 8000 });
     }
   };
 
@@ -196,46 +193,79 @@ function ResearchPanel({ title, onInsertContent }: {
         <Button
           className="w-full h-8 text-xs gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
           onClick={handleDeepResearch}
-          disabled={perplexityMutation.isPending}
+          disabled={gatherMutation.isPending}
         >
-          {perplexityMutation.isPending
-            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Researching...</>
-            : <><Microscope className="w-3.5 h-3.5" /> Deep Research</>
+          {gatherMutation.isPending
+            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Gathering sources...</>
+            : <><Microscope className="w-3.5 h-3.5" /> Research + Outline</>
           }
         </Button>
       </div>
 
-      {/* Deep Research Results */}
+      {/* Research Results */}
       {deepResult && (
         <Card className="border-purple-500/20 bg-purple-500/5">
           <CardContent className="p-2 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-semibold text-purple-400">Research Results</p>
-              <Button
-                size="sm" variant="outline"
-                className="h-6 text-[9px] gap-1 border-purple-500/30 text-purple-400"
-                onClick={() => {
-                  onInsertContent(`\n\n## Deep Research\n\n${deepResult.content}\n`);
-                  toast.success('Research imported into article');
-                }}
-              >
-                Insert into Article
-              </Button>
-            </div>
-            <div className="text-[10px] text-muted-foreground max-h-60 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-              {deepResult.content?.slice(0, 2000)}
-              {deepResult.content?.length > 2000 && '...'}
-            </div>
-            {deepResult.citations?.length > 0 && (
-              <div className="pt-1 border-t border-purple-500/10">
-                <p className="text-[9px] font-medium text-purple-400 mb-0.5">Citations ({deepResult.citations.length}):</p>
-                {deepResult.citations.slice(0, 5).map((c: string, i: number) => (
-                  <a key={i} href={c} target="_blank" rel="noreferrer" className="block text-[9px] text-blue-400 hover:underline truncate">
-                    {c}
-                  </a>
+            {/* Source status */}
+            {deepResult.sourcesLog?.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {deepResult.sourcesLog.map((l: any, i: number) => (
+                  <span key={i} className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono ${l.status === 'ok' && (l.count ?? 1) > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-500/15 text-slate-500'}`}>
+                    {l.source}{l.count != null ? ` (${l.count})` : ''}
+                  </span>
                 ))}
               </div>
             )}
+
+            {/* Outline */}
+            {deepResult.outline?.headline && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-semibold text-purple-400">{deepResult.outline.headline}</p>
+                {deepResult.outline.hook && (
+                  <p className="text-[9px] text-muted-foreground italic">{deepResult.outline.hook}</p>
+                )}
+                {deepResult.outline.sections?.slice(0, 5).map((s: any, i: number) => (
+                  <div key={i} className="pl-2 border-l border-purple-500/20">
+                    <p className="text-[9px] font-medium text-purple-300">{s.heading}</p>
+                    {s.keyPoints?.slice(0, 2).map((p: string, j: number) => (
+                      <p key={j} className="text-[9px] text-muted-foreground">· {p}</p>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-1">
+              <Button
+                size="sm" variant="outline"
+                className="flex-1 h-6 text-[9px] gap-1 border-purple-500/30 text-purple-400"
+                onClick={() => {
+                  const ol = deepResult.outline;
+                  if (!ol) return;
+                  const sections = (ol.sections || []).map((s: any) =>
+                    `## ${s.heading}\n\n${s.keyPoints?.map((p: string) => `- ${p}`).join('\n') || ''}`
+                  ).join('\n\n');
+                  onInsertContent(`# ${ol.headline}\n\n*${ol.hook || ''}*\n\n${sections}\n\n${ol.close || ''}`);
+                  toast.success('Outline inserted');
+                }}
+              >
+                Insert Outline
+              </Button>
+              {deepResult.outline?.themes?.length > 0 && (
+                <Button
+                  size="sm" variant="outline"
+                  className="flex-1 h-6 text-[9px] gap-1 border-purple-500/30 text-purple-400"
+                  onClick={() => {
+                    const themes = deepResult.outline.themes.join(', ');
+                    const stats = (deepResult.outline.keyStats || []).map((s: any) => `- ${s.stat} (${s.context})`).join('\n');
+                    onInsertContent(`\n\n## Research Brief\n\n**Key themes:** ${themes}\n\n**Data points:**\n${stats}\n`);
+                    toast.success('Research brief inserted');
+                  }}
+                >
+                  Insert Brief
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -313,6 +343,7 @@ export default function Writer() {
 
   // tRPC mutations
   const scoreMutation = trpc.ai.score.useMutation();
+  const agenticContinueMutation = trpc.agentic.agenticContinue.useMutation();
   const draftMutation = trpc.ai.draft.useMutation();
   const rewriteMutation = trpc.ai.rewrite.useMutation();
   const saveArticleMutation = trpc.data.articles.create.useMutation();
@@ -683,6 +714,25 @@ export default function Writer() {
       toast.success('Article created and saved');
     }
   }, [title, editorHtml, content, wordCount, selectedPub, selectedVoice, selectedTemplate, scores, activeArticleId, selectedBrandId, selectedProductId, activeBrandObj, addArticle, updateArticle, dbArticleId, saveArticleMutation, updateArticleMutation, assignTeam]);
+
+  // ─── Agentic Continue: detect stage and run appropriate next step ────────────
+  const handleAgenticContinue = async () => {
+    if (!title.trim()) { toast.error('Add a title first'); return; }
+    const toastId = toast.loading('Detecting stage…');
+    try {
+      const result = await agenticContinueMutation.mutateAsync({
+        topic: title,
+        content,
+        templateId: selectedTemplate || undefined,
+        targetPublication: selectedPub?.name,
+        model: writerSettings.models?.pipeline || 'gemini-flash',
+      });
+      insertRichContent('\n\n' + result.continuation);
+      toast.success(`${result.action} (stage: ${result.stage})`, { id: toastId });
+    } catch (err: any) {
+      toast.error('Agentic continue failed: ' + (err.message || 'Unknown'), { id: toastId, duration: 8000 });
+    }
+  };
 
   // ─── Full Pipeline: Title → Research → Draft → Proof → Score → Save ────────
   const fullPipelineMutation = trpc.queue.generateArticle.useMutation();
@@ -1486,6 +1536,18 @@ ${editorHtml}
                 >
                   {draftMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
                   {draftMutation.isPending ? 'Writing...' : 'AI Draft'}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1 border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
+                  disabled={agenticContinueMutation.isPending || !title.trim()}
+                  onClick={handleAgenticContinue}
+                  title="Detects current stage and continues automatically"
+                >
+                  {agenticContinueMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bot className="w-3 h-3" />}
+                  {agenticContinueMutation.isPending ? 'Continuing...' : 'Continue'}
                 </Button>
 
                 <Button

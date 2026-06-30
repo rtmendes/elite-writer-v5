@@ -6,6 +6,7 @@ import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { ENV } from "../_core/env";
 import { academicSearch, formatForLLM, type AcademicResult } from "../lib/academic-search";
+import { invokeLLM, TIER } from "../_core/llm";
 
 export const researchRouter = router({
 
@@ -45,7 +46,9 @@ export const researchRouter = router({
       maxTokens: z.number().default(4000),
     }))
     .mutation(async ({ input }) => {
-      if (!ENV.perplexityApiKey) throw new Error("PERPLEXITY_API_KEY not configured");
+      if (!ENV.perplexityApiKey) {
+        return { success: false, error: "PERPLEXITY_API_KEY not configured", content: "", citations: [] };
+      }
 
       const systemPrompt = input.focusArea
         ? `You are a research assistant specializing in ${input.focusArea}. Provide comprehensive, well-sourced analysis.`
@@ -70,7 +73,7 @@ export const researchRouter = router({
 
       if (!resp.ok) {
         const body = await resp.text();
-        throw new Error(`Perplexity error (${resp.status}): ${body.slice(0, 200)}`);
+        return { success: false, error: `HTTP ${resp.status}`, content: body.slice(0, 200), citations: [] };
       }
 
       const data = await resp.json() as any;
@@ -285,6 +288,160 @@ export const researchRouter = router({
         status: resp.status,
         message: resp.ok ? "Webhook delivered" : `Webhook failed (${resp.status})`,
       };
+    }),
+
+  // ── Multi-source research gather — FREE-FIRST, Perplexity optional last ──
+  // Each source independently wrapped; one failure never blocks others.
+  // Status log: name + ok/skipped only — key values never logged.
+  gather: protectedProcedure
+    .input(z.object({
+      topic: z.string().min(1),
+      templateId: z.string().optional(),
+      targetPublication: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      type SourceLog = { source: string; status: "ok" | "skipped"; count?: number; reason?: string };
+      const log: SourceLog[] = [];
+      let allText = "";
+
+      // 1. Academic (free, no key required)
+      try {
+        const academic = await academicSearch(input.topic, { maxPerSource: 5, includePubMed: false });
+        if (academic.length > 0) {
+          allText += "\n\nACADEMIC SOURCES:\n" + formatForLLM(academic, 8);
+        }
+        log.push({ source: "OpenAlex/CrossRef/Semantic Scholar", status: "ok", count: academic.length });
+      } catch (e: any) {
+        log.push({ source: "academic", status: "skipped", reason: e.message?.slice(0, 50) });
+      }
+
+      // 2. Brave Search (if key configured)
+      if (ENV.braveApiKey) {
+        try {
+          const params = new URLSearchParams({ q: input.topic, count: "10", text_decorations: "false" });
+          const resp = await fetch(`https://api.search.brave.com/res/v1/web/search?${params}`, {
+            headers: { Accept: "application/json", "X-Subscription-Token": ENV.braveApiKey },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!resp.ok) {
+            log.push({ source: "brave", status: "skipped", reason: `HTTP ${resp.status}` });
+          } else {
+            const data = await resp.json() as any;
+            const results = (data.web?.results || []).slice(0, 8);
+            if (results.length) {
+              allText += "\n\nWEB RESULTS:\n" + results.map((r: any) => `- ${r.title}: ${r.description || ""}`).join("\n");
+            }
+            log.push({ source: "brave", status: "ok", count: results.length });
+          }
+        } catch (e: any) {
+          log.push({ source: "brave", status: "skipped", reason: e.message?.slice(0, 50) });
+        }
+      } else {
+        log.push({ source: "brave", status: "skipped", reason: "no key" });
+      }
+
+      // 3. YouTube (if key configured)
+      if (ENV.youtubeApiKey) {
+        try {
+          const params = new URLSearchParams({ part: "snippet", q: input.topic, maxResults: "5", type: "video", key: ENV.youtubeApiKey });
+          const resp = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`, {
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!resp.ok) {
+            log.push({ source: "youtube", status: "skipped", reason: `HTTP ${resp.status}` });
+          } else {
+            const data = await resp.json() as any;
+            const items = (data.items || []).slice(0, 5);
+            if (items.length) {
+              allText += "\n\nYOUTUBE CONTENT:\n" + items.map((i: any) => `- ${i.snippet?.title}: ${(i.snippet?.description || "").slice(0, 100)}`).join("\n");
+            }
+            log.push({ source: "youtube", status: "ok", count: items.length });
+          }
+        } catch (e: any) {
+          log.push({ source: "youtube", status: "skipped", reason: e.message?.slice(0, 50) });
+        }
+      } else {
+        log.push({ source: "youtube", status: "skipped", reason: "no key" });
+      }
+
+      // 4. Perplexity — LAST, OPTIONAL, never blocks
+      if (ENV.perplexityApiKey) {
+        try {
+          const resp = await fetch("https://api.perplexity.ai/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${ENV.perplexityApiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "sonar",
+              messages: [
+                { role: "system", content: "You are a research assistant. Provide concise, sourced research." },
+                { role: "user", content: `Research for article: ${input.topic}. Key facts, statistics, expert voices, recent developments (2025-2026).` },
+              ],
+              max_tokens: 2000,
+            }),
+            signal: AbortSignal.timeout(25000),
+          });
+          if (!resp.ok) {
+            log.push({ source: "perplexity", status: "skipped", reason: `HTTP ${resp.status}` });
+          } else {
+            const data = await resp.json() as any;
+            const content: string = data.choices?.[0]?.message?.content || "";
+            if (content) {
+              allText += "\n\nWEB RESEARCH:\n" + content.slice(0, 3000);
+            }
+            log.push({ source: "perplexity", status: "ok" });
+          }
+        } catch (e: any) {
+          log.push({ source: "perplexity", status: "skipped", reason: e.message?.slice(0, 50) });
+        }
+      } else {
+        log.push({ source: "perplexity", status: "skipped", reason: "no key" });
+      }
+
+      // 5. Generate editorial outline via free LLM
+      const hasData = log.some(l => l.status === "ok" && (l.count ?? 1) > 0);
+      let outline: any = { headline: input.topic, sections: [], themes: [], keyStats: [], openGaps: [] };
+
+      try {
+        const outlinerResult = await invokeLLM({
+          model: TIER.free,
+          messages: [
+            { role: "system", content: "You are a senior editorial strategist at a tier-1 publication. Return ONLY valid JSON. No commentary, no markdown." },
+            {
+              role: "user",
+              content: `Topic: ${input.topic}
+${input.targetPublication ? `Target Publication: ${input.targetPublication}` : ""}
+${input.templateId ? `Template: ${input.templateId}` : ""}
+
+GATHERED RESEARCH:
+${allText.slice(0, 6000) || "(No external sources — use topic knowledge)"}
+
+Return this exact JSON structure:
+{
+  "themes": ["<key theme>"],
+  "keyStats": [{"stat": "<statistic>", "context": "<relevance>"}],
+  "expertVoices": ["<expert or institution to cite>"],
+  "openGaps": ["<coverage gap this article should fill>"],
+  "headline": "<compelling headline>",
+  "subheadline": "<supporting subheadline>",
+  "hook": "<opening 2 sentences>",
+  "sections": [
+    {"heading": "<H2 heading>", "keyPoints": ["<point to cover>"], "wordTarget": 150, "evidence": "<specific data or quote to use>"}
+  ],
+  "close": "<closing strategy>",
+  "seoKeywords": ["<keyword>"]
+}`,
+            },
+          ],
+          maxTokens: 2000,
+          response_format: { type: "json_object" },
+        });
+        const raw = outlinerResult.choices[0]?.message?.content || "{}";
+        outline = JSON.parse(raw);
+      } catch {
+        // keep default outline
+      }
+
+      return { success: true, hasData, sourcesLog: log, outline };
     }),
 
   // System status

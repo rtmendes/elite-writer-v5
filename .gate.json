@@ -1,0 +1,6 @@
+{
+  "typecheck": "npx tsc --noEmit",
+  "test": "npm test --silent",
+  "build": "npm run build",
+  "envGuard": { "enabled": true, "minKeys": 20, "minBytes": 500, "globs": [".env.production"] }
+}
