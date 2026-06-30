@@ -553,7 +553,7 @@ export default function Writer() {
         toast.success(`Draft generated (${tokens} tokens)`, { id: toastId });
       }
     } catch (err: any) {
-      toast.error('AI draft failed: ' + (err.message || 'Unknown error'), { id: toastId });
+      toast.error('AI draft failed: ' + (err.message || 'Unknown error'), { id: toastId, duration: 8000 });
     }
   };
 

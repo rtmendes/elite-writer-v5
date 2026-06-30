@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { like } from "drizzle-orm";
 import { publicProcedure, router } from "../_core/trpc";
-import { invokeLLM } from "../_core/llm";
+import { invokeLLM, TIER } from "../_core/llm";
 import { skillBlockFor } from "../_core/skills";
 import { getDb } from "../db";
 import { publications, aiUsage } from "../../drizzle/schema";
@@ -278,6 +278,7 @@ Return JSON with this exact structure:
     )
     .mutation(async ({ input }) => {
       const result = await invokeLLM({
+        model: TIER.fast,
         messages: [
           {
             role: "system",
