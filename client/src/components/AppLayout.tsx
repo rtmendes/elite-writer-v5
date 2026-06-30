@@ -34,6 +34,7 @@ const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { path: '/pulse', label: 'Pulse Pipeline', icon: Zap, description: 'AI stories → matched articles' },
       { path: '/ideas', label: 'Ideas', icon: Lightbulb, description: 'Article idea pipeline' },
       { path: '/research', label: 'Research', icon: Search, description: 'Data & source gathering' },
+      { path: '/research-library', label: 'Research Library', icon: Library, description: 'Knowledge library — items, highlights, folders' },
       { path: '/writer', label: 'Writer', icon: PenTool, description: 'AI-enhanced editor' },
       { path: '/workspace', label: 'Workspace', icon: LayoutGrid, description: 'Pages, databases & boards' },
       { path: '/queue', label: 'Queue', icon: Inbox, description: 'Pre-written article pipeline' },

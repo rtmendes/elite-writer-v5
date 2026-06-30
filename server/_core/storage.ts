@@ -64,3 +64,32 @@ export async function uploadDataUrl(dataUrl: string, keyPrefix = "covers"): Prom
   const base = ENV.r2PublicUrl.replace(/\/$/, "");
   return base ? `${base}/${key}` : endpoint;
 }
+
+/** Upload arbitrary bytes to R2. Returns the r2 key (not a public URL) so callers
+ *  can construct signed or private URLs. Returns null if storage not configured. */
+export async function uploadBuffer(
+  buf: Buffer | Uint8Array,
+  key: string,
+  contentType = "text/plain",
+): Promise<string | null> {
+  if (!storageConfigured()) return null;
+  const endpoint = `https://${ENV.r2AccountId}.r2.cloudflarestorage.com/${ENV.r2Bucket}/${key}`;
+  const resp = await getClient().fetch(endpoint, {
+    method: "PUT",
+    body: buf as unknown as BodyInit,
+    headers: { "Content-Type": contentType },
+  });
+  if (!resp.ok) {
+    throw new Error(`R2 upload failed: ${resp.status} ${(await resp.text()).slice(0, 160)}`);
+  }
+  return key;
+}
+
+/** Download a key from R2 as text. Returns null if not configured or key missing. */
+export async function downloadText(key: string): Promise<string | null> {
+  if (!storageConfigured()) return null;
+  const endpoint = `https://${ENV.r2AccountId}.r2.cloudflarestorage.com/${ENV.r2Bucket}/${key}`;
+  const resp = await getClient().fetch(endpoint, { method: "GET" });
+  if (!resp.ok) return null;
+  return resp.text();
+}

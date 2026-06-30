@@ -1043,6 +1043,86 @@ export const wsRows = mysqlTable("wsRows", {
   deleted: boolean("deleted").notNull().default(false),
 });
 
+// ─── Research Library (P1) ───────────────────────────────────
+// Folder hierarchy for organizing research items
+export const researchFolders = mysqlTable("research_folders", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 300 }).notNull(),
+  parentId: int("parentId"),
+  color: varchar("color", { length: 20 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ResearchFolder = typeof researchFolders.$inferSelect;
+export type InsertResearchFolder = typeof researchFolders.$inferInsert;
+
+// Projects group research items around a writing initiative
+export const researchProjects = mysqlTable("research_projects", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 300 }).notNull(),
+  description: text("description"),
+  status: mysqlEnum("rpStatus", ["active", "archived"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ResearchProject = typeof researchProjects.$inferSelect;
+export type InsertResearchProject = typeof researchProjects.$inferInsert;
+
+// Core library item — metadata in DB, full body in R2 (r2Key)
+export const researchItems = mysqlTable("research_items", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  folderId: int("folderId"),
+  projectId: int("projectId"),
+  contentType: varchar("contentType", { length: 40 }).notNull().default("webpage"), // webpage | pdf | video | academic | manual
+  title: varchar("title", { length: 700 }).notNull(),
+  url: varchar("url", { length: 2000 }),
+  r2Key: varchar("r2Key", { length: 500 }), // full body/PDF stored in R2
+  authors: json("authors"),       // string[]
+  year: int("year"),
+  doi: varchar("doi", { length: 200 }),
+  publication: varchar("publication", { length: 300 }),
+  abstract: text("abstract"),
+  tags: json("tags"),             // string[]
+  refKey: varchar("refKey", { length: 100 }), // user cite key e.g. smith2024a
+  source: varchar("source", { length: 120 }), // academic | brave | youtube | manual | …
+  citationCount: int("citationCount").default(0),
+  status: mysqlEnum("riStatus", ["inbox", "saved", "archived"]).default("inbox").notNull(),
+  notes: text("notes"),
+  metadata: json("metadata"),     // flexible extras (thumbnailUrl, duration, etc.)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type ResearchItem = typeof researchItems.$inferSelect;
+export type InsertResearchItem = typeof researchItems.$inferInsert;
+
+// Highlights — text selections + annotations on a research item
+export const researchHighlights = mysqlTable("research_highlights", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  itemId: int("itemId").notNull(),
+  text: text("text").notNull(),
+  note: text("note"),
+  color: varchar("color", { length: 20 }).default("yellow"),
+  position: json("position"), // {charStart?, charEnd?, page?}
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ResearchHighlight = typeof researchHighlights.$inferSelect;
+export type InsertResearchHighlight = typeof researchHighlights.$inferInsert;
+
+// Backlinks — article ↔ research item associations
+export const articleResearch = mysqlTable("article_research", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  articleId: int("articleId").notNull(),
+  itemId: int("itemId").notNull(),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ArticleResearch = typeof articleResearch.$inferSelect;
+export type InsertArticleResearch = typeof articleResearch.$inferInsert;
+
 // Template SOPs — one per writing template, editable in-app.
 // The Drafter injects the active SOP into its system prompt so output
 // follows the section order, word targets, evidence rules, etc.
