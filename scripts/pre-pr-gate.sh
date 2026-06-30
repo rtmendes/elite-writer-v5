@@ -2,11 +2,22 @@
 # pre-pr-gate.sh — InsightProfit Lane Gate
 # Run before any merge. Exits 1 on any failure.
 # Reads .gate.json at repo root for per-repo config.
-# Usage: bash scripts/pre-pr-gate.sh [path/to/repo]
+# Usage: bash scripts/pre-pr-gate.sh [path/to/repo] [--env-only]
+#   --env-only  Skip typecheck/test/lint/build; run env-guard only.
+#               Use on VPS where node_modules may not be writable.
 
 set -euo pipefail
 
-REPO_DIR="${1:-$(pwd)}"
+ENV_ONLY=false
+REPO_DIR=""
+for arg in "$@"; do
+  case "$arg" in
+    --env-only) ENV_ONLY=true ;;
+    *) REPO_DIR="$arg" ;;
+  esac
+done
+REPO_DIR="${REPO_DIR:-$(pwd)}"
+
 GATE_FILE="$REPO_DIR/.gate.json"
 PASS=0
 FAIL=1
@@ -85,72 +96,79 @@ fi
 printf "  %-20s | %-6s | %s\n" "CHECK" "RESULT" "DETAIL"
 printf "  %-20s-+-%s\n" "--------------------" "--------+-------------------------------------"
 
-# ── 1. typecheck ─────────────────────────────────────────────────────────────
+# ── 1–4. typecheck / tests / lint / build (skipped in --env-only mode) ───────
 
-tc_cmd=$(json_field "$GATE_FILE" "typecheck")
-if [[ -n "$tc_cmd" ]]; then
-  tc_out=$(cd "$REPO_DIR" && eval "$tc_cmd" 2>&1) && tc_exit=0 || tc_exit=$?
-  if [[ $tc_exit -eq 0 ]]; then
-    print_row "typecheck" "PASS" "$tc_cmd"
-  else
-    first_err=$(echo "$tc_out" | grep -m1 "error TS" | head -c 80 || echo "see output")
-    print_row "typecheck" "FAIL" "$first_err"
-    overall=1
-  fi
+if [[ $ENV_ONLY == true ]]; then
+  print_row "typecheck" "SKIP" "--env-only mode"
+  print_row "tests"     "SKIP" "--env-only mode"
+  print_row "lint"      "SKIP" "--env-only mode"
+  print_row "build"     "SKIP" "--env-only mode"
 else
-  print_row "typecheck" "SKIP" "not configured"
-fi
 
-# ── 2. tests ─────────────────────────────────────────────────────────────────
-
-test_cmd=$(json_field "$GATE_FILE" "test")
-if [[ -n "$test_cmd" ]]; then
-  test_out=$(cd "$REPO_DIR" && eval "$test_cmd" 2>&1) && test_exit=0 || test_exit=$?
-  if [[ $test_exit -eq 0 ]]; then
-    passed=$(echo "$test_out" | grep -oE '[0-9]+ passed' | tail -1 || echo "")
-    print_row "tests" "PASS" "${passed:-exit 0}"
+  # ── 1. typecheck ────────────────────────────────────────────────────────────
+  tc_cmd=$(json_field "$GATE_FILE" "typecheck")
+  if [[ -n "$tc_cmd" ]]; then
+    tc_out=$(cd "$REPO_DIR" && eval "$tc_cmd" 2>&1) && tc_exit=0 || tc_exit=$?
+    if [[ $tc_exit -eq 0 ]]; then
+      print_row "typecheck" "PASS" "$tc_cmd"
+    else
+      first_err=$(echo "$tc_out" | grep -m1 "error TS" | head -c 80 || echo "see output")
+      print_row "typecheck" "FAIL" "$first_err"
+      overall=1
+    fi
   else
-    failed=$(echo "$test_out" | grep -oE '[0-9]+ failed' | tail -1 \
-             || echo "$test_out" | tail -1 | head -c 80)
-    print_row "tests" "FAIL" "$failed"
-    overall=1
+    print_row "typecheck" "SKIP" "not configured"
   fi
-else
-  print_row "tests" "SKIP" "not configured"
-fi
 
-# ── 3. lint ──────────────────────────────────────────────────────────────────
-
-lint_cmd=$(json_field "$GATE_FILE" "lint")
-if [[ -n "$lint_cmd" ]]; then
-  lint_out=$(cd "$REPO_DIR" && eval "$lint_cmd" 2>&1) && lint_exit=0 || lint_exit=$?
-  if [[ $lint_exit -eq 0 ]]; then
-    print_row "lint" "PASS" "$lint_cmd"
+  # ── 2. tests ────────────────────────────────────────────────────────────────
+  test_cmd=$(json_field "$GATE_FILE" "test")
+  if [[ -n "$test_cmd" ]]; then
+    test_out=$(cd "$REPO_DIR" && eval "$test_cmd" 2>&1) && test_exit=0 || test_exit=$?
+    if [[ $test_exit -eq 0 ]]; then
+      passed=$(echo "$test_out" | grep -oE '[0-9]+ passed' | tail -1 || echo "")
+      print_row "tests" "PASS" "${passed:-exit 0}"
+    else
+      failed=$(echo "$test_out" | grep -oE '[0-9]+ failed' | tail -1 \
+               || echo "$test_out" | tail -1 | head -c 80)
+      print_row "tests" "FAIL" "$failed"
+      overall=1
+    fi
   else
-    first_lint=$(echo "$lint_out" | grep -v "^$" | head -1 | head -c 80 || echo "see output")
-    print_row "lint" "FAIL" "$first_lint"
-    overall=1
+    print_row "tests" "SKIP" "not configured"
   fi
-else
-  print_row "lint" "SKIP" "not configured"
-fi
 
-# ── 4. build (optional) ──────────────────────────────────────────────────────
-
-build_cmd=$(json_field "$GATE_FILE" "build")
-if [[ -n "$build_cmd" ]]; then
-  build_out=$(cd "$REPO_DIR" && eval "$build_cmd" 2>&1) && build_exit=0 || build_exit=$?
-  if [[ $build_exit -eq 0 ]]; then
-    print_row "build" "PASS" "$build_cmd"
+  # ── 3. lint ─────────────────────────────────────────────────────────────────
+  lint_cmd=$(json_field "$GATE_FILE" "lint")
+  if [[ -n "$lint_cmd" ]]; then
+    lint_out=$(cd "$REPO_DIR" && eval "$lint_cmd" 2>&1) && lint_exit=0 || lint_exit=$?
+    if [[ $lint_exit -eq 0 ]]; then
+      print_row "lint" "PASS" "$lint_cmd"
+    else
+      first_lint=$(echo "$lint_out" | grep -v "^$" | head -1 | head -c 80 || echo "see output")
+      print_row "lint" "FAIL" "$first_lint"
+      overall=1
+    fi
   else
-    first_build=$(echo "$build_out" | grep -iE "error|failed" | head -1 | head -c 80 \
-                  || echo "exit $build_exit")
-    print_row "build" "FAIL" "$first_build"
-    overall=1
+    print_row "lint" "SKIP" "not configured"
   fi
-else
-  print_row "build" "SKIP" "not configured"
-fi
+
+  # ── 4. build ────────────────────────────────────────────────────────────────
+  build_cmd=$(json_field "$GATE_FILE" "build")
+  if [[ -n "$build_cmd" ]]; then
+    build_out=$(cd "$REPO_DIR" && eval "$build_cmd" 2>&1) && build_exit=0 || build_exit=$?
+    if [[ $build_exit -eq 0 ]]; then
+      print_row "build" "PASS" "$build_cmd"
+    else
+      first_build=$(echo "$build_out" | grep -iE "error|failed" | head -1 | head -c 80 \
+                    || echo "exit $build_exit")
+      print_row "build" "FAIL" "$first_build"
+      overall=1
+    fi
+  else
+    print_row "build" "SKIP" "not configured"
+  fi
+
+fi # end non-env-only checks
 
 # ── 5. env guard ─────────────────────────────────────────────────────────────
 
