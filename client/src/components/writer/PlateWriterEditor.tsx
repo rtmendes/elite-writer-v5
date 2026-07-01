@@ -409,7 +409,7 @@ export function PlateWriterEditor({
           />
         </div>
       ) : (
-        <div className="writer-plate-container flex-1 overflow-y-auto">
+        <div className="writer-plate-container flex-1 overflow-hidden min-h-0">
           <InlineAIProvider rewrite={onAIRewrite}>
             <Plate editor={editor} onValueChange={scheduleEmit} readOnly={readOnly}>
               <EditorContainer>
