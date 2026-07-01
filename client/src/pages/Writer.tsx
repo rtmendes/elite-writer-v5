@@ -64,10 +64,13 @@ function ResearchPanel({ title, onInsertContent }: {
   const [deepQuery, setDeepQuery] = useState('');
   const [deepModel, setDeepModel] = useState('deepseek-r1');
   const [deepResult, setDeepResult] = useState<any>(null);
+  const [researchFilter, setResearchFilter] = useState('');
   const gatherMutation = trpc.research.gather.useMutation();
 
-  // Available research notes from the Research page
   const researchNotes = state.research || [];
+  const filteredNotes = researchFilter
+    ? researchNotes.filter((n: any) => n.title?.toLowerCase().includes(researchFilter.toLowerCase()))
+    : researchNotes;
 
   const handleDeepResearch = async () => {
     const query = deepQuery.trim() || title;
@@ -91,7 +94,7 @@ function ResearchPanel({ title, onInsertContent }: {
             ? `\n\n**Data points:**\n${(ol.keyStats as any[]).map((s: any) => `- ${s.stat} (${s.context})`).join('\n')}`
             : '';
           const brief = themes || stats ? `## Research Brief${themes}${stats}\n\n---\n\n` : '';
-          onInsertContent(`${brief}# ${ol.headline}\n\n*${ol.hook || ''}*\n\n${sections}\n\n${ol.close || ''}`);
+          onInsertContent(formatWithTOC(`${brief}# ${ol.headline}\n\n*${ol.hook || ''}*\n\n${sections}\n\n${ol.close || ''}`));
         }
       }
     } catch (err: any) {
@@ -109,8 +112,17 @@ function ResearchPanel({ title, onInsertContent }: {
             <span className="text-xs font-semibold text-blue-400">Available Research</span>
             <Badge variant="outline" className="text-[9px] ml-auto">{researchNotes.length}</Badge>
           </div>
-          <div className="space-y-1 max-h-40 overflow-y-auto">
-            {researchNotes.slice(0, 8).map((note: any) => (
+          <div className="relative mb-1.5">
+            <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Input
+              value={researchFilter}
+              onChange={e => setResearchFilter(e.target.value)}
+              placeholder="Filter research…"
+              className="pl-6 h-6 text-[10px] bg-white/5 border-white/10 text-slate-300"
+            />
+          </div>
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {filteredNotes.map((note: any) => (
               <button
                 key={note.id}
                 className="w-full text-left p-2 rounded-md bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/10 transition-colors"
@@ -382,8 +394,30 @@ function deslop(text: string): string {
   for (const [pattern, replacement] of SLOP_PATTERNS) {
     out = out.replace(pattern, replacement);
   }
-  // Collapse double spaces created by empty replacements
   return out.replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+$/gm, "");
+}
+
+function formatWithTOC(text: string): string {
+  const lines = text.split('\n');
+  const headings: Array<{ level: number; text: string; slug: string }> = [];
+  for (const line of lines) {
+    const m = line.match(/^(#{2,3})\s+(.+)/);
+    if (m) {
+      const t = m[2].trim();
+      headings.push({
+        level: m[1].length,
+        text: t,
+        slug: t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+      });
+    }
+  }
+  if (headings.length < 2) return text;
+  const toc = ['## Table of Contents', ''];
+  for (const h of headings) {
+    toc.push(`${h.level === 3 ? '  ' : ''}- [${h.text}](#${h.slug})`);
+  }
+  toc.push('', '---', '');
+  return toc.join('\n') + '\n' + text;
 }
 
 // ─── Main Writer Component ──────────────────────────────────
@@ -718,7 +752,7 @@ export default function Writer() {
         wordCount: template?.wordCountRange[1] || 1500,
       });
       if (result.success && result.text) {
-        const clean = deslop(result.text);
+        const clean = formatWithTOC(deslop(result.text));
         setContent(prev => prev ? prev + '\n\n---\n\n' + clean : clean);
         const tokens = result.usage?.total_tokens || 0;
         toast.success(`Draft generated (${tokens} tokens)`, { id: toastId });

@@ -426,9 +426,14 @@ function BulkImportDialog({
 
 // ─── Reading Pane ─────────────────────────────────────────────────────────────
 
-function ReadingPane({ item, onClose, split }: { item: any | null; onClose: () => void; split: boolean }) {
+function ReadingPane({ item, onClose, split, projects }: { item: any | null; onClose: () => void; split: boolean; projects: any[] }) {
   const [newHighlight, setNewHighlight] = useState("");
   const [shareToken, setShareToken] = useState<string | null>(null);
+  const [projectPickerId, setProjectPickerId] = useState<number | null>(null);
+  const updateItem = trpc.researchLibrary.items.update.useMutation({
+    onSuccess: () => { toast.success("Added to project"); setProjectPickerId(null); },
+    onError: e => toast.error(e.message),
+  });
   const createFromResearch = trpc.data.articles.createFromResearch.useMutation({
     onSuccess: (r) => { window.location.href = `/writer/${r.id}`; },
     onError: (e) => toast.error(e.message),
@@ -476,18 +481,16 @@ function ReadingPane({ item, onClose, split }: { item: any | null; onClose: () =
         </button>
       </div>
 
-      {/* P3a: Research → Article bridge actions */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/5 shrink-0">
+      {/* Research → Article: 3-way choice */}
+      <div className="flex items-center flex-wrap gap-1.5 px-3 py-2 border-b border-white/5 shrink-0">
         <Button
           size="sm"
           disabled={createFromResearch.isPending}
           onClick={() => createFromResearch.mutate({ itemId: item.id })}
-          className="text-xs h-7 gap-1 bg-amber-600/80 hover:bg-amber-600 text-white flex-1"
+          className="text-xs h-7 gap-1 bg-amber-600/80 hover:bg-amber-600 text-white"
         >
-          {createFromResearch.isPending
-            ? <Loader2 className="w-3 h-3 animate-spin" />
-            : <PenTool className="w-3 h-3" />}
-          Start article
+          {createFromResearch.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <PenTool className="w-3 h-3" />}
+          New article
         </Button>
         <Button
           size="sm"
@@ -496,11 +499,37 @@ function ReadingPane({ item, onClose, split }: { item: any | null; onClose: () =
           className="text-xs h-7 gap-1 text-slate-400 hover:text-slate-200"
         >
           <Plus className="w-3 h-3" />
-          Insert
+          Add to existing
         </Button>
+        {projects.length > 0 && (
+          <div className="flex items-center gap-1">
+            <Select
+              value={projectPickerId ? String(projectPickerId) : ""}
+              onValueChange={v => setProjectPickerId(v ? Number(v) : null)}
+            >
+              <SelectTrigger className="h-7 text-[10px] bg-white/5 border-white/10 text-slate-300 w-28">
+                <SelectValue placeholder="Project…" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((p: any) => (
+                  <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!projectPickerId || updateItem.isPending}
+              onClick={() => projectPickerId && updateItem.mutate({ id: item.id, projectId: projectPickerId })}
+              className="text-xs h-7 text-amber-400 hover:text-amber-300 px-2"
+            >
+              Add
+            </Button>
+          </div>
+        )}
         <button
           onClick={() => createShare.mutate({ ownerType: "item", ownerId: item.id })}
-          className="text-slate-500 hover:text-amber-400 transition-colors p-1"
+          className="text-slate-500 hover:text-amber-400 transition-colors p-1 ml-auto"
           title="Share link"
         >
           {shareToken ? <Link2 className="w-3.5 h-3.5 text-amber-400" /> : <Share2 className="w-3.5 h-3.5" />}
@@ -666,6 +695,20 @@ export default function ResearchLibrary() {
     )).then(() => { setSelectedIds(new Set()); toast.success("Archived"); });
   }
 
+  function bulkMoveToFolder(folderId: number) {
+    if (selectedIds.size === 0) return;
+    Promise.all(Array.from(selectedIds).map(id => updateItem.mutateAsync({ id, folderId })))
+      .then(() => { setSelectedIds(new Set()); toast.success(`Moved ${selectedIds.size} items`); })
+      .catch(e => toast.error(e.message));
+  }
+
+  function bulkAddToProject(projectId: number) {
+    if (selectedIds.size === 0) return;
+    Promise.all(Array.from(selectedIds).map(id => updateItem.mutateAsync({ id, projectId })))
+      .then(() => { setSelectedIds(new Set()); toast.success(`Added ${selectedIds.size} items to project`); })
+      .catch(e => toast.error(e.message));
+  }
+
   return (
     <div className="h-screen flex flex-col bg-[#0f0f1a] text-slate-100 overflow-hidden">
       {/* Top bar */}
@@ -704,8 +747,32 @@ export default function ResearchLibrary() {
           </SelectContent>
         </Select>
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
             <span className="text-xs text-slate-400">{selectedIds.size} selected</span>
+            {(foldersQ.data ?? []).length > 0 && (
+              <Select onValueChange={v => v && bulkMoveToFolder(Number(v))}>
+                <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-slate-300 w-32">
+                  <SelectValue placeholder="→ Folder" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(foldersQ.data ?? []).map((f: any) => (
+                    <SelectItem key={f.id} value={String(f.id)}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {(projectsQ.data ?? []).length > 0 && (
+              <Select onValueChange={v => v && bulkAddToProject(Number(v))}>
+                <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-slate-300 w-32">
+                  <SelectValue placeholder="→ Project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(projectsQ.data ?? []).map((p: any) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button size="sm" variant="ghost" onClick={bulkArchive}
               className="text-xs text-slate-400 hover:text-slate-200 h-7">
               Archive
@@ -847,7 +914,7 @@ export default function ResearchLibrary() {
         </div>
 
         {/* Pane 3 — Reading pane (split-view aware) */}
-        <ReadingPane item={activeItem} onClose={() => setActiveItem(null)} split={splitView} />
+        <ReadingPane item={activeItem} onClose={() => setActiveItem(null)} split={splitView} projects={projectsQ.data ?? []} />
       </div>
 
       {/* Dialogs */}
