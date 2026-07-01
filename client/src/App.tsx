@@ -37,6 +37,7 @@ import BrandVoice from "./pages/BrandVoice";
 import TaskCenter from "./pages/TaskCenter";
 import KnowledgeHub from "./pages/KnowledgeHub";
 import ResearchLibrary from "./pages/ResearchLibrary";
+import ResearchProjectsDashboard from "./pages/ResearchProjectsDashboard";
 import PlanningBoard from "./pages/PlanningBoard";
 import NotFound from "@/pages/NotFound";
 import OfferPage from "./pages/OfferPage";
@@ -62,6 +63,7 @@ function Router() {
             <Route path="/ideas" component={Ideas} />
             <Route path="/research" component={Research} />
             <Route path="/research-library" component={ResearchLibrary} />
+            <Route path="/research-projects" component={ResearchProjectsDashboard} />
             <Route path="/writer" component={Writer} />
             <Route path="/writer/:id" component={Writer} />
             <Route path="/queue" component={Queue} />

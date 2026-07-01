@@ -313,6 +313,43 @@ const projectsRouter = router({
       .orderBy(desc(researchProjects.updatedAt));
   }),
 
+  // P2: per-project item counts grouped by status for portfolio board
+  stats: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    const projects = await db.select().from(researchProjects)
+      .where(eq(researchProjects.userId, ctx.user.id))
+      .orderBy(desc(researchProjects.updatedAt));
+    const counts = await db.select({
+      projectId: researchItems.projectId,
+      status: researchItems.status,
+      count: sql<number>`count(*)`,
+    })
+      .from(researchItems)
+      .where(eq(researchItems.userId, ctx.user.id))
+      .groupBy(researchItems.projectId, researchItems.status);
+    return projects.map(p => {
+      const pCounts = counts.filter(c => c.projectId === p.id);
+      const total = pCounts.reduce((s, c) => s + Number(c.count), 0);
+      const byStatus: Record<string, number> = {};
+      pCounts.forEach(c => { byStatus[c.status] = Number(c.count); });
+      return { ...p, total, byStatus };
+    });
+  }),
+
+  // P2: bulk-create projects from a newline-separated list of names
+  bulkCreate: protectedProcedure
+    .input(z.object({ names: z.array(z.string().min(1).max(300)) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const rows = input.names.map(name => ({ userId: ctx.user.id, name }));
+      for (const row of rows) {
+        await db.insert(researchProjects).values(row);
+      }
+      return { created: rows.length };
+    }),
+
   create: protectedProcedure
     .input(z.object({
       name: z.string().min(1).max(300),

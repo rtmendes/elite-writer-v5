@@ -1,21 +1,111 @@
 /**
- * Research Library — P1
- * 3-pane workspace: folder/project sidebar | virtualized item list | reading pane
+ * Research Library — P2
+ * 3-pane workspace: subfolder tree | virtualized item list | reading pane (split-view)
  */
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import {
-  BookOpen, Folder, FolderPlus, Plus, Search, Trash2, Link2,
-  FileText, Globe, Video, GraduationCap, Tag, Upload, X, ChevronRight,
-  Highlighter, ExternalLink, Loader2, FolderOpen,
+  BookOpen, Folder, FolderPlus, Plus, Search, Trash2,
+  FileText, Globe, Video, GraduationCap, Upload, X, ChevronRight, ChevronDown,
+  Highlighter, ExternalLink, Loader2, FolderOpen, Columns2,
 } from "lucide-react";
+
+// ─── Subfolder tree helpers ──────────────────────────────────────────────────
+
+function buildTree(folders: any[]): Map<number | null, any[]> {
+  const map = new Map<number | null, any[]>();
+  map.set(null, []);
+  for (const f of folders) {
+    const parent = f.parentId ?? null;
+    if (!map.has(parent)) map.set(parent, []);
+    map.get(parent)!.push(f);
+  }
+  return map;
+}
+
+function FolderTreeNode({
+  folder,
+  tree,
+  activeFolderId,
+  onSelect,
+  onDelete,
+  onCreateChild,
+  depth,
+}: {
+  folder: any;
+  tree: Map<number | null, any[]>;
+  activeFolderId: number | null;
+  onSelect: (id: number) => void;
+  onDelete: (id: number) => void;
+  onCreateChild: (parentId: number) => void;
+  depth: number;
+}) {
+  const children = tree.get(folder.id) ?? [];
+  const [expanded, setExpanded] = useState(true);
+  const isActive = activeFolderId === folder.id;
+
+  return (
+    <div>
+      <div
+        style={{ paddingLeft: depth * 12 + 4 }}
+        className={`flex items-center gap-1 py-1 rounded text-sm cursor-pointer group transition-colors
+          ${isActive ? "text-amber-400" : "text-slate-400 hover:text-slate-200"}`}
+      >
+        {children.length > 0 ? (
+          <button onClick={() => setExpanded(e => !e)} className="shrink-0">
+            {expanded
+              ? <ChevronDown className="w-3 h-3" />
+              : <ChevronRight className="w-3 h-3" />}
+          </button>
+        ) : (
+          <span className="w-3 shrink-0" />
+        )}
+        <button
+          onClick={() => onSelect(folder.id)}
+          className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
+        >
+          {isActive
+            ? <FolderOpen className="w-3.5 h-3.5 shrink-0" />
+            : <Folder className="w-3.5 h-3.5 shrink-0" />}
+          <span className="truncate flex-1">{folder.name}</span>
+        </button>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+          <button
+            onClick={e => { e.stopPropagation(); onCreateChild(folder.id); }}
+            className="text-slate-600 hover:text-amber-400"
+            title="Add subfolder"
+          >
+            <FolderPlus className="w-3 h-3" />
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); onDelete(folder.id); }}
+            className="text-slate-600 hover:text-red-400"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+      {expanded && children.map(child => (
+        <FolderTreeNode
+          key={child.id}
+          folder={child}
+          tree={tree}
+          activeFolderId={activeFolderId}
+          onSelect={onSelect}
+          onDelete={onDelete}
+          onCreateChild={onCreateChild}
+          depth={depth + 1}
+        />
+      ))}
+    </div>
+  );
+}
 
 const ROW_H = 76;
 const WINDOW_ROWS = 20;
@@ -336,7 +426,7 @@ function BulkImportDialog({
 
 // ─── Reading Pane ─────────────────────────────────────────────────────────────
 
-function ReadingPane({ item, onClose }: { item: any | null; onClose: () => void }) {
+function ReadingPane({ item, onClose, split }: { item: any | null; onClose: () => void; split: boolean }) {
   const [newHighlight, setNewHighlight] = useState("");
   const bodyQ = trpc.researchLibrary.items.get.useQuery(
     { id: item?.id ?? 0, includeBody: true },
@@ -354,16 +444,18 @@ function ReadingPane({ item, onClose }: { item: any | null; onClose: () => void 
     onSuccess: () => highlightsQ.refetch(),
   });
 
+  const paneClass = split ? "w-[45%] shrink-0" : "w-80 shrink-0";
+
   if (!item) {
     return (
-      <div className="w-80 shrink-0 border-l border-white/5 flex items-center justify-center text-slate-500 text-sm">
+      <div className={`${paneClass} border-l border-white/5 flex items-center justify-center text-slate-500 text-sm`}>
         Select an item to read
       </div>
     );
   }
 
   return (
-    <div className="w-80 shrink-0 border-l border-white/5 flex flex-col overflow-hidden">
+    <div className={`${paneClass} border-l border-white/5 flex flex-col overflow-hidden`}>
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
         <span className="text-xs text-slate-400 font-medium truncate">{item.title}</span>
         <button onClick={onClose} className="text-slate-500 hover:text-slate-300">
@@ -462,14 +554,19 @@ export default function ResearchLibrary() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
-  const [activeFolderId, setActiveFolderId] = useState<number | null>(null);
-  const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
+  const [activeFolderId, setActiveFolderId] = useState<number | null>(() => {
+    const p = new URLSearchParams(window.location.search).get("project");
+    return null;
+  });
+  const [activeProjectId, setActiveProjectId] = useState<number | null>(() => {
+    const p = new URLSearchParams(window.location.search).get("project");
+    return p ? Number(p) : null;
+  });
   const [activeItem, setActiveItem] = useState<any | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showSave, setShowSave] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
-  const [newProjectName, setNewProjectName] = useState("");
+  const [splitView, setSplitView] = useState(false);
 
   const itemsQ = trpc.researchLibrary.items.list.useQuery({
     search: search || undefined,
@@ -581,6 +678,13 @@ export default function ResearchLibrary() {
         )}
         <div className="flex items-center gap-2 ml-auto">
           <Button size="sm" variant="ghost"
+            onClick={() => setSplitView(v => !v)}
+            className={`text-xs h-8 gap-1 ${splitView ? "text-amber-400" : "text-slate-400 hover:text-slate-200"}`}
+            title="Toggle split view"
+          >
+            <Columns2 className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="sm" variant="ghost"
             onClick={() => setShowBulk(true)}
             className="text-xs text-slate-400 hover:text-slate-200 h-8 gap-1">
             <Upload className="w-3.5 h-3.5" /> Bulk import
@@ -608,9 +712,9 @@ export default function ResearchLibrary() {
             <span className="ml-auto text-xs text-slate-500">{itemsQ.data?.total ?? ""}</span>
           </button>
 
-          {/* Folders */}
-          <div className="px-3 pt-3 pb-1">
-            <div className="flex items-center justify-between mb-1">
+          {/* Folders — subfolder tree */}
+          <div className="px-2 pt-3 pb-1">
+            <div className="flex items-center justify-between mb-1 px-1">
               <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Folders</span>
               <button
                 onClick={() => {
@@ -622,25 +726,25 @@ export default function ResearchLibrary() {
                 <FolderPlus className="w-3.5 h-3.5" />
               </button>
             </div>
-            {foldersQ.data?.map(f => (
-              <button
-                key={f.id}
-                onClick={() => { setActiveFolderId(f.id); setActiveProjectId(null); }}
-                className={`flex items-center gap-1.5 w-full text-left px-1 py-1 rounded text-sm transition-colors group
-                  ${activeFolderId === f.id ? "text-amber-400" : "text-slate-400 hover:text-slate-200"}`}
-              >
-                {activeFolderId === f.id
-                  ? <FolderOpen className="w-3.5 h-3.5 shrink-0" />
-                  : <Folder className="w-3.5 h-3.5 shrink-0" />}
-                <span className="truncate flex-1">{f.name}</span>
-                <button
-                  onClick={e => { e.stopPropagation(); deleteFolder.mutate({ id: f.id }); }}
-                  className="hidden group-hover:block text-slate-600 hover:text-red-400"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </button>
-            ))}
+            {(() => {
+              const tree = buildTree(foldersQ.data ?? []);
+              const roots = tree.get(null) ?? [];
+              return roots.map(f => (
+                <FolderTreeNode
+                  key={f.id}
+                  folder={f}
+                  tree={tree}
+                  activeFolderId={activeFolderId}
+                  onSelect={id => { setActiveFolderId(id); setActiveProjectId(null); }}
+                  onDelete={id => deleteFolder.mutate({ id })}
+                  onCreateChild={parentId => {
+                    const name = prompt("Subfolder name:");
+                    if (name?.trim()) createFolder.mutate({ name: name.trim(), parentId });
+                  }}
+                  depth={0}
+                />
+              ));
+            })()}
           </div>
 
           {/* Projects */}
@@ -698,8 +802,8 @@ export default function ResearchLibrary() {
           )}
         </div>
 
-        {/* Pane 3 — Reading pane */}
-        <ReadingPane item={activeItem} onClose={() => setActiveItem(null)} />
+        {/* Pane 3 — Reading pane (split-view aware) */}
+        <ReadingPane item={activeItem} onClose={() => setActiveItem(null)} split={splitView} />
       </div>
 
       {/* Dialogs */}
