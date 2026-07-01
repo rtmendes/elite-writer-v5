@@ -174,7 +174,7 @@ function SearchTab() {
   const [scope, setScope] = useState<Scope>("all");
   const [saveToKb, setSaveToKb] = useState(false);
   const agentic = trpc.researchHub.agenticSearch.useMutation();
-  const refCreate = trpc.researchHub.references.create.useMutation();
+  const saveToLib = trpc.researchLibrary.items.save.useMutation();
   const utils = trpc.useUtils();
 
   const run = async () => {
@@ -188,12 +188,18 @@ function SearchTab() {
 
   const saveSource = async (s: UISource) => {
     try {
-      await refCreate.mutateAsync({
-        type: s.type === "report" ? "report" : s.type, title: s.title, authors: s.authors || [],
-        year: s.year ?? null, doi: s.doi ?? undefined, url: s.url || undefined,
-        abstract: s.snippet || undefined, source: s.source, citationCount: s.citationCount ?? undefined,
+      const contentType =
+        s.type === "video" ? "video" :
+        s.type === "article" ? "academic" :
+        "webpage";
+      await saveToLib.mutateAsync({
+        title: s.title, url: s.url || undefined, contentType,
+        authors: s.authors || [], year: s.year ?? undefined,
+        doi: s.doi ?? undefined, abstract: s.snippet || undefined,
+        source: s.source, status: "saved",
+        metadata: s.citationCount != null ? { citationCount: s.citationCount } : undefined,
       });
-      await utils.researchHub.references.list.invalidate();
+      await utils.researchLibrary.items.list.invalidate();
       toast.success("Saved to Library");
     } catch (e: any) { toast.error(e?.message || "Could not save"); }
   };

@@ -304,97 +304,79 @@ export const researchRouter = router({
       const log: SourceLog[] = [];
       let allText = "";
 
-      // 1. Academic (free, no key required)
-      try {
-        const academic = await academicSearch(input.topic, { maxPerSource: 5, includePubMed: false });
-        if (academic.length > 0) {
-          allText += "\n\nACADEMIC SOURCES:\n" + formatForLLM(academic, 8);
-        }
-        log.push({ source: "OpenAlex/CrossRef/Semantic Scholar", status: "ok", count: academic.length });
-      } catch (e: any) {
-        log.push({ source: "academic", status: "skipped", reason: e.message?.slice(0, 50) });
-      }
+      // Providers run in parallel — one failure never blocks others.
+      type ProviderResult = { label: string; text: string; logEntry: SourceLog };
 
-      // 2. Brave Search (if key configured)
-      if (ENV.braveApiKey) {
-        try {
-          const params = new URLSearchParams({ q: input.topic, count: "10", text_decorations: "false" });
-          const resp = await fetch(`https://api.search.brave.com/res/v1/web/search?${params}`, {
-            headers: { Accept: "application/json", "X-Subscription-Token": ENV.braveApiKey },
-            signal: AbortSignal.timeout(8000),
-          });
-          if (!resp.ok) {
-            log.push({ source: "brave", status: "skipped", reason: `HTTP ${resp.status}` });
-          } else {
-            const data = await resp.json() as any;
-            const results = (data.web?.results || []).slice(0, 8);
-            if (results.length) {
-              allText += "\n\nWEB RESULTS:\n" + results.map((r: any) => `- ${r.title}: ${r.description || ""}`).join("\n");
-            }
-            log.push({ source: "brave", status: "ok", count: results.length });
-          }
-        } catch (e: any) {
-          log.push({ source: "brave", status: "skipped", reason: e.message?.slice(0, 50) });
-        }
-      } else {
-        log.push({ source: "brave", status: "skipped", reason: "no key" });
-      }
+      const providerJobs: Promise<ProviderResult>[] = [
+        // 1. Academic (free, no key required)
+        (async (): Promise<ProviderResult> => {
+          const academic = await academicSearch(input.topic, { maxPerSource: 5, includePubMed: false });
+          const text = academic.length > 0 ? "\n\nACADEMIC SOURCES:\n" + formatForLLM(academic, 8) : "";
+          return { label: "academic", text, logEntry: { source: "OpenAlex/CrossRef/Semantic Scholar", status: "ok", count: academic.length } };
+        })(),
 
-      // 3. YouTube (if key configured)
-      if (ENV.youtubeApiKey) {
-        try {
-          const params = new URLSearchParams({ part: "snippet", q: input.topic, maxResults: "5", type: "video", key: ENV.youtubeApiKey });
-          const resp = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`, {
-            signal: AbortSignal.timeout(8000),
-          });
-          if (!resp.ok) {
-            log.push({ source: "youtube", status: "skipped", reason: `HTTP ${resp.status}` });
-          } else {
-            const data = await resp.json() as any;
-            const items = (data.items || []).slice(0, 5);
-            if (items.length) {
-              allText += "\n\nYOUTUBE CONTENT:\n" + items.map((i: any) => `- ${i.snippet?.title}: ${(i.snippet?.description || "").slice(0, 100)}`).join("\n");
-            }
-            log.push({ source: "youtube", status: "ok", count: items.length });
-          }
-        } catch (e: any) {
-          log.push({ source: "youtube", status: "skipped", reason: e.message?.slice(0, 50) });
-        }
-      } else {
-        log.push({ source: "youtube", status: "skipped", reason: "no key" });
-      }
+        // 2. Brave Search
+        ENV.braveApiKey
+          ? (async (): Promise<ProviderResult> => {
+              const params = new URLSearchParams({ q: input.topic, count: "10", text_decorations: "false" });
+              const resp = await fetch(`https://api.search.brave.com/res/v1/web/search?${params}`, {
+                headers: { Accept: "application/json", "X-Subscription-Token": ENV.braveApiKey! },
+                signal: AbortSignal.timeout(8000),
+              });
+              if (!resp.ok) return { label: "brave", text: "", logEntry: { source: "brave", status: "skipped", reason: `HTTP ${resp.status}` } };
+              const data = await resp.json() as any;
+              const results = (data.web?.results || []).slice(0, 8);
+              const text = results.length ? "\n\nWEB RESULTS:\n" + results.map((r: any) => `- ${r.title}: ${r.description || ""}`).join("\n") : "";
+              return { label: "brave", text, logEntry: { source: "brave", status: "ok", count: results.length } };
+            })()
+          : Promise.resolve({ label: "brave", text: "", logEntry: { source: "brave", status: "skipped" as const, reason: "no key" } }),
 
-      // 4. Perplexity — LAST, OPTIONAL, never blocks
-      if (ENV.perplexityApiKey) {
-        try {
-          const resp = await fetch("https://api.perplexity.ai/chat/completions", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${ENV.perplexityApiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: "sonar",
-              messages: [
-                { role: "system", content: "You are a research assistant. Provide concise, sourced research." },
-                { role: "user", content: `Research for article: ${input.topic}. Key facts, statistics, expert voices, recent developments (2025-2026).` },
-              ],
-              max_tokens: 2000,
-            }),
-            signal: AbortSignal.timeout(25000),
-          });
-          if (!resp.ok) {
-            log.push({ source: "perplexity", status: "skipped", reason: `HTTP ${resp.status}` });
-          } else {
-            const data = await resp.json() as any;
-            const content: string = data.choices?.[0]?.message?.content || "";
-            if (content) {
-              allText += "\n\nWEB RESEARCH:\n" + content.slice(0, 3000);
-            }
-            log.push({ source: "perplexity", status: "ok" });
-          }
-        } catch (e: any) {
-          log.push({ source: "perplexity", status: "skipped", reason: e.message?.slice(0, 50) });
+        // 3. YouTube
+        ENV.youtubeApiKey
+          ? (async (): Promise<ProviderResult> => {
+              const params = new URLSearchParams({ part: "snippet", q: input.topic, maxResults: "5", type: "video", key: ENV.youtubeApiKey! });
+              const resp = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`, { signal: AbortSignal.timeout(8000) });
+              if (!resp.ok) return { label: "youtube", text: "", logEntry: { source: "youtube", status: "skipped", reason: `HTTP ${resp.status}` } };
+              const data = await resp.json() as any;
+              const items = (data.items || []).slice(0, 5);
+              const text = items.length ? "\n\nYOUTUBE CONTENT:\n" + items.map((i: any) => `- ${i.snippet?.title}: ${(i.snippet?.description || "").slice(0, 100)}`).join("\n") : "";
+              return { label: "youtube", text, logEntry: { source: "youtube", status: "ok", count: items.length } };
+            })()
+          : Promise.resolve({ label: "youtube", text: "", logEntry: { source: "youtube", status: "skipped" as const, reason: "no key" } }),
+
+        // 4. Perplexity
+        ENV.perplexityApiKey
+          ? (async (): Promise<ProviderResult> => {
+              const resp = await fetch("https://api.perplexity.ai/chat/completions", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${ENV.perplexityApiKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  model: "sonar",
+                  messages: [
+                    { role: "system", content: "You are a research assistant. Provide concise, sourced research." },
+                    { role: "user", content: `Research for article: ${input.topic}. Key facts, statistics, expert voices, recent developments (2025-2026).` },
+                  ],
+                  max_tokens: 2000,
+                }),
+                signal: AbortSignal.timeout(25000),
+              });
+              if (!resp.ok) return { label: "perplexity", text: "", logEntry: { source: "perplexity", status: "skipped", reason: `HTTP ${resp.status}` } };
+              const data = await resp.json() as any;
+              const content: string = data.choices?.[0]?.message?.content || "";
+              return { label: "perplexity", text: content ? "\n\nWEB RESEARCH:\n" + content.slice(0, 3000) : "", logEntry: { source: "perplexity", status: "ok" } };
+            })()
+          : Promise.resolve({ label: "perplexity", text: "", logEntry: { source: "perplexity", status: "skipped" as const, reason: "no key" } }),
+      ];
+
+      const settled = await Promise.allSettled(providerJobs);
+      for (const r of settled) {
+        if (r.status === "fulfilled") {
+          allText += r.value.text;
+          log.push(r.value.logEntry);
+        } else {
+          const err = (r.reason as Error)?.message?.slice(0, 50) || "unknown";
+          log.push({ source: "provider", status: "skipped", reason: err });
         }
-      } else {
-        log.push({ source: "perplexity", status: "skipped", reason: "no key" });
       }
 
       // 5. Generate editorial outline via free LLM

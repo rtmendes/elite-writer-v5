@@ -22,6 +22,7 @@ type NavItem = {
   label: string;
   icon: any;
   description: string;
+  subItems?: Array<{ path: string; label: string; icon: any }>;
 };
 
 const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
@@ -33,9 +34,10 @@ const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { path: '/sources', label: 'Feed Sources', icon: Rss, description: 'YouTube, Reddit & feeds to follow' },
       { path: '/pulse', label: 'Pulse Pipeline', icon: Zap, description: 'AI stories → matched articles' },
       { path: '/ideas', label: 'Ideas', icon: Lightbulb, description: 'Article idea pipeline' },
-      { path: '/research', label: 'Research', icon: Search, description: 'Data & source gathering' },
-      { path: '/research-library', label: 'Research Library', icon: Library, description: 'Knowledge library — items, highlights, folders' },
-      { path: '/research-projects', label: 'Research Projects', icon: LayoutGrid, description: 'Portfolio board — per-project item counts and status' },
+      { path: '/research', label: 'Research', icon: Search, description: 'Search · Library · Projects · Chat', subItems: [
+        { path: '/research-library', label: 'Library', icon: Library },
+        { path: '/research-projects', label: 'Projects', icon: LayoutGrid },
+      ] },
       { path: '/writer', label: 'Writer', icon: PenTool, description: 'AI-enhanced editor' },
       { path: '/workspace', label: 'Workspace', icon: LayoutGrid, description: 'Pages, databases & boards' },
       { path: '/queue', label: 'Queue', icon: Inbox, description: 'Pre-written article pipeline' },
@@ -120,7 +122,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   const currentItem = NAV_ITEMS.find(item => {
     if (item.path === '/') return location === '/';
-    return location.startsWith(item.path);
+    if (location.startsWith(item.path)) return true;
+    return item.subItems?.some(s => location.startsWith(s.path)) ?? false;
   });
 
   return (
@@ -173,30 +176,52 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   </button>
                 )}
                 {sectionOpen && section.items.map((item) => {
-                  const isActive = item.path === '/' ? location === '/' : location.startsWith(item.path);
+                  const subActive = item.subItems?.some(s => location.startsWith(s.path)) ?? false;
+                  const isActive = item.path === '/' ? location === '/' : location.startsWith(item.path) || subActive;
                   return (
-                    <Link
-                      key={item.path}
-                      href={item.path}
-                      onClick={() => setMobileOpen(false)}
-                      className={cn(
-                        "group flex items-center rounded-xl text-sm transition-all duration-200",
-                        collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
-                        isActive
-                          ? "bg-sidebar-primary/20 text-sidebar-primary-foreground border border-sidebar-primary/25 shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.1)]"
-                          : "text-sidebar-foreground/85 hover:text-sidebar-foreground hover:bg-sidebar-accent/80"
-                      )}
-                    >
-                      <item.icon className={cn("w-4 h-4 shrink-0", isActive && "text-primary")} />
-                      {!collapsed && (
-                        <div className="overflow-hidden">
-                          <span className="block truncate">{item.label}</span>
-                          {isActive && (
-                            <span className="block text-[10px] text-muted-foreground truncate">{item.description}</span>
-                          )}
+                    <div key={item.path}>
+                      <Link
+                        href={item.path}
+                        onClick={() => setMobileOpen(false)}
+                        className={cn(
+                          "group flex items-center rounded-xl text-sm transition-all duration-200",
+                          collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
+                          isActive
+                            ? "bg-sidebar-primary/20 text-sidebar-primary-foreground border border-sidebar-primary/25 shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.1)]"
+                            : "text-sidebar-foreground/85 hover:text-sidebar-foreground hover:bg-sidebar-accent/80"
+                        )}
+                      >
+                        <item.icon className={cn("w-4 h-4 shrink-0", isActive && "text-primary")} />
+                        {!collapsed && (
+                          <div className="overflow-hidden">
+                            <span className="block truncate">{item.label}</span>
+                            {isActive && (
+                              <span className="block text-[10px] text-muted-foreground truncate">{item.description}</span>
+                            )}
+                          </div>
+                        )}
+                      </Link>
+                      {!collapsed && isActive && item.subItems && (
+                        <div className="ml-7 mt-0.5 space-y-0.5">
+                          {item.subItems.map(sub => {
+                            const subIsActive = location.startsWith(sub.path);
+                            return (
+                              <Link key={sub.path} href={sub.path} onClick={() => setMobileOpen(false)}
+                                className={cn(
+                                  "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors",
+                                  subIsActive
+                                    ? "text-primary font-medium"
+                                    : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60"
+                                )}
+                              >
+                                <sub.icon className="w-3.5 h-3.5 shrink-0" />
+                                <span>{sub.label}</span>
+                              </Link>
+                            );
+                          })}
                         </div>
                       )}
-                    </Link>
+                    </div>
                   );
                 })}
               </div>

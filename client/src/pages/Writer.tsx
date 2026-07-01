@@ -79,6 +79,20 @@ function ResearchPanel({ title, onInsertContent }: {
         const succeeded = result.sourcesLog.filter((l: any) => l.status === 'ok' && (l.count ?? 1) > 0).length;
         const skipped = result.sourcesLog.filter((l: any) => l.status === 'skipped').length;
         toast.success(`Research complete — ${succeeded} sources, ${skipped} skipped`);
+
+        // Auto-insert brief + outline into editor
+        const ol = result.outline;
+        if (ol) {
+          const sections = (ol.sections || []).map((s: any) =>
+            `## ${s.heading}\n\n${s.keyPoints?.map((p: string) => `- ${p}`).join('\n') || ''}`
+          ).join('\n\n');
+          const themes = ol.themes?.length ? `\n\n**Key themes:** ${ol.themes.join(', ')}` : '';
+          const stats = (ol.keyStats || []).length
+            ? `\n\n**Data points:**\n${(ol.keyStats as any[]).map((s: any) => `- ${s.stat} (${s.context})`).join('\n')}`
+            : '';
+          const brief = themes || stats ? `## Research Brief${themes}${stats}\n\n---\n\n` : '';
+          onInsertContent(`${brief}# ${ol.headline}\n\n*${ol.hook || ''}*\n\n${sections}\n\n${ol.close || ''}`);
+        }
       }
     } catch (err: any) {
       toast.error('Research failed: ' + (err.message || 'Try again'), { duration: 8000 });
@@ -335,6 +349,43 @@ function RealtimePresence({
   );
 }
 
+// Lightweight client-side slop filter — strips common AI-tell phrases before insert
+const SLOP_PATTERNS: [RegExp, string][] = [
+  [/\bdelve\b/gi, "explore"],
+  [/\bin today['']s fast-paced world\b/gi, "today"],
+  [/\bit(?:'s| is) important to note that\b/gi, "notably,"],
+  [/\bit(?:'s| is) worth noting that\b/gi, ""],
+  [/\bas we (?:navigate|move forward|look ahead)\b/gi, ""],
+  [/\bin conclusion,?\s*/gi, ""],
+  [/\bto summarize,?\s*/gi, ""],
+  [/\bsuffice it to say\b/gi, ""],
+  [/\bin the realm of\b/gi, "in"],
+  [/\bempower(?:ing|ment|s|ed)?\b/gi, "enable$1"],
+  [/\bunlock(?:ing)? (?:the|your) (?:potential|power)\b/gi, "use"],
+  [/\btransformative\b/gi, "significant"],
+  [/\bseamless(?:ly)?\b/gi, "smooth$1"],
+  [/\blocal(?:ized)? expertise\b/gi, "expertise"],
+  [/\bvibrant\b/gi, "active"],
+  [/\btailored to (?:your |(?:the ))?needs\b/gi, "designed for your needs"],
+  [/\bleverage\b/gi, "use"],
+  [/\butilize\b/gi, "use"],
+  [/\bin order to\b/gi, "to"],
+  [/\bdue to the fact that\b/gi, "because"],
+  [/\bfacilitate\b/gi, "help"],
+  [/\bfoster(?:ing)?\b/gi, "build$1"],
+  [/\brobust\b/gi, "strong"],
+  [/\bholistic\b/gi, "comprehensive"],
+];
+
+function deslop(text: string): string {
+  let out = text;
+  for (const [pattern, replacement] of SLOP_PATTERNS) {
+    out = out.replace(pattern, replacement);
+  }
+  // Collapse double spaces created by empty replacements
+  return out.replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+$/gm, "");
+}
+
 // ─── Main Writer Component ──────────────────────────────────
 export default function Writer() {
   const { state, addArticle, updateArticle } = useApp();
@@ -351,6 +402,8 @@ export default function Writer() {
   const draftMutation = trpc.ai.draft.useMutation();
   const rewriteMutation = trpc.ai.rewrite.useMutation();
   const saveArticleMutation = trpc.data.articles.create.useMutation();
+  const autoHumanizeMutation = trpc.bridges.humanizeArticle.useMutation();
+  const autoHumanizePendingRef = useRef(false);
   const updateArticleMutation = trpc.data.articles.update.useMutation();
   const insertResearchMutation = trpc.data.articles.insertResearch.useMutation();
   const setMoneyPageMutation = trpc.data.articles.setMoneyPage.useMutation();
@@ -506,6 +559,19 @@ export default function Writer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorHtml, title, dbArticleId]);
 
+  // Auto-humanize: fires after auto-save lands (updateArticleMutation success) when flag is set
+  useEffect(() => {
+    if (!updateArticleMutation.isSuccess) return;
+    if (!autoHumanizePendingRef.current) return;
+    if (!dbArticleId) return;
+    autoHumanizePendingRef.current = false;
+    autoHumanizeMutation.mutate(
+      { articleId: dbArticleId, intensity: "moderate" },
+      { onSuccess: () => toast.success("Auto-humanized", { duration: 2000 }) }
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateArticleMutation.isSuccess]);
+
   // Auto-score locally on content change (debounced)
   useEffect(() => {
     if (wordCount < 50) { setScores(null); return; }
@@ -652,9 +718,12 @@ export default function Writer() {
         wordCount: template?.wordCountRange[1] || 1500,
       });
       if (result.success && result.text) {
-        setContent(prev => prev ? prev + '\n\n---\n\n' + result.text : result.text);
+        const clean = deslop(result.text);
+        setContent(prev => prev ? prev + '\n\n---\n\n' + clean : clean);
         const tokens = result.usage?.total_tokens || 0;
         toast.success(`Draft generated (${tokens} tokens)`, { id: toastId });
+        // Queue auto-humanize — fires after auto-save debounce lands
+        autoHumanizePendingRef.current = true;
       }
     } catch (err: any) {
       toast.error('AI draft failed: ' + (err.message || 'Unknown error'), { id: toastId, duration: 8000 });
@@ -790,8 +859,9 @@ export default function Writer() {
         targetPublication: selectedPub?.name,
         model: writerSettings.models?.pipeline || 'gemini-flash',
       });
-      insertRichContent('\n\n' + result.continuation);
+      insertRichContent('\n\n' + deslop(result.continuation));
       toast.success(`${result.action} (stage: ${result.stage})`, { id: toastId });
+      autoHumanizePendingRef.current = true;
     } catch (err: any) {
       toast.error('Agentic continue failed: ' + (err.message || 'Unknown'), { id: toastId, duration: 8000 });
     }
