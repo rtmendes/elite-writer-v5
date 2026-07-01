@@ -580,14 +580,14 @@ export default function ResearchLibrary() {
   const projectsQ = trpc.researchLibrary.projects.list.useQuery();
 
   const createFolder = trpc.researchLibrary.folders.create.useMutation({
-    onSuccess: () => { foldersQ.refetch(); setNewFolderName(""); },
+    onSuccess: () => foldersQ.refetch(),
     onError: e => toast.error(e.message),
   });
   const deleteFolder = trpc.researchLibrary.folders.delete.useMutation({
     onSuccess: () => { foldersQ.refetch(); itemsQ.refetch(); setActiveFolderId(null); },
   });
   const createProject = trpc.researchLibrary.projects.create.useMutation({
-    onSuccess: () => { projectsQ.refetch(); setNewProjectName(""); },
+    onSuccess: () => projectsQ.refetch(),
     onError: e => toast.error(e.message),
   });
   const deleteItem = trpc.researchLibrary.items.delete.useMutation({
