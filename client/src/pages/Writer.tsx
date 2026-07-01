@@ -341,6 +341,10 @@ export default function Writer() {
   const [, navigate] = useLocation();
   const [matchRoute, routeParams] = useRoute('/writer/:id');
 
+  // P3a: article metadata state (number, series, tags, money-page)
+  const [articleNumber, setArticleNumber] = useState<number | null>(null);
+  const [isMoneyPage, setIsMoneyPage] = useState(false);
+
   // tRPC mutations
   const scoreMutation = trpc.ai.score.useMutation();
   const agenticContinueMutation = trpc.agentic.agenticContinue.useMutation();
@@ -348,6 +352,8 @@ export default function Writer() {
   const rewriteMutation = trpc.ai.rewrite.useMutation();
   const saveArticleMutation = trpc.data.articles.create.useMutation();
   const updateArticleMutation = trpc.data.articles.update.useMutation();
+  const insertResearchMutation = trpc.data.articles.insertResearch.useMutation();
+  const setMoneyPageMutation = trpc.data.articles.setMoneyPage.useMutation();
   const googleCreateDoc = trpc.google.createDoc.useMutation();
   const matchToArticleMutation = trpc.publications.matchToArticle.useMutation();
   const assignTeamMutation = trpc.agents.assignTeam.useMutation();
@@ -440,8 +446,65 @@ export default function Writer() {
       const pub = PUBLICATIONS.find(p => p.name === article.targetPublication);
       if (pub) setSelectedPub(pub);
     }
+    // P3a: hydrate metadata fields
+    if ((article as any).articleNumber) setArticleNumber((article as any).articleNumber);
+    if ((article as any).isMoneyPage) setIsMoneyPage(!!(article as any).isMoneyPage);
     toast.success(`Loaded: "${article.title}"`);
   }, [matchRoute, routeParams?.id, articlesQuery.data]);
+
+  // P3a: Handle ?from=research&item=ID — inject item as cited block into editor
+  const [fromResearchItemId] = useState<number | null>(() => {
+    const p = new URLSearchParams(window.location.search).get("item");
+    const from = new URLSearchParams(window.location.search).get("from");
+    return from === "research" && p ? Number(p) : null;
+  });
+  const researchItemQ = trpc.researchLibrary.items.get.useQuery(
+    { id: fromResearchItemId ?? 0, includeBody: false },
+    { enabled: fromResearchItemId != null },
+  );
+  useEffect(() => {
+    if (!researchItemQ.data || !fromResearchItemId) return;
+    const item = researchItemQ.data as any;
+    const citationParts = [
+      Array.isArray(item.authors) && item.authors.length > 0 ? item.authors.join(", ") : null,
+      item.year ? `(${item.year})` : null,
+      item.publication ?? null,
+      item.url ? `[Source](${item.url})` : null,
+    ].filter(Boolean).join(" · ");
+    const block = [
+      `## ${item.title}`,
+      item.abstract ? `\n\n> ${item.abstract.slice(0, 600)}` : "",
+      item.notes ? `\n\n${item.notes}` : "",
+      `\n\n*${citationParts}*`,
+    ].join("");
+    insertRichContent(block);
+    toast.success(`Research inserted: "${item.title}"`);
+    // Record attribution if article already saved
+    if (dbArticleId) {
+      insertResearchMutation.mutate({ articleId: dbArticleId, itemId: fromResearchItemId });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [researchItemQ.data]);
+
+  // Evergreen auto-save: debounced 3s after any content/title change on an existing article
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!dbArticleId || !title.trim()) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      updateArticleMutation.mutate({
+        id: dbArticleId,
+        title: title.trim(),
+        content: editorHtml,
+        wordCount,
+        isMoneyPage,
+      } as any);
+    }, 3000);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorHtml, title, dbArticleId]);
 
   // Auto-score locally on content change (debounced)
   useEffect(() => {
@@ -953,6 +1016,31 @@ ${editorHtml}
 
       {/* ═══ Score Tab (DEFAULT) ═══ */}
       <TabsContent value="score" className="p-4 space-y-4 mt-0">
+        {/* P3a: Article metadata strip */}
+        {(articleNumber || dbArticleId) && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground border border-border/50 rounded-md px-2.5 py-1.5">
+            {articleNumber && (
+              <span className="font-mono text-primary/80">#{articleNumber}</span>
+            )}
+            <span className="flex-1 truncate">{dbArticleId ? `Article ${dbArticleId}` : "Unsaved"}</span>
+            <button
+              onClick={() => {
+                const next = !isMoneyPage;
+                setIsMoneyPage(next);
+                if (dbArticleId) setMoneyPageMutation.mutate({ id: dbArticleId, value: next });
+              }}
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                isMoneyPage
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                  : "bg-muted/40 text-muted-foreground border border-border/40 hover:border-amber-500/30"
+              }`}
+              title="Toggle money page"
+            >
+              <DollarSign className="w-2.5 h-2.5" />
+              {isMoneyPage ? "Money Page" : "Money Page?"}
+            </button>
+          </div>
+        )}
         <div className="text-center py-4">
           <div className={`text-4xl font-bold font-mono ${scores ? getScoreColor(scores.overall) : 'text-muted-foreground'}`}>
             {scores ? scores.overall : '--'}

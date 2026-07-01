@@ -13,7 +13,7 @@ import { trpc } from "@/lib/trpc";
 import {
   BookOpen, Folder, FolderPlus, Plus, Search, Trash2,
   FileText, Globe, Video, GraduationCap, Upload, X, ChevronRight, ChevronDown,
-  Highlighter, ExternalLink, Loader2, FolderOpen, Columns2,
+  Highlighter, ExternalLink, Loader2, FolderOpen, Columns2, PenTool, Share2, Link2,
 } from "lucide-react";
 
 // ─── Subfolder tree helpers ──────────────────────────────────────────────────
@@ -428,6 +428,19 @@ function BulkImportDialog({
 
 function ReadingPane({ item, onClose, split }: { item: any | null; onClose: () => void; split: boolean }) {
   const [newHighlight, setNewHighlight] = useState("");
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const createFromResearch = trpc.data.articles.createFromResearch.useMutation({
+    onSuccess: (r) => { window.location.href = `/writer/${r.id}`; },
+    onError: (e) => toast.error(e.message),
+  });
+  const createShare = trpc.researchLibrary.shares.create.useMutation({
+    onSuccess: (r) => {
+      setShareToken(r.token);
+      navigator.clipboard.writeText(`${window.location.origin}/research-share/${r.token}`);
+      toast.success("Share link copied to clipboard");
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const bodyQ = trpc.researchLibrary.items.get.useQuery(
     { id: item?.id ?? 0, includeBody: true },
     { enabled: !!item?.r2Key },
@@ -460,6 +473,37 @@ function ReadingPane({ item, onClose, split }: { item: any | null; onClose: () =
         <span className="text-xs text-slate-400 font-medium truncate">{item.title}</span>
         <button onClick={onClose} className="text-slate-500 hover:text-slate-300">
           <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* P3a: Research → Article bridge actions */}
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/5 shrink-0">
+        <Button
+          size="sm"
+          disabled={createFromResearch.isPending}
+          onClick={() => createFromResearch.mutate({ itemId: item.id })}
+          className="text-xs h-7 gap-1 bg-amber-600/80 hover:bg-amber-600 text-white flex-1"
+        >
+          {createFromResearch.isPending
+            ? <Loader2 className="w-3 h-3 animate-spin" />
+            : <PenTool className="w-3 h-3" />}
+          Start article
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => { window.location.href = `/writer?from=research&item=${item.id}`; }}
+          className="text-xs h-7 gap-1 text-slate-400 hover:text-slate-200"
+        >
+          <Plus className="w-3 h-3" />
+          Insert
+        </Button>
+        <button
+          onClick={() => createShare.mutate({ ownerType: "item", ownerId: item.id })}
+          className="text-slate-500 hover:text-amber-400 transition-colors p-1"
+          title="Share link"
+        >
+          {shareToken ? <Link2 className="w-3.5 h-3.5 text-amber-400" /> : <Share2 className="w-3.5 h-3.5" />}
         </button>
       </div>
 

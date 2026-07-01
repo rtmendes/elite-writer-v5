@@ -38,6 +38,7 @@ import TaskCenter from "./pages/TaskCenter";
 import KnowledgeHub from "./pages/KnowledgeHub";
 import ResearchLibrary from "./pages/ResearchLibrary";
 import ResearchProjectsDashboard from "./pages/ResearchProjectsDashboard";
+import ResearchShare from "./pages/ResearchShare";
 import PlanningBoard from "./pages/PlanningBoard";
 import NotFound from "@/pages/NotFound";
 import OfferPage from "./pages/OfferPage";
@@ -52,6 +53,8 @@ function Router() {
       <Route path="/login" component={Login} />
       {/* Public offer page — no auth wrapper */}
       <Route path="/offer/:id" component={OfferPage} />
+      {/* Public research share — no auth wrapper */}
+      <Route path="/research-share/:token" component={ResearchShare} />
       <Route>
         <AppLayout>
           <ErrorBoundary key={location}>

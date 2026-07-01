@@ -9,7 +9,9 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   researchItems, researchHighlights, researchFolders, researchProjects, articleResearch,
+  researchShare,
 } from "../../drizzle/schema";
+import { nanoid } from "nanoid";
 import { uploadBuffer, downloadText } from "../_core/storage";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -418,6 +420,81 @@ const attachRouter = router({
     }),
 });
 
+// ─── shares ──────────────────────────────────────────────────────────────────
+
+const sharesRouter = router({
+  create: protectedProcedure
+    .input(z.object({
+      ownerType: z.enum(["folder", "item", "project"]),
+      ownerId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const token = nanoid(32);
+      await db.insert(researchShare).values({
+        token,
+        ownerType: input.ownerType,
+        ownerId: input.ownerId,
+        userId: ctx.user.id,
+      });
+      return { token };
+    }),
+
+  get: protectedProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const [row] = await db.select().from(researchShare)
+        .where(and(eq(researchShare.token, input.token), eq(researchShare.userId, ctx.user.id)));
+      return row ?? null;
+    }),
+
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(researchShare)
+      .where(and(eq(researchShare.userId, ctx.user.id), eq(researchShare.revoked, 0)))
+      .orderBy(desc(researchShare.createdAt));
+  }),
+
+  revoke: protectedProcedure
+    .input(z.object({ token: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      await db.update(researchShare)
+        .set({ revoked: 1 })
+        .where(and(eq(researchShare.token, input.token), eq(researchShare.userId, ctx.user.id)));
+      return { success: true };
+    }),
+
+  // Public resolve — no auth required; returns item/folder/project metadata
+  resolve: protectedProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const [share] = await db.select().from(researchShare)
+        .where(and(eq(researchShare.token, input.token), eq(researchShare.revoked, 0)));
+      if (!share) return null;
+      if (share.ownerType === "item") {
+        const [item] = await db.select().from(researchItems).where(eq(researchItems.id, share.ownerId));
+        return { share, item: item ?? null };
+      }
+      if (share.ownerType === "folder") {
+        const [folder] = await db.select().from(researchFolders).where(eq(researchFolders.id, share.ownerId));
+        return { share, folder: folder ?? null };
+      }
+      if (share.ownerType === "project") {
+        const [project] = await db.select().from(researchProjects).where(eq(researchProjects.id, share.ownerId));
+        return { share, project: project ?? null };
+      }
+      return null;
+    }),
+});
+
 // ─── combined ────────────────────────────────────────────────────────────────
 
 export const researchLibraryRouter = router({
@@ -426,4 +503,5 @@ export const researchLibraryRouter = router({
   folders: foldersRouter,
   projects: projectsRouter,
   attach: attachRouter,
+  shares: sharesRouter,
 });

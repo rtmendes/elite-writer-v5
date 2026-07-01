@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { eq, desc, and, isNotNull } from "drizzle-orm";
+import { eq, desc, and, isNotNull, max, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { syncArticleToPipeline } from "../lib/supabase-sync";
 import {
   ideas, articles, pitches, researchNotes, generatedImages,
   brands, products, earnings, intelligenceItems, userSettings,
+  researchItems, articleResearch, researchSeries, articleTag,
   type InsertIdea, type InsertArticle, type InsertPitch,
   type InsertResearchNote, type InsertBrand, type InsertProduct,
   type InsertEarning, type InsertIntelligenceItem,
@@ -129,13 +130,17 @@ const articlesRouter = router({
     targetPublication: z.string().optional(),
     brandId: z.string().optional(),
     productId: z.string().optional(),
+    seriesId: z.number().nullable().optional(),
+    isMoneyPage: z.boolean().optional(),
+    articleNumber: z.number().optional(),
     sources: z.array(z.object({ title: z.string(), url: z.string().optional(), note: z.string().optional(), addedAt: z.string().optional() }).passthrough()).optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database unavailable");
-    const { id, ...updates } = input;
+    const { id, isMoneyPage: isMoneyPageBool, ...updates } = input;
     const setObj: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(updates)) { if (v !== undefined) setObj[k] = v; }
+    if (isMoneyPageBool !== undefined) setObj.isMoneyPage = isMoneyPageBool ? 1 : 0;
     if (Object.keys(setObj).length > 0) {
       await db.update(articles).set(setObj).where(and(eq(articles.id, id), eq(articles.userId, ctx.user.id)));
     }
@@ -189,6 +194,115 @@ const articlesRouter = router({
     await db.delete(articles).where(and(eq(articles.id, input.id), eq(articles.userId, ctx.user.id)));
     return { success: true };
   }),
+
+  // P3a: Record attribution when a research item's content is inserted into an article.
+  // Content is inserted client-side via insertRichContent (preserves Plate HTML format).
+  // This procedure only records the article_research link and appends to sources JSON.
+  insertResearch: protectedProcedure
+    .input(z.object({
+      articleId: z.number(),
+      itemId: z.number(),
+      note: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const [article] = await db.select().from(articles)
+        .where(and(eq(articles.id, input.articleId), eq(articles.userId, ctx.user.id)));
+      if (!article) throw new Error("Article not found");
+      const [item] = await db.select().from(researchItems)
+        .where(and(eq(researchItems.id, input.itemId), eq(researchItems.userId, ctx.user.id)));
+      if (!item) throw new Error("Research item not found");
+      // Record attribution link
+      await db.insert(articleResearch).values({
+        userId: ctx.user.id,
+        articleId: input.articleId,
+        itemId: input.itemId,
+        note: input.note ?? null,
+      });
+      // Append to sources JSON provenance registry
+      const existingSources = (article.sources as any[] | null) ?? [];
+      const newSource = {
+        title: item.title,
+        url: item.url ?? undefined,
+        note: input.note ?? undefined,
+        addedAt: new Date().toISOString(),
+      };
+      await db.update(articles)
+        .set({ sources: [...existingSources, newSource] })
+        .where(eq(articles.id, input.articleId));
+      return { success: true };
+    }),
+
+  // P3a: Create a new article seeded with a research item's content.
+  // Auto-assigns article_number (per-user MAX+1).
+  createFromResearch: protectedProcedure
+    .input(z.object({
+      itemId: z.number(),
+      title: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const [item] = await db.select().from(researchItems)
+        .where(and(eq(researchItems.id, input.itemId), eq(researchItems.userId, ctx.user.id)));
+      if (!item) throw new Error("Research item not found");
+      // auto article_number
+      const [maxRow] = await db.select({ m: max(articles.articleNumber) })
+        .from(articles).where(eq(articles.userId, ctx.user.id));
+      const nextNum = ((maxRow?.m ?? 0) as number) + 1;
+      const citationLine = [
+        item.authors && (item.authors as string[]).length > 0 ? (item.authors as string[]).join(", ") : null,
+        item.year ? `(${item.year})` : null,
+        item.publication ?? null,
+        item.url ? `[Source](${item.url})` : null,
+      ].filter(Boolean).join(" · ");
+      const seedContent = [
+        `## ${item.title}`,
+        item.abstract ? `\n\n> ${item.abstract.slice(0, 600)}` : "",
+        item.notes ? `\n\n${item.notes}` : "",
+        `\n\n*${citationLine}*`,
+      ].join("");
+      const articleTitle = input.title ?? item.title;
+      const vals: InsertArticle = {
+        userId: ctx.user.id,
+        title: articleTitle,
+        content: seedContent,
+        articleNumber: nextNum,
+        sources: [{ title: item.title, url: item.url ?? undefined, addedAt: new Date().toISOString() }],
+      };
+      const [result] = await db.insert(articles).values(vals).$returningId();
+      await db.insert(articleResearch).values({
+        userId: ctx.user.id,
+        articleId: result.id,
+        itemId: input.itemId,
+        note: null,
+      });
+      syncArticleToPipeline({ articleId: result.id, title: articleTitle, status: "draft" });
+      return { id: result.id, articleNumber: nextNum };
+    }),
+
+  // P3a: Set/clear series on an article
+  setSeries: protectedProcedure
+    .input(z.object({ id: z.number(), seriesId: z.number().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      await db.update(articles).set({ seriesId: input.seriesId })
+        .where(and(eq(articles.id, input.id), eq(articles.userId, ctx.user.id)));
+      return { success: true };
+    }),
+
+  // P3a: Toggle money page flag
+  setMoneyPage: protectedProcedure
+    .input(z.object({ id: z.number(), value: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      await db.update(articles).set({ isMoneyPage: input.value ? 1 : 0 })
+        .where(and(eq(articles.id, input.id), eq(articles.userId, ctx.user.id)));
+      return { success: true };
+    }),
 });
 
 // ─── Pitches ──────────────────────────────────────────────
@@ -477,6 +591,73 @@ const settingsRouter = router({
   }),
 });
 
+// ─── Series (P3a) ─────────────────────────────────────────
+const seriesRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(researchSeries)
+      .where(eq(researchSeries.userId, ctx.user.id))
+      .orderBy(desc(researchSeries.createdAt));
+  }),
+  create: protectedProcedure
+    .input(z.object({ name: z.string().min(1).max(300), description: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const [res] = await db.insert(researchSeries).values({
+        userId: ctx.user.id, name: input.name, description: input.description ?? null,
+      }).$returningId();
+      return { id: res.id };
+    }),
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      await db.update(articles).set({ seriesId: null })
+        .where(and(eq(articles.seriesId, input.id), eq(articles.userId, ctx.user.id)));
+      await db.delete(researchSeries)
+        .where(and(eq(researchSeries.id, input.id), eq(researchSeries.userId, ctx.user.id)));
+      return { success: true };
+    }),
+});
+
+// ─── Article Tags (P3a) ───────────────────────────────────
+const articleTagRouter = router({
+  list: protectedProcedure
+    .input(z.object({ articleId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(articleTag)
+        .where(and(eq(articleTag.articleId, input.articleId), eq(articleTag.userId, ctx.user.id)));
+    }),
+  tag: protectedProcedure
+    .input(z.object({ articleId: z.number(), tag: z.string().min(1).max(100) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      await db.insert(articleTag).values({
+        userId: ctx.user.id, articleId: input.articleId, tag: input.tag.toLowerCase().trim(),
+      });
+      return { success: true };
+    }),
+  untag: protectedProcedure
+    .input(z.object({ articleId: z.number(), tag: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      await db.delete(articleTag)
+        .where(and(
+          eq(articleTag.articleId, input.articleId),
+          eq(articleTag.tag, input.tag),
+          eq(articleTag.userId, ctx.user.id),
+        ));
+      return { success: true };
+    }),
+});
+
 // ─── Combined Data Router ─────────────────────────────────
 export const dataRouter = router({
   ideas: ideasRouter,
@@ -488,4 +669,6 @@ export const dataRouter = router({
   earnings: earningsRouter,
   intelligence: intelligenceRouter,
   settings: settingsRouter,
+  series: seriesRouter,
+  articleTags: articleTagRouter,
 });

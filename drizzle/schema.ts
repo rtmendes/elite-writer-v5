@@ -1,5 +1,5 @@
 import {
-  int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, decimal, boolean, bigint, uniqueIndex
+  int, tinyint, mysqlEnum, mysqlTable, text, timestamp, varchar, json, decimal, boolean, bigint, uniqueIndex
 } from "drizzle-orm/mysql-core";
 
 // ─── Core User ────────────────────────────────────────────
@@ -56,6 +56,11 @@ export const articles = mysqlTable("articles", {
   // Source registry: [{title, url, note, addedAt}] — research provenance per article
   sources: json("sources"),
   importedFrom: varchar("importedFrom", { length: 500 }),
+  // P3a: Research → Article bridge fields
+  articleNumber: int("article_number"),
+  seriesId: int("series_id"),
+  isMoneyPage: tinyint("is_money_page").default(0).notNull(),
+  primaryOfferId: int("primary_offer_id"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -1122,6 +1127,41 @@ export const articleResearch = mysqlTable("article_research", {
 });
 export type ArticleResearch = typeof articleResearch.$inferSelect;
 export type InsertArticleResearch = typeof articleResearch.$inferInsert;
+
+// P3a: Research Series — normalized series entity for grouping articles
+export const researchSeries = mysqlTable("research_series", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 300 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ResearchSeries = typeof researchSeries.$inferSelect;
+export type InsertResearchSeries = typeof researchSeries.$inferInsert;
+
+// P3a: Article tags — normalized per-article tags (filterable)
+export const articleTag = mysqlTable("article_tag", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  articleId: int("articleId").notNull(),
+  tag: varchar("tag", { length: 100 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ArticleTag = typeof articleTag.$inferSelect;
+export type InsertArticleTag = typeof articleTag.$inferInsert;
+
+// P3a: Research share links — unguessable share tokens for folders/items/projects
+export const researchShare = mysqlTable("research_share", {
+  id: int("id").autoincrement().primaryKey(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  ownerType: mysqlEnum("ownerType", ["folder", "item", "project"]).notNull(),
+  ownerId: int("ownerId").notNull(),
+  userId: int("userId").notNull(),
+  revoked: tinyint("revoked").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ResearchShare = typeof researchShare.$inferSelect;
+export type InsertResearchShare = typeof researchShare.$inferInsert;
 
 // Template SOPs — one per writing template, editable in-app.
 // The Drafter injects the active SOP into its system prompt so output
