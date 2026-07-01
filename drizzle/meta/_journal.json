@@ -36,6 +36,55 @@
       "when": 1782847389833,
       "tag": "0004_outgoing_emma_frost",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1782895341000,
+      "tag": "0005_publication_intel",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1782895341000,
+      "tag": "0006_ai_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1782895341000,
+      "tag": "0007_article_sources",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1782895341000,
+      "tag": "0008_research_references",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1782895341000,
+      "tag": "0009_template_sops",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1782906122000,
+      "tag": "0010_research_article_bridge",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1782919648000,
+      "tag": "0011_research_library_merge",
+      "breakpoints": true
     }
   ]
 }
