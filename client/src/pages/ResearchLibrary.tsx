@@ -14,6 +14,7 @@ import {
   BookOpen, Folder, FolderPlus, Plus, Search, Trash2,
   FileText, Globe, Video, GraduationCap, Upload, X, ChevronRight, ChevronDown,
   Highlighter, ExternalLink, Loader2, FolderOpen, Columns2, PenTool, Share2, Link2,
+  Zap, ChevronUp,
 } from "lucide-react";
 
 // ─── Subfolder tree helpers ──────────────────────────────────────────────────
@@ -426,8 +427,16 @@ function BulkImportDialog({
 
 // ─── Reading Pane ─────────────────────────────────────────────────────────────
 
+const READING_LEVELS = ["5th grade", "8th grade", "college", "expert"] as const;
+type ReadingLevel = typeof READING_LEVELS[number];
+
 function ReadingPane({ item, onClose, split, projects }: { item: any | null; onClose: () => void; split: boolean; projects: any[] }) {
   const [newHighlight, setNewHighlight] = useState("");
+  const [spinOpen, setSpinOpen] = useState(false);
+  const [spinAngles, setSpinAngles] = useState<any | null>(null);
+  const [spinMap, setSpinMap] = useState<any | null>(null);
+  const [spinLevels, setSpinLevels] = useState<ReadingLevel[]>(["8th grade", "college"]);
+  const [spinDrafts, setSpinDrafts] = useState<any[]>([]);
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [projectPickerId, setProjectPickerId] = useState<number | null>(null);
   const updateItem = trpc.researchLibrary.items.update.useMutation({
@@ -460,6 +469,18 @@ function ReadingPane({ item, onClose, split, projects }: { item: any | null; onC
   });
   const deleteHighlight = trpc.researchLibrary.highlights.delete.useMutation({
     onSuccess: () => highlightsQ.refetch(),
+  });
+  const spinAnglesMut = trpc.researchLibrary.spin.angles.useMutation({
+    onSuccess: (r) => setSpinAngles(r),
+    onError: (e) => toast.error(e.message),
+  });
+  const spinMapMut = trpc.researchLibrary.spin.rankMap.useMutation({
+    onSuccess: (r) => setSpinMap(r),
+    onError: (e) => toast.error(e.message),
+  });
+  const spinDraftsMut = trpc.researchLibrary.spin.drafts.useMutation({
+    onSuccess: (r) => setSpinDrafts(r),
+    onError: (e) => toast.error(e.message),
   });
 
   const paneClass = split ? "w-[45%] shrink-0" : "w-80 shrink-0";
@@ -615,6 +636,153 @@ function ReadingPane({ item, onClose, split, projects }: { item: any | null; onC
               Add Highlight
             </Button>
           </div>
+        </div>
+
+        {/* P3b: Spin into Assets */}
+        <div className="border border-white/10 rounded-lg overflow-hidden">
+          <button
+            onClick={() => setSpinOpen(v => !v)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-amber-400 hover:bg-white/5 transition-colors"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            Spin into Assets
+            {spinOpen ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
+          </button>
+
+          {spinOpen && (
+            <div className="px-3 pb-3 space-y-3 border-t border-white/5">
+              {/* Step 1: Find Angles */}
+              <div className="pt-2">
+                <p className="text-[10px] text-slate-500 mb-1.5">Step 1 — Extract content angles &amp; gaps</p>
+                <Button
+                  size="sm"
+                  disabled={spinAnglesMut.isPending}
+                  onClick={() => spinAnglesMut.mutate({ itemIds: [item.id] })}
+                  className="w-full text-xs h-7 bg-white/5 hover:bg-white/10 text-slate-300"
+                >
+                  {spinAnglesMut.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                  Find Angles &amp; Gaps
+                </Button>
+                {spinAngles && (
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-[10px] text-slate-500">{spinAngles.corpusSummary}</p>
+                    {spinAngles.angles?.map((a: any, i: number) => (
+                      <div key={i} className="bg-white/5 rounded p-2 text-[11px]">
+                        <p className="font-medium text-slate-200">{a.title}</p>
+                        <p className="text-slate-400 mt-0.5">{a.hook}</p>
+                        <p className="text-amber-400/80 mt-0.5 text-[10px]">Gap: {a.gap}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Step 2: Ranked Map */}
+              {spinAngles && (
+                <div>
+                  <p className="text-[10px] text-slate-500 mb-1.5">Step 2 — Pub / idea / offer map</p>
+                  <Button
+                    size="sm"
+                    disabled={spinMapMut.isPending}
+                    onClick={() => spinMapMut.mutate({ anglesJson: JSON.stringify(spinAngles) })}
+                    className="w-full text-xs h-7 bg-white/5 hover:bg-white/10 text-slate-300"
+                  >
+                    {spinMapMut.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                    Build Revenue Map
+                  </Button>
+                  {spinMap && (
+                    <div className="mt-2 space-y-1.5 text-[11px]">
+                      {spinMap.publications?.slice(0, 3).map((p: any, i: number) => (
+                        <div key={i} className="bg-white/5 rounded px-2 py-1.5">
+                          <span className="text-slate-200 font-medium">{p.name}</span>
+                          <span className={`ml-2 text-[10px] ${p.fit === "high" ? "text-green-400" : "text-slate-500"}`}>{p.fit} fit</span>
+                          <span className="ml-2 text-amber-400">{p.payRange}</span>
+                          <p className="text-slate-400 mt-0.5">{p.pitchHook}</p>
+                        </div>
+                      ))}
+                      {spinMap.offers?.slice(0, 3).map((o: any, i: number) => (
+                        <div key={i} className="bg-white/5 rounded px-2 py-1.5">
+                          <span className="text-slate-200 font-medium">{o.name}</span>
+                          <span className="ml-2 text-amber-400">{o.pricePoint}</span>
+                          <p className="text-slate-400 mt-0.5">{o.corePromise}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 3: Multi-Level Drafts */}
+              {spinAngles?.angles?.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-slate-500 mb-1.5">Step 3 — Generate audience-angled drafts</p>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {READING_LEVELS.map(level => (
+                      <button
+                        key={level}
+                        onClick={() => setSpinLevels(prev =>
+                          prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level]
+                        )}
+                        className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                          spinLevels.includes(level)
+                            ? "border-amber-500 bg-amber-500/20 text-amber-300"
+                            : "border-white/10 text-slate-500 hover:border-white/20"
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={spinDraftsMut.isPending || spinLevels.length === 0}
+                    onClick={() => {
+                      const top = spinAngles.angles[0];
+                      spinDraftsMut.mutate({
+                        itemIds: [item.id],
+                        angleTitle: top.title,
+                        angleHook: top.hook,
+                        keyPoints: top.keyPoints ?? [],
+                        readingLevels: spinLevels,
+                        wordTarget: 800,
+                      });
+                    }}
+                    className="w-full text-xs h-7 bg-amber-600/80 hover:bg-amber-600 text-white"
+                  >
+                    {spinDraftsMut.isPending
+                      ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Generating {spinLevels.length} drafts…</>
+                      : `Generate ${spinLevels.length} draft${spinLevels.length !== 1 ? "s" : ""}`
+                    }
+                  </Button>
+                  {spinDrafts.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      {spinDrafts.map((d, i) => (
+                        <div key={i} className="bg-white/5 rounded px-2 py-1.5 text-[11px]">
+                          {d.error ? (
+                            <p className="text-red-400">{d.readingLevel}: {d.error}</p>
+                          ) : (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <span className="text-amber-400 font-medium">{d.readingLevel}</span>
+                                <a
+                                  href={`/writer/${d.articleId}`}
+                                  className="text-slate-400 hover:text-amber-400 flex items-center gap-0.5"
+                                >
+                                  <PenTool className="w-3 h-3" /> Open
+                                </a>
+                              </div>
+                              <p className="text-slate-400 mt-0.5 line-clamp-2">{d.preview}</p>
+                              <p className="text-slate-600 text-[10px] mt-0.5">{d.wordCount} words</p>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

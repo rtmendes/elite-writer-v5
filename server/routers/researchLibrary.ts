@@ -13,6 +13,8 @@ import {
 } from "../../drizzle/schema";
 import { nanoid } from "nanoid";
 import { uploadBuffer, downloadText } from "../_core/storage";
+import { invokeLLM } from "../_core/llm";
+import { articles } from "../../drizzle/schema";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -495,6 +497,233 @@ const sharesRouter = router({
     }),
 });
 
+// ─── P3b: Research → Revenue Brain ───────────────────────────────────────────
+//
+// Three procedures:
+//   spin.angles   — angle/gap finder over a corpus of research item IDs
+//   spin.rankMap  — ranked publication / idea / offer map from the angles JSON
+//   spin.drafts   — one-corpus → N audience-angled drafts at set reading levels
+//                   each draft is inserted into `articles` and the new IDs returned
+
+const READING_LEVELS = ["5th grade", "8th grade", "college", "expert"] as const;
+
+const spinRouter = router({
+  /** Step 1: extract content angles + gap analysis from a set of research items */
+  angles: protectedProcedure
+    .input(z.object({
+      itemIds: z.array(z.number()).min(1).max(50),
+      niche: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      const rows = await db.select({
+        title: researchItems.title,
+        abstract: researchItems.abstract,
+        notes: researchItems.notes,
+        tags: researchItems.tags,
+      })
+        .from(researchItems)
+        .where(and(
+          eq(researchItems.userId, ctx.user.id),
+          sql`${researchItems.id} IN (${sql.join(input.itemIds.map(id => sql`${id}`), sql`, `)})`,
+        ));
+
+      const corpus = rows.map((r, i) =>
+        `[${i + 1}] ${r.title}\n${r.abstract ?? ""}\nNotes: ${r.notes ?? ""}\nTags: ${JSON.stringify(r.tags ?? [])}`
+      ).join("\n\n---\n\n");
+
+      const prompt = `You are a content strategist and revenue intelligence analyst.
+
+Research corpus (${rows.length} items):
+${corpus}
+${input.niche ? `\nNiche/topic focus: ${input.niche}` : ""}
+
+Analyze the corpus and return a JSON object with:
+{
+  "angles": [
+    {
+      "title": "concise angle title",
+      "hook": "1-sentence hook for this angle",
+      "gap": "what is missing / underserved in this space that this angle fills",
+      "strength": "high|medium|low",
+      "targetEmotion": "curiosity|urgency|aspiration|fear|validation",
+      "keyPoints": ["point 1", "point 2", "point 3"]
+    }
+  ],
+  "corpusSummary": "2-sentence synthesis of the entire corpus",
+  "dominantThemes": ["theme1", "theme2"],
+  "underservedAngles": ["angle idea not yet in corpus 1", "angle idea 2"]
+}
+
+Return 3-7 angles, ranked by revenue/engagement potential. ONLY valid JSON.`;
+
+      const result = await invokeLLM({
+        model: "openai/gpt-4o-mini:free",
+        messages: [{ role: "user", content: prompt }],
+        responseFormat: { type: "json_object" },
+        maxTokens: 2000,
+        temperature: 0.4,
+      });
+
+      try {
+        return JSON.parse(result.choices[0].message.content);
+      } catch {
+        throw new Error("LLM returned invalid JSON");
+      }
+    }),
+
+  /** Step 2: ranked publication / idea / offer map from angles analysis */
+  rankMap: protectedProcedure
+    .input(z.object({
+      anglesJson: z.string(), // output of spin.angles stringified
+      niche: z.string().optional(),
+    }))
+    .mutation(async ({ ctx: _ctx, input }) => {
+      const prompt = `You are a freelance writing revenue strategist.
+
+Angles analysis:
+${input.anglesJson}
+${input.niche ? `\nNiche: ${input.niche}` : ""}
+
+Return a JSON object:
+{
+  "publications": [
+    {
+      "name": "publication name",
+      "fit": "high|medium|low",
+      "payRange": "$X–$Y per piece or flat rate",
+      "bestAngleIndex": 0,
+      "pitchHook": "one-sentence pitch hook for this publication",
+      "notes": "why this pub, what they want"
+    }
+  ],
+  "ideas": [
+    {
+      "title": "article/content idea title",
+      "format": "listicle|essay|how-to|opinion|case-study|interview",
+      "angleIndex": 0,
+      "revenueType": "freelance|affiliate|lead-gen|product-sale|newsletter",
+      "estimatedValue": "$X",
+      "priority": "high|medium|low"
+    }
+  ],
+  "offers": [
+    {
+      "name": "product/offer name",
+      "type": "course|ebook|template|coaching|newsletter|community",
+      "angleIndex": 0,
+      "pricePoint": "$X",
+      "targetAudience": "who buys this",
+      "corePromise": "one-sentence outcome"
+    }
+  ]
+}
+
+Return 3-5 of each. Rank by revenue potential. ONLY valid JSON.`;
+
+      const result = await invokeLLM({
+        model: "openai/gpt-4o-mini:free",
+        messages: [{ role: "user", content: prompt }],
+        responseFormat: { type: "json_object" },
+        maxTokens: 2500,
+        temperature: 0.4,
+      });
+
+      try {
+        return JSON.parse(result.choices[0].message.content);
+      } catch {
+        throw new Error("LLM returned invalid JSON");
+      }
+    }),
+
+  /** Step 3: one corpus → N audience-angled drafts at specified reading levels
+   *  Each draft is saved as a new article. Returns the created article IDs + previews. */
+  drafts: protectedProcedure
+    .input(z.object({
+      itemIds: z.array(z.number()).min(1).max(50),
+      angleTitle: z.string(),
+      angleHook: z.string(),
+      keyPoints: z.array(z.string()),
+      readingLevels: z.array(z.enum(READING_LEVELS)).min(1).max(4),
+      targetPublication: z.string().optional(),
+      wordTarget: z.number().min(200).max(3000).default(800),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+
+      const rows = await db.select({
+        title: researchItems.title,
+        abstract: researchItems.abstract,
+        notes: researchItems.notes,
+      })
+        .from(researchItems)
+        .where(and(
+          eq(researchItems.userId, ctx.user.id),
+          sql`${researchItems.id} IN (${sql.join(input.itemIds.map(id => sql`${id}`), sql`, `)})`,
+        ));
+
+      const corpus = rows.map((r, i) =>
+        `[${i + 1}] ${r.title}\n${r.abstract ?? ""}\n${r.notes ?? ""}`
+      ).join("\n---\n");
+
+      // Generate all reading-level drafts in parallel
+      const draftPromises = input.readingLevels.map(async (level) => {
+        const prompt = `You are an expert writer creating a ${level}-level article.
+
+Angle: ${input.angleTitle}
+Hook: ${input.angleHook}
+Key points to cover: ${input.keyPoints.join("; ")}
+Target word count: ~${input.wordTarget} words
+Reading level: ${level} (calibrate vocabulary, sentence length, and complexity accordingly)
+${input.targetPublication ? `Target publication: ${input.targetPublication}` : ""}
+
+Research corpus to draw from:
+${corpus}
+
+Write a complete, publishable draft. Use markdown headings (##) for sections.
+Open with the hook. Cover all key points naturally. Do NOT mention AI or that this was generated.
+Write in an authentic human voice appropriate for the reading level.`;
+
+        const result = await invokeLLM({
+          model: "openai/gpt-4o-mini:free",
+          messages: [{ role: "user", content: prompt }],
+          maxTokens: Math.round(input.wordTarget * 2.5),
+          temperature: 0.7,
+        });
+
+        const content = result.choices[0].message.content;
+        const wordCount = content.split(/\s+/).length;
+        const title = `${input.angleTitle} [${level}]`;
+
+        const [inserted] = await db.insert(articles).values({
+          userId: ctx.user.id,
+          title,
+          content,
+          wordCount,
+          status: "draft",
+          targetPublication: input.targetPublication ?? null,
+          sources: input.itemIds.map(id => ({ researchItemId: id })),
+        });
+
+        return {
+          articleId: inserted.insertId,
+          readingLevel: level,
+          wordCount,
+          title,
+          preview: content.slice(0, 300),
+        };
+      });
+
+      const results = await Promise.allSettled(draftPromises);
+      return results.map((r, i) => {
+        if (r.status === "fulfilled") return r.value;
+        return { readingLevel: input.readingLevels[i], error: String(r.reason), articleId: null };
+      });
+    }),
+});
+
 // ─── combined ────────────────────────────────────────────────────────────────
 
 export const researchLibraryRouter = router({
@@ -504,4 +733,5 @@ export const researchLibraryRouter = router({
   projects: projectsRouter,
   attach: attachRouter,
   shares: sharesRouter,
+  spin: spinRouter,
 });
