@@ -24,7 +24,8 @@ async function dbExec(query: string): Promise<Array<Record<string, unknown>>> {
   const db = await getDb();
   if (!db) return [];
   const result = await db.execute(sql.raw(query));
-  return ((result as unknown as [Array<Record<string, unknown>>])[0] ?? []);
+  // postgres-js returns the row array directly (mysql2 returned [rows, fields])
+  return ((result as unknown as Array<Record<string, unknown>>) ?? []);
 }
 
 const parse = <T,>(raw: unknown): T => (typeof raw === "string" ? JSON.parse(raw) : raw) as T;
@@ -126,16 +127,16 @@ const DB_NAME = "Agent Skills & SOPs";
 const STAGE_COLORS = ["#6366f1", "#8b5cf6", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#14b8a6", "#ec4899", "#a3a3a3"];
 
 async function loadDatabases(): Promise<WsDatabase[]> {
-  const rows = await dbExec("SELECT data FROM `wsDatabases` WHERE deleted = FALSE");
+  const rows = await dbExec(`SELECT data FROM "wsDatabases" WHERE deleted = FALSE`);
   return rows.map((r) => parse<WsDatabase>(r.data));
 }
 
 async function loadRowsFor(dbId: string): Promise<WsRow[]> {
   try {
-    const rows = await dbExec(`SELECT data FROM \`wsRows\` WHERE deleted = FALSE AND dbId = ${JSON.stringify(dbId)}`);
+    const rows = await dbExec(`SELECT data FROM "wsRows" WHERE deleted = FALSE AND "dbId" = '${dbId.replace(/'/g, "''")}'`);
     return rows.map((r) => parse<WsRow>(r.data));
   } catch {
-    const rows = await dbExec("SELECT data FROM `wsRows` WHERE deleted = FALSE");
+    const rows = await dbExec(`SELECT data FROM "wsRows" WHERE deleted = FALSE`);
     return rows.map((r) => parse<WsRow>(r.data)).filter((r) => r.dbId === dbId);
   }
 }
@@ -145,9 +146,9 @@ async function save(table: "wsDatabases" | "wsRows", record: { id: string } & Re
   if (!db) return;
   record.updatedAt = Date.now();
   await db.execute(sql`
-    INSERT INTO ${sql.raw(table)} (id, data, updatedAt, deleted)
-    VALUES (${record.id}, ${JSON.stringify(record)}, ${record.updatedAt}, FALSE)
-    ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = VALUES(updatedAt), deleted = FALSE
+    INSERT INTO ${sql.raw(`"${table}"`)} (id, data, "updatedAt", deleted)
+    VALUES (${record.id}, ${JSON.stringify(record)}::jsonb, ${record.updatedAt}, FALSE)
+    ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, "updatedAt" = EXCLUDED."updatedAt", deleted = FALSE
   `);
 }
 

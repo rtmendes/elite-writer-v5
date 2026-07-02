@@ -184,7 +184,7 @@ export const pulseRouter = router({
         newsPeg: story.whyItMatters ?? undefined,
         status: "drafting",
         brandId: input.targetBrand ?? undefined,
-      });
+      }).returning({ id: ideas.id });
 
       // Create a draft article
       const [articleResult] = await db.insert(articles).values({
@@ -194,21 +194,21 @@ export const pulseRouter = router({
         status: "draft",
         brandId: input.targetBrand ?? undefined,
         targetPublication: input.targetPublication ?? undefined,
-      });
+      }).returning({ id: articles.id });
 
       // Update pulse story status and link
       await db.update(pulseStories)
         .set({
           status: "in_pipeline",
-          articleId: articleResult.insertId,
-          ideaId: ideaResult.insertId,
+          articleId: articleResult.id,
+          ideaId: ideaResult.id,
         })
         .where(eq(pulseStories.id, input.id));
 
       return {
         success: true,
-        articleId: articleResult.insertId,
-        ideaId: ideaResult.insertId,
+        articleId: articleResult.id,
+        ideaId: ideaResult.id,
       };
     }),
 

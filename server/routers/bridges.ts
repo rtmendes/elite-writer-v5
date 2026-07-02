@@ -322,7 +322,7 @@ GEO Enhancement Checklist:
           overallScore: scoreData.overall || null,
           scoreData,
           targetPublication: input.targetPublication || null,
-        }).$returningId();
+        }).returning({ id: articles.id });
 
         savedArticles.push({
           id: saved.id,
@@ -1071,7 +1071,7 @@ No AI clichés. US English. Every sentence earns its place.`;
         scoreData,
         targetPublication: input.targetPublication || null,
         productId: input.productIds?.join(",") || null,
-      }).$returningId();
+      }).returning({ id: articles.id });
 
       steps.push({ step: "save", status: "complete", detail: `Article #${saved.id}` });
       syncArticleToPipeline({

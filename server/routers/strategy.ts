@@ -323,9 +323,9 @@ Return JSON:
             estimated_traffic: parsed.estimated_total_words,
             content_gap_analysis: parsed.internal_linking_plan,
           },
-        });
+        }).returning({ id: contentStrategies.id });
 
-        return { id: inserted.insertId, ...parsed };
+        return { id: inserted.id, ...parsed };
       }),
 
     // ─── Enhance Strategy ─────────────────────────────────────

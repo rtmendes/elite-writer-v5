@@ -24,7 +24,7 @@ async function ensureArticleIdColumn() {
   const db = await getDb();
   if (!db) return;
   try {
-    await db.execute(sql.raw("ALTER TABLE `products` ADD COLUMN IF NOT EXISTS `articleId` INT NULL"));
+    await db.execute(sql.raw(`ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "articleId" INT`));
   } catch { /* already present or unsupported syntax */ }
 }
 
@@ -204,7 +204,7 @@ Format in markdown with appropriate subheadings.`,
           price: structure.suggestedPrice || "19.99",
           description: structure.description || `eBook based on: ${input.articleTitle}`,
           status: "draft",
-        }).$returningId();
+        }).returning({ id: products.id });
         productId = res.id;
       }
 
@@ -300,7 +300,7 @@ Return JSON:
           price: courseData.suggestedPrice || "97.00",
           description: courseData.description || `Course based on: ${input.articleTitle}`,
           status: "draft",
-        }).$returningId();
+        }).returning({ id: products.id });
         productId = res.id;
       }
 
@@ -382,7 +382,7 @@ Return JSON:
           price: "0.00",
           description: leadMagnet.description || `Lead magnet: ${input.articleTitle}`,
           status: "draft",
-        }).$returningId();
+        }).returning({ id: products.id });
         productId = res.id;
       }
 

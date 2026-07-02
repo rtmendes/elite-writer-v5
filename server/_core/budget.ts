@@ -108,7 +108,8 @@ export function recordUsage(
           costMicros: estimateCostMicros(model, usage),
           calls: 1,
         })
-        .onDuplicateKeyUpdate({
+        .onConflictDoUpdate({
+          target: [aiUsage.day, aiUsage.model],
           set: {
             promptTokens: sql`${aiUsage.promptTokens} + ${usage.prompt_tokens ?? 0}`,
             completionTokens: sql`${aiUsage.completionTokens} + ${usage.completion_tokens ?? 0}`,

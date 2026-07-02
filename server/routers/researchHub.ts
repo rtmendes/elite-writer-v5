@@ -266,7 +266,7 @@ export const researchHubRouter = router({
             source: "Research Hub",
             tokenCount: Math.ceil(body.length / 4),
           };
-          const [r] = await db.insert(kbItems).values(vals).$returningId();
+          const [r] = await db.insert(kbItems).values(vals).returning({ id: kbItems.id });
           savedId = r.id;
         }
       }
@@ -373,7 +373,7 @@ export const researchHubRouter = router({
             source: "Research Hub",
             tokenCount: Math.ceil(report.length / 4),
           };
-          const [r] = await db.insert(kbItems).values(vals).$returningId();
+          const [r] = await db.insert(kbItems).values(vals).returning({ id: kbItems.id });
           savedId = r.id;
         }
       }
@@ -465,7 +465,7 @@ export const researchHubRouter = router({
           tags: input.tags,
           notes: input.notes ?? null,
         };
-        const [r] = await db.insert(researchReferences).values(vals).$returningId();
+        const [r] = await db.insert(researchReferences).values(vals).returning({ id: researchReferences.id });
         return { success: true, id: r.id };
       }),
 
@@ -557,7 +557,7 @@ export const researchHubRouter = router({
           sourceUrl: ref.url || null,
           tokenCount: Math.ceil(body.length / 4),
         };
-        const [r] = await db.insert(kbItems).values(vals).$returningId();
+        const [r] = await db.insert(kbItems).values(vals).returning({ id: kbItems.id });
         return { success: true, kbId: r.id };
       }),
   }),

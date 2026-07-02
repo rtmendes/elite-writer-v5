@@ -188,8 +188,8 @@ Return JSON:
           },
         };
 
-        const [inserted] = await db.insert(socialPosts).values(insertData);
-        return { id: inserted.insertId, ...parsed };
+        const [inserted] = await db.insert(socialPosts).values(insertData).returning({ id: socialPosts.id });
+        return { id: inserted.id, ...parsed };
       }
 
       return parsed;
@@ -377,8 +377,8 @@ Each post must be optimized for its specific platform. Don't just resize — rei
             language: "en",
             score: post.score || null,
             status: "draft",
-          });
-          savedPosts.push({ id: inserted.insertId, platform, ...post });
+          }).returning({ id: socialPosts.id });
+          savedPosts.push({ id: inserted.id, platform, ...post });
         }
       }
 

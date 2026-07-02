@@ -62,8 +62,8 @@ export const studioRouter = router({
         userId: ctx.user.id,
         charCount,
         ...input,
-      } as any);
-      return { id: result.insertId };
+      } as any).returning({ id: contentStudioItems.id });
+      return { id: result.id };
     }),
 
   update: protectedProcedure

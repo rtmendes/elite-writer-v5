@@ -108,7 +108,7 @@ export const kbRouter = router({
         tokenCount,
       };
 
-      const [result] = await db.insert(kbItems).values(vals).$returningId();
+      const [result] = await db.insert(kbItems).values(vals).returning({ id: kbItems.id });
       return { success: true, id: result.id, tokenCount };
     }),
 
@@ -210,7 +210,7 @@ export const kbRouter = router({
               source: input.source,
               sourceUrl: input.sourceUrl,
               tokenCount: Math.ceil((item.content || "").length / 4),
-            }).$returningId();
+            }).returning({ id: kbItems.id });
             saved.push(res.id);
           } catch { /* skip */ }
         }

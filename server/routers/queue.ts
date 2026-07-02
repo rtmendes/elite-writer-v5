@@ -286,7 +286,7 @@ Return JSON:
           overallScore: scoreData.overall || null,
           scoreData: scoreData,
           targetPublication: input.targetPublication || null,
-        }).$returningId();
+        }).returning({ id: articles.id });
         articleId = result.id;
         syncArticleToPipeline({
           articleId: result.id, title: outline.headline || input.title, status: "scored",
@@ -378,7 +378,7 @@ Return JSON:
             overallScore: scoreData.overall || null,
             scoreData,
             targetPublication: topic.targetPublication || null,
-          }).$returningId();
+          }).returning({ id: articles.id });
 
           syncArticleToPipeline({
             articleId: result.id, title: topic.title, status: "scored",

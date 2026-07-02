@@ -87,9 +87,9 @@ export const brandContextRouter = router({
         sampleContent: input.sampleContent || [],
         languagePreferences: input.languagePreferences || { primary: "en" },
         imagePreferences: input.imagePreferences || {},
-      });
+      }).returning({ id: brandContexts.id });
 
-      return { id: inserted.insertId };
+      return { id: inserted.id };
     }),
 
   // ─── Update Brand Context ────────────────────────────────

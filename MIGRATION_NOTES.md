@@ -185,12 +185,41 @@ redeploy Phase-1 git SHA. MySQL never touched, never decommissioned in this migr
   wsRows.dbId populated 580/580 with 9 distinct values (= 9 wsDatabases) ✓.
 - Rerun before Phase 6 cutover to pick up fresh prod data (script is idempotent).
 
+## Phase 4 record — 2026-07-02
+
+- Driver swap: `drizzle-orm/mysql2` → `drizzle-orm/postgres-js` in server/db.ts (only import site).
+- All MySQL-specific SQL ported:
+  - `ON DUPLICATE KEY UPDATE` → `ON CONFLICT ... DO UPDATE` (workspace push keeps the
+    newest-wins `IF()` logic as `CASE WHEN EXCLUDED."updatedAt" >= ...`).
+  - Drizzle `.onDuplicateKeyUpdate` → `.onConflictDoUpdate` with explicit targets
+    (users.openId, template_sops.templateId, ai_usage day+model, feed_seen userId+urlHash).
+  - `.$returningId()` (30 sites) and mysql2 `insertId` (22 sites + 3 in agents.ts) →
+    `.returning({ id: table.id })`; test stub server/test/memoryDb.ts updated to match.
+  - Runtime DDL (ensureTables / ensureWsTables / ensureFeedSeenTable / products articleId)
+    rewritten in PG syntax with `IF NOT EXISTS`; inline INDEX → separate CREATE INDEX;
+    dbId generated column now `data->>'dbId'`.
+  - Result shapes: postgres-js returns rows directly — removed all `[rows, fields]`
+    destructures; `JSON.stringify(id)` string literals (double quotes = identifiers in PG)
+    → single-quoted escaped literals; camelCase identifiers quoted in all raw SQL.
+  - feed_seen unique key (was runtime-created in MySQL, not in drizzle schema) added as
+    `uq_feed_seen` unique index in Supabase + ensured at runtime.
+- Dev-only cutover: local `.env` DATABASE_URL → Supabase through SSH tunnel
+  (socat sidecar `ew-pg-tunnel` on VPS loopback 127.0.0.1:55432 + `ssh -L 55432`).
+  Previous MySQL value kept commented in `.env`. Production `.env.production` UNTOUCHED.
+- Gate: `tsc --noEmit` 0 errors · vitest 76/76 pass · `pnpm build` clean.
+- Local flow test against Supabase (all verified in DB afterward):
+  login ✓ (matched the migrated admin row via openId upsert) · list shows migrated
+  articles ✓ · create article → id 10 (continues migrated seq after 9) ✓ · research
+  query (academicSearch, 5 results) ✓ · research note → id 6 ✓ · update/save article ✓ ·
+  workspace pull reads migrated data ✓ · workspace push upsert insert + conflict-update ✓.
+  No DB errors in server logs (only benign IF NOT EXISTS notices).
+
 ## Phase log
 
 - [x] Phase 0 discovery — 2026-07-02 (this file)
 - [x] Phase 1 backup — 2026-07-02
 - [x] Phase 2 schema port — 2026-07-02 (56/56 tables live in Supabase `elite_writer`)
 - [x] Phase 3 data migration + verify — 2026-07-02 (56/56 counts match, spot checks pass)
-- [ ] Phase 4 app swap + gate
-- [ ] Phase 5 founder approval 🛑
-- [ ] Phase 6 cutover
+- [x] Phase 4 app swap + gate + local flow test — 2026-07-02 (gate green, flows match MySQL)
+- [ ] Phase 5 founder approval 🛑 ← WE ARE HERE
+- [ ] Phase 6 cutover (rerun data copy for freshness, then prod DATABASE_URL swap)

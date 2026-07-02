@@ -101,8 +101,8 @@ export const interviewsRouter = router({
         questions,
         status: "not_started",
         completeness: 0,
-      } as any);
-      return { id: result.insertId };
+      } as any).returning({ id: aiInterviews.id });
+      return { id: result.id };
     }),
 
   answerQuestion: protectedProcedure
