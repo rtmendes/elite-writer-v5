@@ -1,7 +1,14 @@
 {
-  "typecheck": "npx tsc --noEmit",
-  "test": "npm test --silent",
-  "build": "npm run build",
-  "envGuard": { "enabled": true, "minKeys": 20, "minBytes": 500, "globs": [".env.production"] },
-  "migrationRule": "drizzle-kit migrate only — drizzle-kit push is FORBIDDEN on prod"
+  "typecheck": "auto",
+  "envGuard": {
+    "enabled": true,
+    "minKeys": 20,
+    "minBytes": 500,
+    "globs": [
+      ".env.production"
+    ]
+  },
+  "test": "pnpm test",
+  "build": "pnpm build",
+  "migrationRule": "drizzle-kit migrate only \u2014 drizzle-kit push is FORBIDDEN on prod"
 }

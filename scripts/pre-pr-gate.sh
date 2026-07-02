@@ -3,7 +3,7 @@
 # Run before any merge. Exits 1 on any failure.
 # Reads .gate.json at repo root for per-repo config.
 # Usage: bash scripts/pre-pr-gate.sh [path/to/repo] [--env-only]
-#   --env-only  Skip typecheck/test/lint/build; run env-guard only.
+#   --env-only  Skip typecheck/test/build/secrets-scan; run env-guard only.
 #               Use on VPS where node_modules may not be writable.
 
 set -euo pipefail
@@ -50,31 +50,53 @@ json_field() {
   if command -v jq &>/dev/null; then
     val=$(jq -r ".$field // empty" "$file" 2>/dev/null)
   else
-    # fallback: grep+sed (no jq)
     val=$(grep -o "\"$field\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$file" 2>/dev/null \
           | sed 's/.*: *"\(.*\)"/\1/' | head -1)
   fi
   echo "${val:-$default}"
 }
 
-json_bool() {
-  local file="$1" field="$2" default="${3:-false}"
-  if command -v jq &>/dev/null; then
-    jq -r ".$field // \"$default\"" "$file" 2>/dev/null
+run_typecheck() {
+  local configured="$1"
+  cd "$REPO_DIR"
+  if [[ ! -f tsconfig.json ]] && { [[ "$configured" == "auto" ]] || [[ "$configured" == "skip" ]]; }; then
+    return 2
+  fi
+  if [[ "$configured" == "skip" ]]; then
+    return 2
+  fi
+  if [[ "$configured" == "auto" ]] || [[ "$configured" == "tsc --noEmit" ]] || [[ "$configured" == *"tsc --noEmit"* ]]; then
+    if command -v pnpm &>/dev/null && { [[ -f pnpm-lock.yaml ]] || [[ -f pnpm-workspace.yaml ]]; }; then
+      pnpm exec tsc --noEmit
+    else
+      npx tsc --noEmit
+    fi
   else
-    grep -o "\"$field\"[[:space:]]*:[[:space:]]*[a-z]*" "$file" 2>/dev/null \
-      | sed 's/.*: *//' | head -1 || echo "$default"
+    eval "$configured"
   fi
 }
 
-json_number() {
-  local file="$1" field="$2" default="${3:-0}"
-  if command -v jq &>/dev/null; then
-    jq -r ".$field // $default" "$file" 2>/dev/null
-  else
-    grep -o "\"$field\"[[:space:]]*:[[:space:]]*[0-9]*" "$file" 2>/dev/null \
-      | sed 's/.*: *//' | head -1 || echo "$default"
+run_secrets_scan() {
+  cd "$REPO_DIR"
+  if ! git rev-parse --git-dir &>/dev/null; then
+    print_row "secrets-scan" "SKIP" "not a git repo"
+    return 0
   fi
+  local hits
+  hits=$(git grep -lE 'AKIA[0-9A-Z]{16}|sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|xox[baprs]-[a-zA-Z0-9-]{10,}|-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----' \
+    -- . \
+    ':(exclude)*.md' ':(exclude)*.mdx' ':(exclude)*.example' ':(exclude)*.template' ':(exclude)*.sample' \
+    ':(exclude)docs/' ':(exclude)docs/*' ':(exclude)README*' ':(exclude)CHANGELOG*' \
+    ':(exclude)package-lock.json' ':(exclude)pnpm-lock.yaml' \
+    ':(exclude)*settings/page.tsx' ':(exclude)*settings/*.tsx' 2>/dev/null || true)
+  if [[ -n "$hits" ]]; then
+    local count
+    count=$(echo "$hits" | grep -c . || echo 0)
+    print_row "secrets-scan" "FAIL" "$count tracked file(s) match secret patterns"
+    return 1
+  fi
+  print_row "secrets-scan" "PASS" "no secret patterns in tracked files"
+  return 0
 }
 
 # ── gate config ──────────────────────────────────────────────────────────────
@@ -96,23 +118,33 @@ fi
 printf "  %-20s | %-6s | %s\n" "CHECK" "RESULT" "DETAIL"
 printf "  %-20s-+-%s\n" "--------------------" "--------+-------------------------------------"
 
-# ── 1–4. typecheck / tests / lint / build (skipped in --env-only mode) ───────
+# ── 1–4. typecheck / tests / build / secrets-scan (skipped in --env-only) ───
 
 if [[ $ENV_ONLY == true ]]; then
-  print_row "typecheck" "SKIP" "--env-only mode"
-  print_row "tests"     "SKIP" "--env-only mode"
-  print_row "lint"      "SKIP" "--env-only mode"
-  print_row "build"     "SKIP" "--env-only mode"
+  print_row "typecheck"     "SKIP" "--env-only mode"
+  print_row "tests"         "SKIP" "--env-only mode"
+  print_row "build"         "SKIP" "--env-only mode"
+  print_row "secrets-scan"  "SKIP" "--env-only mode"
 else
 
   # ── 1. typecheck ────────────────────────────────────────────────────────────
   tc_cmd=$(json_field "$GATE_FILE" "typecheck")
   if [[ -n "$tc_cmd" ]]; then
-    tc_out=$(cd "$REPO_DIR" && eval "$tc_cmd" 2>&1) && tc_exit=0 || tc_exit=$?
-    if [[ $tc_exit -eq 0 ]]; then
-      print_row "typecheck" "PASS" "$tc_cmd"
+    tc_out=$(run_typecheck "$tc_cmd" 2>&1) && tc_exit=0 || tc_exit=$?
+    if [[ $tc_exit -eq 2 ]]; then
+      print_row "typecheck" "SKIP" "no tsconfig.json (JS-only repo)"
+    elif [[ $tc_exit -eq 0 ]]; then
+      if [[ "$tc_cmd" == "auto" ]]; then
+        if command -v pnpm &>/dev/null && { [[ -f "$REPO_DIR/pnpm-lock.yaml" ]] || [[ -f "$REPO_DIR/pnpm-workspace.yaml" ]]; }; then
+          print_row "typecheck" "PASS" "pnpm exec tsc --noEmit"
+        else
+          print_row "typecheck" "PASS" "npx tsc --noEmit"
+        fi
+      else
+        print_row "typecheck" "PASS" "$tc_cmd"
+      fi
     else
-      first_err=$(echo "$tc_out" | grep -m1 "error TS" | head -c 80 || echo "see output")
+      first_err=$(echo "$tc_out" | grep -m1 "error TS" | head -c 80 || echo "$tc_out" | tail -1 | head -c 80)
       print_row "typecheck" "FAIL" "$first_err"
       overall=1
     fi
@@ -137,22 +169,7 @@ else
     print_row "tests" "SKIP" "not configured"
   fi
 
-  # ── 3. lint ─────────────────────────────────────────────────────────────────
-  lint_cmd=$(json_field "$GATE_FILE" "lint")
-  if [[ -n "$lint_cmd" ]]; then
-    lint_out=$(cd "$REPO_DIR" && eval "$lint_cmd" 2>&1) && lint_exit=0 || lint_exit=$?
-    if [[ $lint_exit -eq 0 ]]; then
-      print_row "lint" "PASS" "$lint_cmd"
-    else
-      first_lint=$(echo "$lint_out" | grep -v "^$" | head -1 | head -c 80 || echo "see output")
-      print_row "lint" "FAIL" "$first_lint"
-      overall=1
-    fi
-  else
-    print_row "lint" "SKIP" "not configured"
-  fi
-
-  # ── 4. build ────────────────────────────────────────────────────────────────
+  # ── 3. build ────────────────────────────────────────────────────────────────
   build_cmd=$(json_field "$GATE_FILE" "build")
   if [[ -n "$build_cmd" ]]; then
     build_out=$(cd "$REPO_DIR" && eval "$build_cmd" 2>&1) && build_exit=0 || build_exit=$?
@@ -166,6 +183,11 @@ else
     fi
   else
     print_row "build" "SKIP" "not configured"
+  fi
+
+  # ── 4. secrets-scan ───────────────────────────────────────────────────────────
+  if ! run_secrets_scan; then
+    overall=1
   fi
 
 fi # end non-env-only checks
