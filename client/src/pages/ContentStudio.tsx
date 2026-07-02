@@ -13,8 +13,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useSelection } from "@/hooks/useSelection";
+import { SelectionBar } from "@/components/SelectionBar";
 import {
   PenTool, Plus, Search, Loader2, LayoutGrid, List, Copy,
   Send, Trash2, Edit, Eye, CheckCircle2, Clock, Archive,
@@ -83,7 +86,9 @@ export default function ContentStudio() {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterBrand, setFilterBrand] = useState("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "title" | "status">("newest");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [detailItem, setDetailItem] = useState<any>(null);
@@ -121,6 +126,9 @@ export default function ContentStudio() {
   const publishMutation = trpc.studio.publish.useMutation({
     onSuccess: () => { toast.success("Published!"); itemsQuery.refetch(); },
   });
+  // Silent instances for bulk loops (no per-item toasts).
+  const bulkUpdateMutation = trpc.studio.update.useMutation();
+  const bulkDeleteMutation = trpc.studio.delete.useMutation();
 
   const brandMap = useMemo(() => {
     const m: Record<number, string> = {};
@@ -173,11 +181,48 @@ export default function ContentStudio() {
   };
 
   const items = useMemo(() => {
-    const list = itemsQuery.data || [];
-    if (!searchQuery) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter((i: any) => i.title?.toLowerCase().includes(q) || i.body?.toLowerCase().includes(q));
-  }, [itemsQuery.data, searchQuery]);
+    let list = [...(itemsQuery.data || [])];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((i: any) => i.title?.toLowerCase().includes(q) || i.body?.toLowerCase().includes(q));
+    }
+    list.sort((a: any, b: any) => {
+      if (sortBy === "newest") return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
+      if (sortBy === "oldest") return new Date(a.updatedAt || a.createdAt || 0).getTime() - new Date(b.updatedAt || b.createdAt || 0).getTime();
+      if (sortBy === "title") return (a.title || "").localeCompare(b.title || "");
+      return (a.status || "").localeCompare(b.status || "");
+    });
+    return list;
+  }, [itemsQuery.data, searchQuery, sortBy]);
+
+  // Multi-select (visible-scoped, shared hook)
+  const visibleIds = useMemo(() => items.map((i: any) => i.id as number), [items]);
+  const selection = useSelection<number>(visibleIds);
+
+  const bulkSetStatus = async (status: string) => {
+    if (selection.selectedList.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selection.selectedList) {
+      try { await bulkUpdateMutation.mutateAsync({ id, status }); ok++; } catch { /* keep going */ }
+    }
+    await itemsQuery.refetch();
+    setBulkBusy(false);
+    toast.success(`${ok}/${selection.selectedList.length} set to ${status}`);
+  };
+
+  const bulkDelete = async () => {
+    if (selection.selectedList.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selection.selectedList) {
+      try { await bulkDeleteMutation.mutateAsync({ id }); ok++; } catch { /* keep going */ }
+    }
+    await itemsQuery.refetch();
+    selection.clear();
+    setBulkBusy(false);
+    toast.success(`${ok} item(s) deleted`);
+  };
 
   const charLimit = PLATFORMS.find(p => p.value === formPlatform)?.charLimit || 3000;
   const charCount = formBody.length;
@@ -245,6 +290,15 @@ export default function ContentStudio() {
             {STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={sortBy} onValueChange={v => setSortBy(v as any)}>
+          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest First</SelectItem>
+            <SelectItem value="oldest">Oldest First</SelectItem>
+            <SelectItem value="title">Title A–Z</SelectItem>
+            <SelectItem value="status">Status</SelectItem>
+          </SelectContent>
+        </Select>
         <div className="flex gap-1 border rounded-md p-1">
           <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("grid")}>
             <LayoutGrid className="w-4 h-4" />
@@ -270,6 +324,26 @@ export default function ContentStudio() {
         })}
       </div>
 
+      {/* Select-all + bulk actions */}
+      {items.length > 0 && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <Checkbox checked={selection.allSelected} onCheckedChange={selection.toggleAll} aria-label="Select all" />
+            Select all ({items.length})
+          </label>
+          {selection.selected.size > 0 && <span className="text-primary font-medium">{selection.selected.size} selected</span>}
+        </div>
+      )}
+      <SelectionBar
+        count={selection.selected.size}
+        statusOptions={STATUSES.map(s => ({ value: s.value, label: s.label }))}
+        onSetStatus={bulkSetStatus}
+        onDelete={bulkDelete}
+        deleteNoun="item"
+        onClear={selection.clear}
+        busy={bulkBusy}
+      />
+
       {/* Content */}
       {itemsQuery.isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
@@ -291,7 +365,7 @@ export default function ContentStudio() {
             const brandName = item.brandId ? brandMap[item.brandId] : null;
             const brandColor = brandName ? (BRAND_COLORS[brandName] || "bg-muted text-muted-foreground") : "";
             return (
-              <Card key={item.id} className="group hover:border-primary/30 transition-colors overflow-hidden">
+              <Card key={item.id} className={`group hover:border-primary/30 transition-colors overflow-hidden ${selection.selected.has(item.id) ? "ring-2 ring-primary" : ""}`}>
                 {/* Image Preview */}
                 {item.imageUrl && (
                   <div className="h-40 w-full overflow-hidden bg-muted">
@@ -301,6 +375,9 @@ export default function ContentStudio() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
+                      <span onClick={e => e.stopPropagation()} className="shrink-0 flex items-center">
+                        <Checkbox checked={selection.selected.has(item.id)} onCheckedChange={() => selection.toggle(item.id)} aria-label={`Select ${item.title}`} />
+                      </span>
                       <PlatIcon className="w-4 h-4 text-muted-foreground shrink-0" />
                       <Badge variant="outline" className="text-xs">{item.contentType}</Badge>
                       {brandName && (
@@ -385,8 +462,11 @@ export default function ContentStudio() {
             const brandName = item.brandId ? brandMap[item.brandId] : null;
             const brandColor = brandName ? (BRAND_COLORS[brandName] || "bg-muted text-muted-foreground") : "";
             return (
-              <Card key={item.id} className="hover:border-primary/30 transition-colors">
+              <Card key={item.id} className={`hover:border-primary/30 transition-colors ${selection.selected.has(item.id) ? "ring-2 ring-primary" : ""}`}>
                 <CardContent className="p-4 flex items-center gap-4">
+                  <span onClick={e => e.stopPropagation()} className="shrink-0 flex items-center">
+                    <Checkbox checked={selection.selected.has(item.id)} onCheckedChange={() => selection.toggle(item.id)} aria-label={`Select ${item.title}`} />
+                  </span>
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt="" className="w-12 h-12 rounded object-cover shrink-0" />
                   ) : (

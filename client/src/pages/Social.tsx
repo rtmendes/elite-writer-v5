@@ -13,8 +13,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useSelection } from "@/hooks/useSelection";
+import { SelectionBar } from "@/components/SelectionBar";
 import {
   MessageSquare, Plus, Search, Loader2, Twitter, Linkedin,
   Facebook, Send, Trash2, Copy, Sparkles, Hash, Globe,
@@ -32,10 +35,20 @@ const PLATFORMS = [
 const POST_TYPES = ["single", "thread", "carousel", "poll"] as const;
 const TONES = ["professional", "casual", "witty", "authoritative", "inspirational", "provocative", "educational"];
 
+// Statuses accepted by social.update (server enum)
+const POST_STATUSES = [
+  { value: "draft", label: "Draft" },
+  { value: "approved", label: "Approved" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "published", label: "Published" },
+] as const;
+
 export default function Social() {
   const [tab, setTab] = useState("create");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPlatform, setFilterPlatform] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "status">("newest");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Create form state
   const [platform, setPlatform] = useState<string>("twitter");
@@ -78,11 +91,51 @@ export default function Social() {
   const updateMutation = trpc.social.update.useMutation({
     onSuccess: () => { toast.success("Updated"); postsQuery.refetch(); },
   });
+  // Silent instances for bulk loops (no per-item toasts).
+  const bulkUpdateMutation = trpc.social.update.useMutation();
+  const bulkDeleteMutation = trpc.social.delete.useMutation();
 
   const posts = postsQuery.data || [];
   const filteredPosts = useMemo(() => {
-    return posts.filter(p => !searchQuery || p.content.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [posts, searchQuery]);
+    const list = posts.filter(p => !searchQuery || p.content.toLowerCase().includes(searchQuery.toLowerCase()));
+    return [...list].sort((a, b) => {
+      if (sortBy === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (sortBy === "status") return (a.status || "").localeCompare(b.status || "");
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [posts, searchQuery, sortBy]);
+
+  // Multi-select (visible-scoped, shared hook)
+  const visibleIds = useMemo(() => filteredPosts.map(p => p.id), [filteredPosts]);
+  const selection = useSelection<number>(visibleIds);
+
+  const bulkSetStatus = async (status: string) => {
+    if (selection.selectedList.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selection.selectedList) {
+      try {
+        await bulkUpdateMutation.mutateAsync({ id, status: status as "draft" | "approved" | "scheduled" | "published" });
+        ok++;
+      } catch { /* keep going */ }
+    }
+    await postsQuery.refetch();
+    setBulkBusy(false);
+    toast.success(`${ok}/${selection.selectedList.length} set to ${status}`);
+  };
+
+  const bulkDelete = async () => {
+    if (selection.selectedList.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selection.selectedList) {
+      try { await bulkDeleteMutation.mutateAsync({ id }); ok++; } catch { /* keep going */ }
+    }
+    await postsQuery.refetch();
+    selection.clear();
+    setBulkBusy(false);
+    toast.success(`${ok} post(s) deleted`);
+  };
 
   const handleGenerate = () => {
     if (!sourceContent.trim()) { toast.error("Provide source content"); return; }
@@ -346,7 +399,35 @@ export default function Social() {
                   {PLATFORMS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <Select value={sortBy} onValueChange={v => setSortBy(v as any)}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="Sort" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* Select-all + bulk actions */}
+            {filteredPosts.length > 0 && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <Checkbox checked={selection.allSelected} onCheckedChange={selection.toggleAll} aria-label="Select all" />
+                  Select all ({filteredPosts.length})
+                </label>
+                {selection.selected.size > 0 && <span className="text-primary font-medium">{selection.selected.size} selected</span>}
+              </div>
+            )}
+            <SelectionBar
+              count={selection.selected.size}
+              statusOptions={POST_STATUSES.map(s => ({ value: s.value, label: s.label }))}
+              onSetStatus={bulkSetStatus}
+              onDelete={bulkDelete}
+              deleteNoun="post"
+              onClear={selection.clear}
+              busy={bulkBusy}
+            />
 
             {postsQuery.isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
@@ -359,10 +440,13 @@ export default function Social() {
                 {filteredPosts.map(post => {
                   const pInfo = getPlatformInfo(post.platform);
                   return (
-                    <Card key={post.id} className="hover:border-primary/30 transition-colors">
+                    <Card key={post.id} className={`hover:border-primary/30 transition-colors ${selection.selected.has(post.id) ? "ring-2 ring-primary" : ""}`}>
                       <CardContent className="pt-4 space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
+                            <span onClick={e => e.stopPropagation()} className="shrink-0 flex items-center">
+                              <Checkbox checked={selection.selected.has(post.id)} onCheckedChange={() => selection.toggle(post.id)} aria-label={`Select post ${post.id}`} />
+                            </span>
                             <Badge className={pInfo.bg + " " + pInfo.color}>{pInfo.label}</Badge>
                             <Badge variant="outline" className="text-xs capitalize">{post.postType}</Badge>
                           </div>
