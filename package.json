@@ -119,6 +119,7 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4",
     "platejs": "^53",
+    "postgres": "^3.4.9",
     "react": "^19.2.1",
     "react-day-picker": "^10.0.1",
     "react-dnd": "^16.0.1",
