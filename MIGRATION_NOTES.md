@@ -112,6 +112,13 @@ Raw `ON DUPLICATE KEY UPDATE ... VALUES(col)` → `INSERT ... ON CONFLICT (pk) D
 - server/_core/proactiveAgents.ts:93, 104
 - server/_core/skills.ts:147
 
+Runtime self-migration DDL (MySQL syntax → PG syntax):
+- server/routers/workspace.ts:33-50 and server/_core/proactiveAgents.ts:59-61 —
+  `ensureTables()` creates ws tables + `ALTER TABLE wsRows ADD COLUMN dbId ... GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(data,'$.dbId'))) STORED` + `idx_wsRows_dbId`.
+  PG equivalent (already applied to Supabase in Phase 3):
+  `ALTER TABLE "wsRows" ADD COLUMN IF NOT EXISTS "dbId" varchar(40) GENERATED ALWAYS AS (data->>'dbId') STORED` + `CREATE INDEX IF NOT EXISTS`.
+  App code must emit PG syntax after driver swap (queried by proactiveAgents.ts:81, skills.ts:135).
+
 Drizzle `.onDuplicateKeyUpdate({set})` → `.onConflictDoUpdate({target, set})`:
 - server/db.ts:96 (users.openId)
 - server/routers/sources.ts:293
@@ -154,12 +161,36 @@ redeploy Phase-1 git SHA. MySQL never touched, never decommissioned in this migr
 - Supabase: created database `elite_writer`, `CREATE EXTENSION vector` (pgvector), applied schema → 56/56 tables in `public`
 - NOTE: serial PKs accept explicit id inserts during Phase 3 copy; run `setval` per sequence after
 
+## Phase 3 record — 2026-07-02
+
+- Full drift scan (MySQL information_schema vs PG) before copy. 3 findings:
+  1. **wsRows.dbId** — MySQL STORED GENERATED column created at runtime by `ensureTables()`
+     raw SQL (workspace.ts / proactiveAgents.ts), absent from drizzle schema. Blocked first
+     copy attempt (fail-safe FATAL, no partial verify). Fixed: PG generated column
+     `data->>'dbId'` + `idx_wsRows_dbId` applied to Supabase.
+  2. **image_presets** — live MySQL table stale vs schema.ts (old columns description/
+     isPublic/settings/usageCount; schema.ts has brandId/model/prompt* etc — drizzle
+     migration never applied in prod). 0 rows, copy unaffected. PG side = schema.ts, correct.
+  3. **intelligence_items.metadata** — in schema.ts/PG, missing in live MySQL (same cause).
+     Copy unaffected (PG column fills NULL for 100 migrated rows).
+- Runtime MySQL indexes replicated in PG: idx_wsPages_updated, idx_wsDatabases_updated,
+  idx_wsRows_updated, idx_wsRows_dbId.
+- Copy script: `scripts/migrate-mysql-to-pg.py` (run in throwaway dual-network container,
+  creds via env from .env.production / supabase-db, never printed). Truncate-first =
+  idempotent; skips PG generated columns; per-table count verify; sequence setval.
+- **Row counts: 56/56 tables MATCH MySQL exactly** (incl. wsRows 580, content_studio_items 316,
+  news_items 131, intelligence_items 100 — full table above is the truth reference).
+- Spot checks: articles id 1 title/status ✓, research_items id 1 (riStatus inbox) ✓,
+  users id 1 openId+admin ✓, articles_id_seq=9 ✓, content_studio_items_id_seq=316 ✓,
+  wsRows.dbId populated 580/580 with 9 distinct values (= 9 wsDatabases) ✓.
+- Rerun before Phase 6 cutover to pick up fresh prod data (script is idempotent).
+
 ## Phase log
 
 - [x] Phase 0 discovery — 2026-07-02 (this file)
 - [x] Phase 1 backup — 2026-07-02
 - [x] Phase 2 schema port — 2026-07-02 (56/56 tables live in Supabase `elite_writer`)
-- [ ] Phase 3 data migration + verify
+- [x] Phase 3 data migration + verify — 2026-07-02 (56/56 counts match, spot checks pass)
 - [ ] Phase 4 app swap + gate
 - [ ] Phase 5 founder approval 🛑
 - [ ] Phase 6 cutover
