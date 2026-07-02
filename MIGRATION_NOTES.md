@@ -214,6 +214,29 @@ redeploy Phase-1 git SHA. MySQL never touched, never decommissioned in this migr
   workspace pull reads migrated data ✓ · workspace push upsert insert + conflict-update ✓.
   No DB errors in server logs (only benign IF NOT EXISTS notices).
 
+## Phase 6 record — CUTOVER, 2026-07-02
+
+Founder approved same day. Executed in order:
+
+1. Fresh pre-cutover MySQL backup: `~/backups/elite-writer/ew-20260702-1628.sql.gz` (736K)
+2. `docker-compose.yml`: app service joined `supabase_default` (external) — required
+   because deploy recreates the container, so runtime network-connect wouldn't survive
+3. Final data copy rerun (truncate-first): **56/56 row counts matched again**, spot checks pass
+   (also wiped the Phase-4 local-test rows — intended)
+4. `/opt/elite-writer-v5/.env.production`: DATABASE_URL → Supabase
+   (`supabase-db:5432/elite_writer`); MySQL value kept commented in-file; full pre-swap
+   copy at `.env.production.pre-supabase-backup`
+5. Merged PR #76 → main `adb651a`; cron deploy built + started 16:35:59 UTC, HTTP 200
+6. Verified: container healthy on both networks (`coolify` + `supabase_default`);
+   app holds live Postgres connections (pg_stat_activity from 10.0.7.x); ensureTables
+   DDL ran clean (only IF NOT EXISTS notices); site 200; tRPC responding;
+   **real prod write confirmed** — owner bypass login → `users.lastSignedIn` updated
+   in Supabase at 16:36:59 UTC
+7. MySQL (`thepopebot-mysql`) left running, completely untouched — rollback hot for 24-48h
+
+Rollback (unchanged): restore `.env.production.pre-supabase-backup` (or uncomment the
+MySQL DATABASE_URL line) + redeploy SHA `a1d9343`.
+
 ## Phase log
 
 - [x] Phase 0 discovery — 2026-07-02 (this file)
@@ -221,5 +244,6 @@ redeploy Phase-1 git SHA. MySQL never touched, never decommissioned in this migr
 - [x] Phase 2 schema port — 2026-07-02 (56/56 tables live in Supabase `elite_writer`)
 - [x] Phase 3 data migration + verify — 2026-07-02 (56/56 counts match, spot checks pass)
 - [x] Phase 4 app swap + gate + local flow test — 2026-07-02 (gate green, flows match MySQL)
-- [ ] Phase 5 founder approval 🛑 ← WE ARE HERE
-- [ ] Phase 6 cutover (rerun data copy for freshness, then prod DATABASE_URL swap)
+- [x] Phase 5 founder approval — 2026-07-02 ("go")
+- [x] Phase 6 cutover — 2026-07-02 16:36 UTC (prod on Supabase, verified; MySQL hot standby)
+- [ ] Watch window: keep MySQL running until ~2026-07-04, then decide decommission separately
