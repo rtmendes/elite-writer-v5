@@ -13,12 +13,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useSelection } from "@/hooks/useSelection";
+import { SelectionBar } from "@/components/SelectionBar";
 import {
   Mic, Plus, Search, Loader2, ChevronDown, ChevronUp,
   MessageSquare, CheckCircle2, Circle, Trash2, Target,
-  Brain, Users, Sparkles, BookOpen, LayoutGrid, List,
+  Brain, Users, Sparkles, BookOpen, LayoutGrid, List, ArrowUpDown,
 } from "lucide-react";
 
 const TOPIC_PACK_INFO = [
@@ -35,9 +38,14 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   archived: { label: "Archived", color: "bg-muted text-muted-foreground" },
 };
 
+const BULK_STATUS_OPTIONS = Object.entries(STATUS_CONFIG).map(([value, v]) => ({ value, label: v.label }));
+
+type SortKey = "newest" | "oldest" | "title" | "status" | "completeness";
+
 export default function Interviews() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -64,6 +72,11 @@ export default function Interviews() {
     onSuccess: () => { toast.success("Deleted"); interviewsQuery.refetch(); },
   });
 
+  // Bulk mutation instances (no per-item onSuccess toast — bulk handlers toast once)
+  const bulkDeleteMut = trpc.interviews.delete.useMutation();
+  const bulkUpdateMut = trpc.interviews.update.useMutation();
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   const closeDialog = () => {
     setShowCreateDialog(false);
     setFormTitle(""); setFormTopic(""); setFormPack("brand_foundations"); setFormCustomQuestions("");
@@ -87,11 +100,48 @@ export default function Interviews() {
   };
 
   const interviews = useMemo(() => {
-    const list = interviewsQuery.data || [];
-    if (!searchQuery) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter((i: any) => i.title?.toLowerCase().includes(q) || i.topic?.toLowerCase().includes(q));
-  }, [interviewsQuery.data, searchQuery]);
+    let list = interviewsQuery.data || [];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((i: any) => i.title?.toLowerCase().includes(q) || i.topic?.toLowerCase().includes(q));
+    }
+    const sorted = [...list];
+    sorted.sort((a: any, b: any) => {
+      if (sortBy === "title") return (a.title || "").localeCompare(b.title || "");
+      if (sortBy === "status") return (a.status || "").localeCompare(b.status || "");
+      if (sortBy === "completeness") return (b.completeness || 0) - (a.completeness || 0);
+      const aT = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const bT = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return sortBy === "oldest" ? aT - bT : bT - aT;
+    });
+    return sorted;
+  }, [interviewsQuery.data, searchQuery, sortBy]);
+
+  // Multi-select over the visible (filtered) interviews
+  const selection = useSelection(interviews.map((i: any) => i.id as number));
+
+  const bulkSetStatus = async (status: string) => {
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selection.selectedList) {
+      try { await bulkUpdateMut.mutateAsync({ id, status }); ok++; } catch { /* keep going */ }
+    }
+    await interviewsQuery.refetch();
+    setBulkBusy(false);
+    toast.success(`${ok}/${selection.selectedList.length} moved to ${STATUS_CONFIG[status]?.label || status}`);
+  };
+
+  const bulkDelete = async () => {
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selection.selectedList) {
+      try { await bulkDeleteMut.mutateAsync({ id }); ok++; } catch { /* keep going */ }
+    }
+    await interviewsQuery.refetch();
+    selection.clear();
+    setBulkBusy(false);
+    toast.success(`${ok} interview(s) deleted`);
+  };
 
   return (
     <div className="space-y-6">
@@ -170,6 +220,19 @@ export default function Interviews() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={sortBy} onValueChange={v => setSortBy(v as SortKey)}>
+          <SelectTrigger className="w-[170px]">
+            <ArrowUpDown className="w-3.5 h-3.5 mr-1.5" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest First</SelectItem>
+            <SelectItem value="oldest">Oldest First</SelectItem>
+            <SelectItem value="title">Title A→Z</SelectItem>
+            <SelectItem value="status">Status</SelectItem>
+            <SelectItem value="completeness">Completeness</SelectItem>
+          </SelectContent>
+        </Select>
         <div className="flex gap-1 border rounded-md p-1">
           <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("grid")}><LayoutGrid className="w-4 h-4" /></Button>
           <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("list")}><List className="w-4 h-4" /></Button>
@@ -198,6 +261,27 @@ export default function Interviews() {
         </CardContent></Card>
       </div>
 
+      {/* Select-all + bulk action bar */}
+      {interviews.length > 0 && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <Checkbox checked={selection.allSelected} onCheckedChange={selection.toggleAll} aria-label="Select all" />
+            Select all ({interviews.length})
+          </label>
+          {selection.selected.size > 0 && <span className="text-primary font-medium">{selection.selected.size} selected</span>}
+        </div>
+      )}
+
+      <SelectionBar
+        count={selection.selected.size}
+        statusOptions={BULK_STATUS_OPTIONS}
+        onSetStatus={bulkSetStatus}
+        onDelete={bulkDelete}
+        deleteNoun="interview"
+        onClear={selection.clear}
+        busy={bulkBusy}
+      />
+
       {/* Interview list */}
       {interviewsQuery.isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
@@ -217,13 +301,20 @@ export default function Interviews() {
             const questions = (interview.questions as any[]) || [];
 
             return (
-              <Card key={interview.id} className="overflow-hidden">
+              <Card key={interview.id} className={`overflow-hidden ${selection.selected.has(interview.id) ? "ring-2 ring-primary" : ""}`}>
                 <CardHeader
                   className="cursor-pointer hover:bg-muted/30 transition-colors"
                   onClick={() => setExpandedId(isExpanded ? null : interview.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
+                      <div onClick={e => e.stopPropagation()} className="flex items-center">
+                        <Checkbox
+                          checked={selection.selected.has(interview.id)}
+                          onCheckedChange={() => selection.toggle(interview.id)}
+                          aria-label={`Select ${interview.title}`}
+                        />
+                      </div>
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${packInfo?.bg || "bg-muted"}`}>
                         <PackIcon className={`w-5 h-5 ${packInfo?.color || "text-muted-foreground"}`} />
                       </div>

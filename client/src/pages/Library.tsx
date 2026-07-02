@@ -15,8 +15,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useSelection } from "@/hooks/useSelection";
+import { SelectionBar } from "@/components/SelectionBar";
 import {
   Library, Plus, Search, Loader2, Star, StarOff, Trash2,
   Copy, Image, FileText, Quote, Lightbulb, LayoutTemplate,
@@ -92,6 +95,12 @@ export default function ContentLibrary() {
     onSuccess: () => { toast.success("Deleted"); presetsQuery.refetch(); },
   });
 
+  // Bulk mutation instances (no per-item onSuccess toast — bulk handlers toast once)
+  const bulkDeleteContentMut = trpc.library.content.delete.useMutation();
+  const bulkDeleteImageMut = trpc.library.images.delete.useMutation();
+  const bulkDeletePresetMut = trpc.library.presets.delete.useMutation();
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   const resetSaveForm = () => { setSaveTitle(""); setSaveContent(""); setSaveTags(""); };
 
   const [sortBy, setSortBy] = useState<'newest' | 'title' | 'type'>('newest');
@@ -103,6 +112,48 @@ export default function ContentLibrary() {
   }, [contentQuery.data, sortBy]);
   const images = imagesQuery.data || [];
   const presets = presetsQuery.data || [];
+
+  // Multi-select per tab (UI standard: every collection gets multi-select + bulk actions).
+  // Library entities have no status concept, so bulk Delete only.
+  const contentSel = useSelection(contentItems.map(i => i.id));
+  const imagesSel = useSelection(images.map(i => i.id));
+  const presetsSel = useSelection(presets.map(p => p.id));
+
+  const bulkDeleteContent = async () => {
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of contentSel.selectedList) {
+      try { await bulkDeleteContentMut.mutateAsync({ id }); ok++; } catch { /* keep going */ }
+    }
+    await contentQuery.refetch();
+    contentSel.clear();
+    setBulkBusy(false);
+    toast.success(`${ok} item(s) deleted`);
+  };
+
+  const bulkDeleteImages = async () => {
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of imagesSel.selectedList) {
+      try { await bulkDeleteImageMut.mutateAsync({ id }); ok++; } catch { /* keep going */ }
+    }
+    await imagesQuery.refetch();
+    imagesSel.clear();
+    setBulkBusy(false);
+    toast.success(`${ok} image(s) deleted`);
+  };
+
+  const bulkDeletePresets = async () => {
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of presetsSel.selectedList) {
+      try { await bulkDeletePresetMut.mutateAsync({ id }); ok++; } catch { /* keep going */ }
+    }
+    await presetsQuery.refetch();
+    presetsSel.clear();
+    setBulkBusy(false);
+    toast.success(`${ok} preset(s) deleted`);
+  };
 
   return (
     <div className="h-full overflow-auto">
@@ -154,6 +205,24 @@ export default function ContentLibrary() {
               <Button onClick={() => setShowSaveDialog(true)}><Plus className="w-4 h-4 mr-1" />Save New</Button>
             </div>
 
+            {contentItems.length > 0 && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <Checkbox checked={contentSel.allSelected} onCheckedChange={contentSel.toggleAll} aria-label="Select all" />
+                  Select all ({contentItems.length})
+                </label>
+                {contentSel.selected.size > 0 && <span className="text-primary font-medium">{contentSel.selected.size} selected</span>}
+              </div>
+            )}
+
+            <SelectionBar
+              count={contentSel.selected.size}
+              onDelete={bulkDeleteContent}
+              deleteNoun="item"
+              onClear={contentSel.clear}
+              busy={bulkBusy}
+            />
+
             {contentQuery.isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
             ) : contentItems.length === 0 ? (
@@ -163,10 +232,17 @@ export default function ContentLibrary() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {contentItems.map(item => (
-                  <Card key={item.id} className="hover:border-primary/30 transition-colors">
+                  <Card key={item.id} className={`hover:border-primary/30 transition-colors ${contentSel.selected.has(item.id) ? "ring-2 ring-primary" : ""}`}>
                     <CardContent className="pt-4 space-y-2">
                       <div className="flex items-center justify-between">
-                        <Badge variant="secondary" className="text-xs capitalize">{item.type.replace("_", " ")}</Badge>
+                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                          <Checkbox
+                            checked={contentSel.selected.has(item.id)}
+                            onCheckedChange={() => contentSel.toggle(item.id)}
+                            aria-label={`Select ${item.title || "item"}`}
+                          />
+                          <Badge variant="secondary" className="text-xs capitalize">{item.type.replace("_", " ")}</Badge>
+                        </div>
                         <div className="flex gap-1">
                           <Button size="sm" variant="ghost" onClick={() => toggleStarMut.mutate({ id: item.id })}>
                             {item.starred ? <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> : <StarOff className="w-3 h-3" />}
@@ -208,6 +284,24 @@ export default function ContentLibrary() {
               <Button onClick={() => setShowImageSave(true)}><Plus className="w-4 h-4 mr-1" />Add Image</Button>
             </div>
 
+            {images.length > 0 && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <Checkbox checked={imagesSel.allSelected} onCheckedChange={imagesSel.toggleAll} aria-label="Select all" />
+                  Select all ({images.length})
+                </label>
+                {imagesSel.selected.size > 0 && <span className="text-primary font-medium">{imagesSel.selected.size} selected</span>}
+              </div>
+            )}
+
+            <SelectionBar
+              count={imagesSel.selected.size}
+              onDelete={bulkDeleteImages}
+              deleteNoun="image"
+              onClear={imagesSel.clear}
+              busy={bulkBusy}
+            />
+
             {imagesQuery.isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
             ) : images.length === 0 ? (
@@ -217,9 +311,16 @@ export default function ContentLibrary() {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {images.map(img => (
-                  <Card key={img.id} className="overflow-hidden hover:border-primary/30 transition-colors group">
+                  <Card key={img.id} className={`overflow-hidden hover:border-primary/30 transition-colors group ${imagesSel.selected.has(img.id) ? "ring-2 ring-primary" : ""}`}>
                     <div className="aspect-square bg-muted relative">
                       <img src={img.imageUrl} alt={img.name} className="w-full h-full object-cover" loading="lazy" />
+                      <div className="absolute top-2 left-2 z-10 bg-background/80 backdrop-blur rounded-md p-1.5" onClick={e => e.stopPropagation()}>
+                        <Checkbox
+                          checked={imagesSel.selected.has(img.id)}
+                          onCheckedChange={() => imagesSel.toggle(img.id)}
+                          aria-label={`Select ${img.name}`}
+                        />
+                      </div>
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                         <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(img.imageUrl); toast.success("URL copied!"); }}>
                           <Copy className="w-3 h-3" />
@@ -249,6 +350,24 @@ export default function ContentLibrary() {
               <Button onClick={() => setShowPresetSave(true)}><Plus className="w-4 h-4 mr-1" />New Preset</Button>
             </div>
 
+            {presets.length > 0 && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <Checkbox checked={presetsSel.allSelected} onCheckedChange={presetsSel.toggleAll} aria-label="Select all" />
+                  Select all ({presets.length})
+                </label>
+                {presetsSel.selected.size > 0 && <span className="text-primary font-medium">{presetsSel.selected.size} selected</span>}
+              </div>
+            )}
+
+            <SelectionBar
+              count={presetsSel.selected.size}
+              onDelete={bulkDeletePresets}
+              deleteNoun="preset"
+              onClear={presetsSel.clear}
+              busy={bulkBusy}
+            />
+
             {presetsQuery.isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
             ) : presets.length === 0 ? (
@@ -258,12 +377,19 @@ export default function ContentLibrary() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {presets.map(preset => (
-                  <Card key={preset.id}>
+                  <Card key={preset.id} className={presetsSel.selected.has(preset.id) ? "ring-2 ring-primary" : ""}>
                     <CardContent className="pt-4 space-y-2">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium flex items-center gap-2">
-                          <Wand2 className="w-4 h-4 text-primary" />{preset.name}
-                        </h3>
+                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                          <Checkbox
+                            checked={presetsSel.selected.has(preset.id)}
+                            onCheckedChange={() => presetsSel.toggle(preset.id)}
+                            aria-label={`Select ${preset.name}`}
+                          />
+                          <h3 className="text-sm font-medium flex items-center gap-2">
+                            <Wand2 className="w-4 h-4 text-primary" />{preset.name}
+                          </h3>
+                        </div>
                         <Button size="sm" variant="ghost" className="text-destructive"
                           onClick={() => deletePresetMut.mutate({ id: preset.id })}>
                           <Trash2 className="w-3 h-3" />
