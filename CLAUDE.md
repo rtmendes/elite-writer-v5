@@ -13,3 +13,6 @@
 - Output strict, modular, and deterministic code.
 - Eliminate conversational filler, redundant confirmations, and verbose error logging.
 - Execute commands silently where possible; report only critical failures or definitive success states.
+## Secrets (Infisical primary, Vault fallback)
+- Load secrets via `infisical run -- <cmd>` (primary); Vault and `.env` retained as fallback.
+- Never print or commit secret values; reference env var NAMES only.

@@ -13,7 +13,9 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "validate": "tsc --noEmit && eslint ."
+    "validate": "tsc --noEmit && eslint .",
+    "dev:secrets": "infisical run -- NODE_ENV=development tsx watch server/_core/index.ts",
+    "start:secrets": "infisical run -- NODE_ENV=production node dist/index.js"
   },
   "dependencies": {
     "@ariakit/react": "^0.4.29",
