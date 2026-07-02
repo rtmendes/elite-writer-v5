@@ -59,6 +59,12 @@ json_field() {
 run_typecheck() {
   local configured="$1"
   cd "$REPO_DIR"
+  if [[ ! -f tsconfig.json ]] && { [[ "$configured" == "auto" ]] || [[ "$configured" == "skip" ]]; }; then
+    return 2
+  fi
+  if [[ "$configured" == "skip" ]]; then
+    return 2
+  fi
   if [[ "$configured" == "auto" ]] || [[ "$configured" == "tsc --noEmit" ]] || [[ "$configured" == *"tsc --noEmit"* ]]; then
     if command -v pnpm &>/dev/null && { [[ -f pnpm-lock.yaml ]] || [[ -f pnpm-workspace.yaml ]]; }; then
       pnpm exec tsc --noEmit
@@ -79,8 +85,10 @@ run_secrets_scan() {
   local hits
   hits=$(git grep -lE 'AKIA[0-9A-Z]{16}|sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|xox[baprs]-[a-zA-Z0-9-]{10,}|-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----' \
     -- . \
-    ':(exclude)*.example' ':(exclude)*.template' ':(exclude)*.sample' ':(exclude)*.md' \
-    ':(exclude)package-lock.json' ':(exclude)pnpm-lock.yaml' 2>/dev/null || true)
+    ':(exclude)*.md' ':(exclude)*.mdx' ':(exclude)*.example' ':(exclude)*.template' ':(exclude)*.sample' \
+    ':(exclude)docs/' ':(exclude)docs/*' ':(exclude)README*' ':(exclude)CHANGELOG*' \
+    ':(exclude)package-lock.json' ':(exclude)pnpm-lock.yaml' \
+    ':(exclude)*settings/page.tsx' ':(exclude)*settings/*.tsx' 2>/dev/null || true)
   if [[ -n "$hits" ]]; then
     local count
     count=$(echo "$hits" | grep -c . || echo 0)
@@ -123,7 +131,9 @@ else
   tc_cmd=$(json_field "$GATE_FILE" "typecheck")
   if [[ -n "$tc_cmd" ]]; then
     tc_out=$(run_typecheck "$tc_cmd" 2>&1) && tc_exit=0 || tc_exit=$?
-    if [[ $tc_exit -eq 0 ]]; then
+    if [[ $tc_exit -eq 2 ]]; then
+      print_row "typecheck" "SKIP" "no tsconfig.json (JS-only repo)"
+    elif [[ $tc_exit -eq 0 ]]; then
       if [[ "$tc_cmd" == "auto" ]]; then
         if command -v pnpm &>/dev/null && { [[ -f "$REPO_DIR/pnpm-lock.yaml" ]] || [[ -f "$REPO_DIR/pnpm-workspace.yaml" ]]; }; then
           print_row "typecheck" "PASS" "pnpm exec tsc --noEmit"

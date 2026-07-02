@@ -1,7 +1,5 @@
 {
   "typecheck": "auto",
-  "test": "npm test --silent",
-  "build": "npm run build",
   "envGuard": {
     "enabled": true,
     "minKeys": 20,
@@ -10,5 +8,7 @@
       ".env.production"
     ]
   },
+  "test": "pnpm test",
+  "build": "pnpm build",
   "migrationRule": "drizzle-kit migrate only \u2014 drizzle-kit push is FORBIDDEN on prod"
 }
