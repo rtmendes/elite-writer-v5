@@ -46,6 +46,17 @@ export type InvokeResult = {
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 };
 
+const ANTHROPIC_DEFAULT_MODEL = "claude-sonnet-4-20250514";
+
+const ANTHROPIC_MODEL_ALIASES: Record<string, string> = {
+  "claude-sonnet": ANTHROPIC_DEFAULT_MODEL,
+  "claude-sonnet-4": ANTHROPIC_DEFAULT_MODEL,
+  "claude-sonnet-4-0": ANTHROPIC_DEFAULT_MODEL,
+  "claude-opus": "claude-opus-4-20250514",
+  "claude-opus-4": "claude-opus-4-20250514",
+  "claude-opus-4-0": "claude-opus-4-20250514",
+};
+
 function extractText(content: MessageContent | MessageContent[]): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
@@ -53,6 +64,12 @@ function extractText(content: MessageContent | MessageContent[]): string {
   }
   if (content.type === "text") return content.text;
   return "";
+}
+
+function toAnthropicModel(model?: string): string {
+  const normalized = model?.startsWith("anthropic/") ? model.slice("anthropic/".length) : model;
+  if (!normalized) return ANTHROPIC_DEFAULT_MODEL;
+  return ANTHROPIC_MODEL_ALIASES[normalized] ?? normalized;
 }
 
 /**
@@ -64,7 +81,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const format = params.response_format ?? params.responseFormat;
   const wantsJson = format?.type === "json_object" || format?.type === "json_schema";
   const temperature = params.temperature ?? 0.7;
-  const model = params.model ?? "claude-sonnet-4";
+  const model = params.model ?? ANTHROPIC_DEFAULT_MODEL;
 
   // If model is explicitly OpenRouter or starts with a known OpenRouter pattern
   if (params.model?.includes("/") && ENV.openrouterApiKey) {
@@ -80,16 +97,16 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   if (ENV.anthropicApiKey) {
     try {
       // Map OpenRouter model names back to Anthropic model names
-      let anthropicModel = model;
+      let anthropicModel = toAnthropicModel(model);
       if (params.model?.startsWith("anthropic/")) {
-        anthropicModel = params.model.replace("anthropic/", "");
+        anthropicModel = toAnthropicModel(params.model);
       } else if (params.model?.startsWith("openai/") || params.model?.startsWith("google/") || params.model?.startsWith("deepseek/")) {
         // Non-Anthropic model — try OpenAI or skip to next fallback
         if (ENV.openaiApiKey && (params.model?.startsWith("openai/") || !ENV.anthropicApiKey)) {
           return await invokeOpenAI(params.messages, { maxTokens, format, temperature });
         }
         // For Google/DeepSeek models, still fall through to Anthropic as a general fallback
-        anthropicModel = "claude-sonnet-4";
+        anthropicModel = ANTHROPIC_DEFAULT_MODEL;
       }
       return await invokeAnthropic(params.messages, { maxTokens, wantsJson, temperature, model: anthropicModel });
     } catch (err: any) {
@@ -336,7 +353,7 @@ export async function* streamLLM(params: InvokeParams): AsyncGenerator<string> {
   }
 
   const payload: Record<string, unknown> = {
-    model: params.model ?? "claude-sonnet-4",
+    model: toAnthropicModel(params.model),
     max_tokens: params.maxTokens ?? params.max_tokens ?? 4096,
     temperature: params.temperature ?? 0.7,
     messages: conversationMessages,
