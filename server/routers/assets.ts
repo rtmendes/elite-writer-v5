@@ -79,7 +79,7 @@ Return JSON:
               content: asset.content,
               topic: input.articleTitle,
               metadata: { platform: asset.platform, tips: asset.tips, characterCount: asset.characterCount },
-            }).$returningId();
+            }).returning({ id: marketingAssets.id });
             savedIds.push(res.id);
           } catch { /* skip */ }
         }
@@ -253,7 +253,7 @@ Return JSON:
           status: "draft",
           importedFrom: input.url,
           wordCount: cleanedContent.split(/\s+/).length,
-        }).$returningId();
+        }).returning({ id: articles.id });
         articleId = res.id;
       }
 

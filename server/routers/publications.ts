@@ -99,7 +99,7 @@ export const publicationsRouter = router({
           responseTime: input.responseTime ?? null,
           audienceAvatar: input.audienceAvatar ?? null,
           editorPreferences: input.editorPreferences ?? null,
-        }).$returningId();
+        }).returning({ id: publications.id });
         return { success: true, action: "created", id: result.id };
       }
     }),

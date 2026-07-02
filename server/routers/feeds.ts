@@ -57,7 +57,7 @@ export const feedsRouter = router({
           emailFrom: input.emailFrom ?? null,
           keywords: input.keywords || [],
           active: input.active ? 1 : 0,
-        }).$returningId();
+        }).returning({ id: feeds.id });
         return { success: true, action: "created", id: result.id };
       }
     }),
@@ -232,7 +232,7 @@ Return JSON:
           pricePoint: input.pricePoint ?? null,
           stages: funnelData.stages,
           status: "draft",
-        }).$returningId();
+        }).returning({ id: funnels.id });
         funnelId = res.id;
       }
 

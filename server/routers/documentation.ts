@@ -71,7 +71,7 @@ export const documentationRouter = router({
         category: CATEGORY,
         subcategory: input.docType ?? null,
         source: "Documentation AI",
-      }).$returningId();
+      }).returning({ id: kbItems.id });
       return { id: r.id };
     }),
 

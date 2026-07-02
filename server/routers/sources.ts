@@ -207,15 +207,18 @@ const sha1 = (s: string) => createHash("sha1").update(s).digest("hex");
 let feedSeenEnsured = false;
 async function ensureFeedSeenTable(db: any) {
   if (feedSeenEnsured) return;
-  await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`feed_seen\` (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    userId INT NOT NULL,
-    sourceId INT NOT NULL,
-    urlHash VARCHAR(40) NOT NULL,
-    createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_feed_seen (userId, urlHash),
-    INDEX idx_feed_seen_created (createdAt)
+  await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS "feed_seen" (
+    id SERIAL PRIMARY KEY,
+    "userId" INT NOT NULL,
+    "sourceId" INT NOT NULL,
+    "urlHash" VARCHAR(40) NOT NULL,
+    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_feed_seen UNIQUE ("userId", "urlHash")
   )`));
+  await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS idx_feed_seen_created ON "feed_seen"("createdAt")`));
+  // Table may predate the unique key (migrated from drizzle schema without it) —
+  // the ON CONFLICT upsert below requires it.
+  await db.execute(sql.raw(`CREATE UNIQUE INDEX IF NOT EXISTS uq_feed_seen ON "feed_seen"("userId", "urlHash")`));
   feedSeenEnsured = true;
 }
 
@@ -290,7 +293,7 @@ export async function ingestSource(db: any, source: any, limit: number, beats: s
   const keep = await screenItems(fresh, beats);
 
   // Record every fresh URL as seen (kept or not) so we never re-screen it.
-  await db.insert(feedSeen).values(fresh.map((it) => ({ userId: source.userId, sourceId: source.id, urlHash: sha1(it.url) }))).onDuplicateKeyUpdate({ set: { sourceId: source.id } });
+  await db.insert(feedSeen).values(fresh.map((it) => ({ userId: source.userId, sourceId: source.id, urlHash: sha1(it.url) }))).onConflictDoUpdate({ target: [feedSeen.userId, feedSeen.urlHash], set: { sourceId: source.id } });
 
   const toStore: InsertSourceItem[] = [];
   fresh.forEach((item, i) => {
@@ -430,10 +433,10 @@ export const sourcesRouter = router({
         active: 1,
         fetchFrequency: input.fetchFrequency,
         metadata,
-      });
+      }).returning({ id: contentSources.id });
 
       return {
-        id: inserted.insertId,
+        id: inserted.id,
         name,
         description,
         iconUrl,

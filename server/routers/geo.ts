@@ -91,8 +91,8 @@ export const geoRouter = router({
           competitors: input.competitors || [],
           monitorKeywords: input.monitorKeywords || [],
           targetLocation: input.targetLocation,
-        });
-        return { id: inserted.insertId };
+        }).returning({ id: geoProjects.id });
+        return { id: inserted.id };
       }),
 
     update: protectedProcedure

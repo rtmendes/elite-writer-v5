@@ -288,7 +288,8 @@ export const templateSopsRouter = router({
           visualSlots: (rest.visualSlots ?? null) as unknown as object,
           isSeeded: false,
         })
-        .onDuplicateKeyUpdate({
+        .onConflictDoUpdate({
+          target: templateSops.templateId,
           set: {
             ...rest,
             sections: (rest.sections ?? null) as unknown as object,

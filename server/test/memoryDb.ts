@@ -52,7 +52,7 @@ export function createMemoryDb() {
   return {
     insert: (table: object) => ({
       values: (vals: Record<string, unknown>) => ({
-        $returningId: async () => {
+        returning: async (_fields?: unknown) => {
           const id = seq++;
           storeFor(table).push({ ...vals, id, createdAt: new Date(), updatedAt: new Date() });
           return [{ id }];

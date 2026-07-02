@@ -63,8 +63,8 @@ const contentRouter = router({
         tags: input.tags || [],
         brandId: input.brandId || null,
         sourcePostId: input.sourcePostId || null,
-      });
-      return { id: inserted.insertId };
+      }).returning({ id: contentLibrary.id });
+      return { id: inserted.id };
     }),
 
   update: protectedProcedure
@@ -169,8 +169,8 @@ const imagesRouter = router({
         height: input.height || null,
         presetName: input.presetName || null,
         metadata: input.metadata || {},
-      });
-      return { id: inserted.insertId };
+      }).returning({ id: imageLibrary.id });
+      return { id: inserted.id };
     }),
 
   delete: protectedProcedure
@@ -219,8 +219,8 @@ const presetsRouter = router({
         referenceImages: input.referenceImages || [],
         characterConsistency: input.characterConsistency ? 1 : 0,
         brandId: input.brandId || null,
-      });
-      return { id: inserted.insertId };
+      }).returning({ id: imagePresets.id });
+      return { id: inserted.id };
     }),
 
   update: protectedProcedure

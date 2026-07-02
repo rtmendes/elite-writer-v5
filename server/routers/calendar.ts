@@ -61,8 +61,8 @@ export const calendarRouter = router({
       const [result] = await db.insert(contentCalendar).values({
         userId: ctx.user.id,
         ...input,
-      } as any);
-      return { id: result.insertId };
+      } as any).returning({ id: contentCalendar.id });
+      return { id: result.id };
     }),
 
   update: protectedProcedure

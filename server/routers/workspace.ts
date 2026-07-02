@@ -30,23 +30,23 @@ async function ensureTables() {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   for (const table of Object.values(SYNC_TABLES)) {
-    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS \`${table}\` (
+    await db.execute(sql.raw(`CREATE TABLE IF NOT EXISTS "${table}" (
       id VARCHAR(32) PRIMARY KEY,
-      data JSON NOT NULL,
-      updatedAt BIGINT NOT NULL DEFAULT 0,
-      deleted BOOLEAN NOT NULL DEFAULT FALSE,
-      INDEX idx_${table}_updated (updatedAt)
+      data JSONB NOT NULL,
+      "updatedAt" BIGINT NOT NULL DEFAULT 0,
+      deleted BOOLEAN NOT NULL DEFAULT FALSE
     )`));
+    await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS "idx_${table}_updated" ON "${table}"("updatedAt")`));
   }
   // Scale fix: promote rows.dbId to an indexed generated column so per-database
   // queries filter in SQL (O(log n)) instead of scanning + filtering in JS.
   // Idempotent — ignore "duplicate column/key" once applied.
   try {
     await db.execute(sql.raw(
-      "ALTER TABLE `wsRows` ADD COLUMN `dbId` VARCHAR(40) " +
-      "GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.dbId'))) STORED, " +
-      "ADD INDEX `idx_wsRows_dbId` (`dbId`)",
+      `ALTER TABLE "wsRows" ADD COLUMN IF NOT EXISTS "dbId" VARCHAR(40) ` +
+      `GENERATED ALWAYS AS (data->>'dbId') STORED`,
     ));
+    await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS "idx_wsRows_dbId" ON "wsRows"("dbId")`));
   } catch { /* already migrated */ }
   tablesEnsured = true;
 }
@@ -153,9 +153,9 @@ async function fetchPitchHistory(): Promise<string> {
     const db = await getDb();
     if (!db) return "";
     const rows = await db.execute(sql.raw(
-      "SELECT publicationName, status, COUNT(*) as n FROM pitches WHERE publicationName IS NOT NULL GROUP BY publicationName, status",
+      `SELECT "publicationName", status, COUNT(*) as n FROM pitches WHERE "publicationName" IS NOT NULL GROUP BY "publicationName", status`,
     ));
-    const list = (rows as unknown as [Array<Record<string, unknown>>])[0] ?? [];
+    const list = (rows as unknown as Array<Record<string, unknown>>) ?? [];
     if (list.length === 0) return "";
     const byPub = new Map<string, Record<string, number>>();
     for (const r of list) {
@@ -189,9 +189,9 @@ async function fetchPublicationsList(): Promise<string> {
     const db = await getDb();
     if (db) {
       const rows = await db.execute(sql.raw(
-        "SELECT name, category, payRange, tier, topics FROM publications WHERE acceptsFreelance = 1 ORDER BY tier ASC LIMIT 250",
+        `SELECT name, category, "payRange", tier, topics FROM publications WHERE "acceptsFreelance" = 1 ORDER BY tier ASC LIMIT 250`,
       ));
-      const list = (rows as unknown as [Array<Record<string, unknown>>])[0] ?? [];
+      const list = (rows as unknown as Array<Record<string, unknown>>) ?? [];
       if (list.length) {
         return list
           .map((p) => {
@@ -231,9 +231,9 @@ export const workspaceRouter = router({
       if (!db) throw new Error("Database not available");
       const table = SYNC_TABLES[input.table as SyncTable];
       const result = await db.execute(sql.raw(
-        `SELECT id, data, updatedAt, deleted FROM \`${table}\` WHERE updatedAt > ${Math.floor(input.since)} ORDER BY updatedAt ASC LIMIT 2000`,
+        `SELECT id, data, "updatedAt", deleted FROM "${table}" WHERE "updatedAt" > ${Math.floor(input.since)} ORDER BY "updatedAt" ASC LIMIT 2000`,
       ));
-      const rows = (result as unknown as [Array<{ id: string; data: unknown; updatedAt: number; deleted: number }>])[0] ?? [];
+      const rows = (result as unknown as Array<{ id: string; data: unknown; updatedAt: number; deleted: boolean }>) ?? [];
       return rows.map((r) => ({
         id: r.id,
         data: typeof r.data === "string" ? JSON.parse(r.data) : r.data,
@@ -251,12 +251,12 @@ export const workspaceRouter = router({
       const table = SYNC_TABLES[input.table as SyncTable];
       for (const rec of input.records) {
         await db.execute(sql`
-          INSERT INTO ${sql.raw(`\`${table}\``)} (id, data, updatedAt, deleted)
-          VALUES (${rec.id}, ${JSON.stringify(rec.data ?? {})}, ${rec.updated_at}, ${rec.deleted})
-          ON DUPLICATE KEY UPDATE
-            data = IF(VALUES(updatedAt) >= updatedAt, VALUES(data), data),
-            deleted = IF(VALUES(updatedAt) >= updatedAt, VALUES(deleted), deleted),
-            updatedAt = IF(VALUES(updatedAt) >= updatedAt, VALUES(updatedAt), updatedAt)
+          INSERT INTO ${sql.raw(`"${table}"`)} (id, data, "updatedAt", deleted)
+          VALUES (${rec.id}, ${JSON.stringify(rec.data ?? {})}::jsonb, ${rec.updated_at}, ${rec.deleted})
+          ON CONFLICT (id) DO UPDATE SET
+            data = CASE WHEN EXCLUDED."updatedAt" >= ${sql.raw(`"${table}"`)}."updatedAt" THEN EXCLUDED.data ELSE ${sql.raw(`"${table}"`)}.data END,
+            deleted = CASE WHEN EXCLUDED."updatedAt" >= ${sql.raw(`"${table}"`)}."updatedAt" THEN EXCLUDED.deleted ELSE ${sql.raw(`"${table}"`)}.deleted END,
+            "updatedAt" = CASE WHEN EXCLUDED."updatedAt" >= ${sql.raw(`"${table}"`)}."updatedAt" THEN EXCLUDED."updatedAt" ELSE ${sql.raw(`"${table}"`)}."updatedAt" END
         `);
       }
       return { ok: true, count: input.records.length };
@@ -467,7 +467,7 @@ ${drafts[1].text}` },
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       await db.execute(sql`
-        INSERT INTO pitches (userId, publicationId, publicationName, editorEmail, subject, body, articleTitle, status, sentAt)
+        INSERT INTO pitches ("userId", "publicationId", "publicationName", "editorEmail", subject, body, "articleTitle", status, "sentAt")
         VALUES (${ctx.user.id}, ${input.publicationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 90)},
                 ${input.publicationName}, ${input.editorEmail}, ${input.subject}, ${input.body},
                 ${input.articleTitle}, ${input.sent ? "sent" : "draft"}, ${input.sent ? new Date() : null})
@@ -663,9 +663,9 @@ ${input.research || "(use the outline; mark anything needing reporting as [TK: .
       const now = Date.now();
       const page = { id: pageId, parentId: null, title, icon: "📄", doc: blocks, sortOrder: now, createdAt: now, updatedAt: now };
       await db.execute(sql`
-        INSERT INTO wsPages (id, data, updatedAt, deleted)
-        VALUES (${pageId}, ${JSON.stringify(page)}, ${now}, FALSE)
-        ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = VALUES(updatedAt), deleted = FALSE
+        INSERT INTO "wsPages" (id, data, "updatedAt", deleted)
+        VALUES (${pageId}, ${JSON.stringify(page)}::jsonb, ${now}, FALSE)
+        ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, "updatedAt" = EXCLUDED."updatedAt", deleted = FALSE
       `);
       return { pageId, title, blocks: blocks.length };
     }),

@@ -31,7 +31,7 @@ const ideasRouter = router({
     const db = await getDb();
     if (!db) throw new Error("Database unavailable");
     const vals: InsertIdea = { userId: ctx.user.id, title: input.title, angle: input.angle ?? null, category: input.category ?? null, newsPeg: input.newsPeg ?? null, status: input.status ?? "idea", score: input.score ?? null, brandId: input.brandId ?? null };
-    const [result] = await db.insert(ideas).values(vals).$returningId();
+    const [result] = await db.insert(ideas).values(vals).returning({ id: ideas.id });
     return { id: result.id, ...input };
   }),
   update: protectedProcedure.input(z.object({
@@ -109,7 +109,7 @@ const articlesRouter = router({
       targetPublication: input.targetPublication ?? null,
       brandId: input.brandId ?? null, productId: input.productId ?? null,
     };
-    const [result] = await db.insert(articles).values(vals).$returningId();
+    const [result] = await db.insert(articles).values(vals).returning({ id: articles.id });
     syncArticleToPipeline({
       articleId: result.id, title: input.title, status: input.status ?? "draft",
       brandId: input.brandId, score: input.overallScore, wordCount: input.wordCount,
@@ -271,7 +271,7 @@ const articlesRouter = router({
         articleNumber: nextNum,
         sources: [{ title: item.title, url: item.url ?? undefined, addedAt: new Date().toISOString() }],
       };
-      const [result] = await db.insert(articles).values(vals).$returningId();
+      const [result] = await db.insert(articles).values(vals).returning({ id: articles.id });
       await db.insert(articleResearch).values({
         userId: ctx.user.id,
         articleId: result.id,
@@ -331,7 +331,7 @@ const pitchesRouter = router({
       body: input.body ?? null, articleTitle: input.articleTitle ?? null,
       status: input.status ?? "draft",
     };
-    const [result] = await db.insert(pitches).values(vals).$returningId();
+    const [result] = await db.insert(pitches).values(vals).returning({ id: pitches.id });
     return { id: result.id, ...input };
   }),
   update: protectedProcedure.input(z.object({
@@ -378,7 +378,7 @@ const researchRouter = router({
       userId: ctx.user.id, title: input.title, content: input.content ?? null,
       sources: input.sources ?? null, dataPoints: input.dataPoints ?? null,
     };
-    const [result] = await db.insert(researchNotes).values(vals).$returningId();
+    const [result] = await db.insert(researchNotes).values(vals).returning({ id: researchNotes.id });
     return { id: result.id, ...input };
   }),
   update: protectedProcedure.input(z.object({
@@ -428,7 +428,7 @@ const brandsRouter = router({
       niche: input.niche ?? null, website: input.website ?? null,
       color: input.color ?? null, alignedPublications: input.alignedPublications ?? null,
     };
-    const [result] = await db.insert(brands).values(vals).$returningId();
+    const [result] = await db.insert(brands).values(vals).returning({ id: brands.id });
     return { id: result.id, ...input };
   }),
   update: protectedProcedure.input(z.object({
@@ -482,7 +482,7 @@ const productsRouter = router({
       description: input.description ?? null, funnelUrl: input.funnelUrl ?? null,
       status: input.status ?? "draft",
     };
-    const [result] = await db.insert(products).values(vals).$returningId();
+    const [result] = await db.insert(products).values(vals).returning({ id: products.id });
     return { id: result.id, ...input };
   }),
   delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
@@ -514,7 +514,7 @@ const earningsRouter = router({
       amount: input.amount, description: input.description ?? null,
       brandId: input.brandId ?? null,
     };
-    const [result] = await db.insert(earnings).values(vals).$returningId();
+    const [result] = await db.insert(earnings).values(vals).returning({ id: earnings.id });
     return { id: result.id, ...input };
   }),
   delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
@@ -547,7 +547,7 @@ const intelligenceRouter = router({
       source: input.source ?? null, url: input.url ?? null,
       category: input.category ?? null, relevanceScore: input.relevanceScore ?? null,
     };
-    const [result] = await db.insert(intelligenceItems).values(vals).$returningId();
+    const [result] = await db.insert(intelligenceItems).values(vals).returning({ id: intelligenceItems.id });
     return { id: result.id, ...input };
   }),
   delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
@@ -607,7 +607,7 @@ const seriesRouter = router({
       if (!db) throw new Error("Database unavailable");
       const [res] = await db.insert(researchSeries).values({
         userId: ctx.user.id, name: input.name, description: input.description ?? null,
-      }).$returningId();
+      }).returning({ id: researchSeries.id });
       return { id: res.id };
     }),
   delete: protectedProcedure

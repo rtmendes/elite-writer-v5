@@ -116,8 +116,8 @@ const itemsRouter = router({
         url: url ?? null,
         metadata: metadata ?? null,
         ...rest,
-      });
-      const newId = res.insertId;
+      }).returning({ id: researchItems.id });
+      const newId = res.id;
 
       // Async R2 body fetch — don't block the response
       if (url && (input.contentType === "webpage" || input.contentType === "academic")) {
@@ -194,8 +194,8 @@ const itemsRouter = router({
             tags: input.tags ?? [],
             source: "bulk_import",
             status: "inbox",
-          });
-          const newId = res.insertId;
+          }).returning({ id: researchItems.id });
+          const newId = res.id;
           results.push({ url, id: newId });
 
           // Async body fetch
@@ -247,8 +247,8 @@ const highlightsRouter = router({
         note: input.note ?? null,
         color: input.color ?? "yellow",
         position: input.position ?? null,
-      });
-      return { id: res.insertId };
+      }).returning({ id: researchHighlights.id });
+      return { id: res.id };
     }),
 
   delete: protectedProcedure
@@ -287,8 +287,8 @@ const foldersRouter = router({
         name: input.name,
         parentId: input.parentId ?? null,
         color: input.color ?? null,
-      });
-      return { id: res.insertId };
+      }).returning({ id: researchFolders.id });
+      return { id: res.id };
     }),
 
   delete: protectedProcedure
@@ -366,8 +366,8 @@ const projectsRouter = router({
         userId: ctx.user.id,
         name: input.name,
         description: input.description ?? null,
-      });
-      return { id: res.insertId };
+      }).returning({ id: researchProjects.id });
+      return { id: res.id };
     }),
 
   delete: protectedProcedure
@@ -407,8 +407,8 @@ const attachRouter = router({
         articleId: input.articleId,
         itemId: input.itemId,
         note: input.note ?? null,
-      });
-      return { id: res.insertId };
+      }).returning({ id: articleResearch.id });
+      return { id: res.id };
     }),
 
   detach: protectedProcedure
@@ -705,10 +705,10 @@ Write in an authentic human voice appropriate for the reading level.`;
           status: "draft",
           targetPublication: input.targetPublication ?? null,
           sources: input.itemIds.map(id => ({ researchItemId: id })),
-        });
+        }).returning({ id: articles.id });
 
         return {
-          articleId: inserted.insertId,
+          articleId: inserted.id,
           readingLevel: level,
           wordCount,
           title,

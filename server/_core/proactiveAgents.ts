@@ -35,7 +35,8 @@ async function dbExec(query: string): Promise<Array<Record<string, unknown>>> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const result = await db.execute(sql.raw(query));
-  return ((result as unknown as [Array<Record<string, unknown>>])[0] ?? []);
+  // postgres-js returns the row array directly (mysql2 returned [rows, fields])
+  return ((result as unknown as Array<Record<string, unknown>>) ?? []);
 }
 
 /** The workspace sync tables are normally created lazily by the first client
@@ -46,20 +47,20 @@ let wsTablesEnsured = false;
 async function ensureWsTables() {
   if (wsTablesEnsured) return;
   for (const table of ["wsPages", "wsDatabases", "wsRows"]) {
-    await dbExec(`CREATE TABLE IF NOT EXISTS \`${table}\` (
+    await dbExec(`CREATE TABLE IF NOT EXISTS "${table}" (
       id VARCHAR(32) PRIMARY KEY,
-      data JSON NOT NULL,
-      updatedAt BIGINT NOT NULL DEFAULT 0,
-      deleted BOOLEAN NOT NULL DEFAULT FALSE,
-      INDEX idx_${table}_updated (updatedAt)
+      data JSONB NOT NULL,
+      "updatedAt" BIGINT NOT NULL DEFAULT 0,
+      deleted BOOLEAN NOT NULL DEFAULT FALSE
     )`);
+    await dbExec(`CREATE INDEX IF NOT EXISTS "idx_${table}_updated" ON "${table}"("updatedAt")`);
   }
   try {
     await dbExec(
-      "ALTER TABLE `wsRows` ADD COLUMN `dbId` VARCHAR(40) " +
-      "GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.dbId'))) STORED, " +
-      "ADD INDEX `idx_wsRows_dbId` (`dbId`)",
+      `ALTER TABLE "wsRows" ADD COLUMN IF NOT EXISTS "dbId" VARCHAR(40) ` +
+      `GENERATED ALWAYS AS (data->>'dbId') STORED`,
     );
+    await dbExec(`CREATE INDEX IF NOT EXISTS "idx_wsRows_dbId" ON "wsRows"("dbId")`);
   } catch { /* already migrated */ }
   wsTablesEnsured = true;
 }
@@ -69,7 +70,7 @@ function parseData<T>(raw: unknown): T {
 }
 
 export async function loadDatabases(): Promise<WsDatabase[]> {
-  const rows = await dbExec("SELECT data FROM `wsDatabases` WHERE deleted = FALSE");
+  const rows = await dbExec(`SELECT data FROM "wsDatabases" WHERE deleted = FALSE`);
   return rows.map((r) => parseData<WsDatabase>(r.data));
 }
 
@@ -78,10 +79,10 @@ export async function loadRows(dbId: string): Promise<WsRow[]> {
   // this is an index lookup, not a full-table scan + JS filter. Falls back to
   // a scan only if the column hasn't been added yet (first boot before migrate).
   try {
-    const rows = await dbExec(`SELECT data FROM \`wsRows\` WHERE deleted = FALSE AND dbId = ${JSON.stringify(dbId)}`);
+    const rows = await dbExec(`SELECT data FROM "wsRows" WHERE deleted = FALSE AND "dbId" = '${dbId.replace(/'/g, "''")}'`);
     return rows.map((r) => parseData<WsRow>(r.data));
   } catch {
-    const rows = await dbExec("SELECT data FROM `wsRows` WHERE deleted = FALSE");
+    const rows = await dbExec(`SELECT data FROM "wsRows" WHERE deleted = FALSE`);
     return rows.map((r) => parseData<WsRow>(r.data)).filter((r) => r.dbId === dbId);
   }
 }
@@ -91,9 +92,9 @@ async function saveDatabase(database: WsDatabase) {
   if (!db) return;
   database.updatedAt = Date.now();
   await db.execute(sql`
-    INSERT INTO wsDatabases (id, data, updatedAt, deleted)
-    VALUES (${database.id}, ${JSON.stringify(database)}, ${database.updatedAt}, FALSE)
-    ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = VALUES(updatedAt), deleted = FALSE
+    INSERT INTO "wsDatabases" (id, data, "updatedAt", deleted)
+    VALUES (${database.id}, ${JSON.stringify(database)}::jsonb, ${database.updatedAt}, FALSE)
+    ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, "updatedAt" = EXCLUDED."updatedAt", deleted = FALSE
   `);
 }
 
@@ -102,9 +103,9 @@ export async function saveRow(row: WsRow) {
   if (!db) return;
   row.updatedAt = Date.now();
   await db.execute(sql`
-    INSERT INTO wsRows (id, data, updatedAt, deleted)
-    VALUES (${row.id}, ${JSON.stringify(row)}, ${row.updatedAt}, FALSE)
-    ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = VALUES(updatedAt), deleted = FALSE
+    INSERT INTO "wsRows" (id, data, "updatedAt", deleted)
+    VALUES (${row.id}, ${JSON.stringify(row)}::jsonb, ${row.updatedAt}, FALSE)
+    ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, "updatedAt" = EXCLUDED."updatedAt", deleted = FALSE
   `);
 }
 

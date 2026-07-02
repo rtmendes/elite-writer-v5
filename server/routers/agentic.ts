@@ -340,7 +340,7 @@ REQUIREMENTS:
           wordCount: draftText.split(/\s+/).length,
           targetPublication: input.targetPublication,
           status: "draft",
-        }).$returningId();
+        }).returning({ id: articles.id });
         articleId = res.id;
       }
 

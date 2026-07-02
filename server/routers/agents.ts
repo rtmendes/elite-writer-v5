@@ -407,8 +407,8 @@ export const agentsRouter = router({
         title,
         agentIds: validAgentIds,
         mode,
-      });
-      const insertId = (result as any)?.insertId ?? (result as any)?.id ?? 0;
+      }).returning({ id: agentChats.id });
+      const insertId = result?.id ?? 0;
       return { id: insertId, title, mode };
     }),
 
@@ -672,8 +672,8 @@ ${contextBlock}`;
         fact: input.fact,
         category: input.category || "context",
         importance: input.importance || 7,
-      });
-      const insertId = (result as any)?.insertId ?? (result as any)?.id ?? 0;
+      }).returning({ id: agentMemories.id });
+      const insertId = result?.id ?? 0;
       return { id: insertId, success: true };
     }),
 
@@ -749,8 +749,8 @@ ${contextBlock}`;
         targetTitle: input.targetTitle,
         role: input.role,
         notes: input.notes,
-      });
-      const insertId = (result as any)?.insertId ?? (result as any)?.id ?? 0;
+      }).returning({ id: agentAssignments.id });
+      const insertId = result?.id ?? 0;
       return { id: insertId };
     }),
 

@@ -50,8 +50,8 @@ export const trendingRouter = router({
       const [result] = await db.insert(trendingTopics).values({
         userId: ctx.user.id,
         ...input,
-      } as any);
-      return { id: result.insertId };
+      } as any).returning({ id: trendingTopics.id });
+      return { id: result.id };
     }),
 
   update: protectedProcedure
