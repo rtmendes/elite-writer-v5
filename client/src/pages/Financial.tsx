@@ -7,7 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { useSelection } from '@/hooks/useSelection';
+import { SelectionBar } from '@/components/SelectionBar';
 import {
   DollarSign, TrendingUp, Target, Plus, Calendar,
   BarChart3, PieChart, ArrowUpRight, Trash2, Building2,
@@ -107,6 +110,33 @@ export default function Financial() {
     setAmount(''); setPublication(''); setDescription('');
     setShowNew(false);
     toast.success(`$${amt.toLocaleString()} ${earningType} earning recorded`);
+  };
+
+  // Multi-select + bulk delete for earnings history (UI standard).
+  // Mirrors the single-row delete: DB row removed when a session-created
+  // dbId exists in earningIdMap, local state row always removed.
+  const visibleEarningIds = useMemo(
+    () => state.earnings.filter(e => activeView === 'overview' || e.type === activeView).map(e => e.id),
+    [state.earnings, activeView],
+  );
+  const selection = useSelection<string>(visibleEarningIds);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const bulkDeleteEarnings = async () => {
+    if (selection.selectedList.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selection.selectedList) {
+      const dbId = earningIdMap.get(id);
+      if (dbId) {
+        try { await deleteEarningDb.mutateAsync({ id: dbId }); } catch { /* keep going */ }
+      }
+      deleteEarning(id);
+      ok++;
+    }
+    selection.clear();
+    setBulkBusy(false);
+    toast.success(`${ok} earning(s) removed`);
   };
 
   const contentGoal = state.settings.content_revenue_goal || 100000;
@@ -360,9 +390,19 @@ export default function Financial() {
 
           {/* Earnings History */}
           <div className="lg:col-span-2">
-            <Card className="border-border">
+            <SelectionBar
+              count={selection.selected.size}
+              onDelete={bulkDeleteEarnings}
+              deleteNoun="earning"
+              onClear={selection.clear}
+              busy={bulkBusy}
+            />
+            <Card className={`border-border ${selection.selected.size > 0 ? 'mt-4' : ''}`}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
+                  {visibleEarningIds.length > 0 && (
+                    <Checkbox checked={selection.allSelected} onCheckedChange={selection.toggleAll} aria-label="Select all earnings" />
+                  )}
                   <BarChart3 className="w-4 h-4 text-primary" />
                   Earnings History
                 </CardTitle>
@@ -384,6 +424,12 @@ export default function Financial() {
                         const brand = state.brands.find(b => b.id === earning.brand_id);
                         return (
                           <div key={earning.id} className="flex items-center gap-3 p-2.5 rounded-md bg-secondary/30 group">
+                            <Checkbox
+                              className="shrink-0"
+                              checked={selection.selected.has(earning.id)}
+                              onCheckedChange={() => selection.toggle(earning.id)}
+                              aria-label={`Select ${earning.publication || earning.description || 'earning'}`}
+                            />
                             <span className="text-sm">{stream?.icon || '💰'}</span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">

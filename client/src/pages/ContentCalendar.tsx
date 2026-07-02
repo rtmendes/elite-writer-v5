@@ -12,8 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useSelection } from "@/hooks/useSelection";
+import { SelectionBar } from "@/components/SelectionBar";
 import {
   Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight,
   Loader2, Trash2, Edit, Linkedin, Twitter, Instagram,
@@ -44,6 +47,11 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const STATUS_OPTIONS = Object.keys(STATUS_COLORS).map(s => ({
+  value: s,
+  label: s.charAt(0).toUpperCase() + s.slice(1),
+}));
 
 export default function ContentCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -82,6 +90,42 @@ export default function ContentCalendar() {
   const deleteMutation = trpc.calendar.delete.useMutation({
     onSuccess: () => { toast.success("Removed"); eventsQuery.refetch(); },
   });
+  // Silent twins for bulk loops — one toast/refetch at the end, not per item
+  const bulkUpdateMutation = trpc.calendar.update.useMutation();
+  const bulkDeleteMutation = trpc.calendar.delete.useMutation();
+
+  // Multi-select + bulk actions (UI standard)
+  const visibleEventIds = useMemo(
+    () => (eventsQuery.data || []).map((e: any) => e.id as number),
+    [eventsQuery.data],
+  );
+  const selection = useSelection<number>(visibleEventIds);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const bulkSetStatus = async (status: string) => {
+    if (selection.selectedList.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selection.selectedList) {
+      try { await bulkUpdateMutation.mutateAsync({ id, status }); ok++; } catch { /* keep going */ }
+    }
+    await eventsQuery.refetch();
+    setBulkBusy(false);
+    toast.success(`${ok}/${selection.selectedList.length} set to ${status}`);
+  };
+
+  const bulkDeleteEvents = async () => {
+    if (selection.selectedList.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selection.selectedList) {
+      try { await bulkDeleteMutation.mutateAsync({ id }); ok++; } catch { /* keep going */ }
+    }
+    await eventsQuery.refetch();
+    selection.clear();
+    setBulkBusy(false);
+    toast.success(`${ok} event(s) removed`);
+  };
 
   const closeDialog = () => {
     setShowDialog(false); setEditingEvent(null); setSelectedDate(null);
@@ -195,6 +239,17 @@ export default function ContentCalendar() {
         </div>
       </div>
 
+      {/* Bulk actions */}
+      <SelectionBar
+        count={selection.selected.size}
+        statusOptions={STATUS_OPTIONS}
+        onSetStatus={bulkSetStatus}
+        onDelete={bulkDeleteEvents}
+        deleteNoun="event"
+        onClear={selection.clear}
+        busy={bulkBusy}
+      />
+
       {/* Month title */}
       <h2 className="text-xl font-semibold text-center">{monthName}</h2>
 
@@ -238,6 +293,13 @@ export default function ContentCalendar() {
                           className="flex items-center gap-1 px-1 py-0.5 rounded text-[10px] bg-muted/60 hover:bg-muted truncate"
                           onClick={(e) => { e.stopPropagation(); openEdit(event); }}
                         >
+                          <Checkbox
+                            checked={selection.selected.has(event.id)}
+                            onCheckedChange={() => selection.toggle(event.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-3 w-3 shrink-0"
+                            aria-label={`Select ${event.title}`}
+                          />
                           <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor}`} />
                           <span className="truncate">{event.title}</span>
                         </div>

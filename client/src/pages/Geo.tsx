@@ -9,8 +9,11 @@
  * - AI Humanizer & Content Quality Suite
  * - GEO/AEO Content Writer
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useSelection } from "@/hooks/useSelection";
+import { SelectionBar } from "@/components/SelectionBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -102,6 +105,26 @@ export default function Geo() {
 
   const projects = projectsQuery.data || [];
 
+  // Multi-select + bulk delete for GEO projects (UI standard)
+  const projectIds = useMemo(() => projects.map(p => p.id), [projectsQuery.data]);
+  const selection = useSelection<number>(projectIds);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  // Silent twin for bulk loops — one toast/refetch at the end, not per item
+  const bulkDeleteProject = trpc.geo.projects.delete.useMutation();
+
+  const bulkDeleteProjects = async () => {
+    if (selection.selectedList.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selection.selectedList) {
+      try { await bulkDeleteProject.mutateAsync({ id }); ok++; } catch { /* keep going */ }
+    }
+    await projectsQuery.refetch();
+    selection.clear();
+    setBulkBusy(false);
+    toast.success(`${ok} project(s) removed`);
+  };
+
   return (
     <div className="h-full overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -128,9 +151,22 @@ export default function Geo() {
           {/* ─── GEO Projects ────────────────────────────── */}
           <TabsContent value="projects" className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Track your brand's visibility across AI search engines</p>
+              <div className="flex items-center gap-2">
+                {projects.length > 0 && (
+                  <Checkbox checked={selection.allSelected} onCheckedChange={selection.toggleAll} aria-label="Select all projects" />
+                )}
+                <p className="text-sm text-muted-foreground">Track your brand's visibility across AI search engines</p>
+              </div>
               <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4 mr-1" />New Project</Button>
             </div>
+
+            <SelectionBar
+              count={selection.selected.size}
+              onDelete={bulkDeleteProjects}
+              deleteNoun="project"
+              onClear={selection.clear}
+              busy={bulkBusy}
+            />
 
             {projectsQuery.isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
@@ -146,9 +182,17 @@ export default function Geo() {
                     <Card key={project.id}>
                       <CardContent className="pt-4">
                         <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="font-medium text-foreground">{project.name}</h3>
-                            <p className="text-xs text-muted-foreground">{project.websiteUrl}</p>
+                          <div className="flex items-start gap-2">
+                            <Checkbox
+                              className="mt-0.5"
+                              checked={selection.selected.has(project.id)}
+                              onCheckedChange={() => selection.toggle(project.id)}
+                              aria-label={`Select ${project.name}`}
+                            />
+                            <div>
+                              <h3 className="font-medium text-foreground">{project.name}</h3>
+                              <p className="text-xs text-muted-foreground">{project.websiteUrl}</p>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             {project.overallGeoScore !== null && (
