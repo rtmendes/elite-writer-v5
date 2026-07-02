@@ -2,6 +2,16 @@
 
 All notable operational and code changes to Elite Writer.
 
+## 2026-07-02 — Multi-select + bulk actions on every collection view (Issue #44)
+
+Shared `useSelection` hook (`client/src/hooks/useSelection.ts`) + `SelectionBar` (`client/src/components/SelectionBar.tsx`) — page-level twins of the workspace pattern, Queue-style visuals. Additive only; nothing deleted.
+
+- Wired: ContentInsights (bulk delete + save/unsave), Giststack (bulk save + create-ideas — items have no server persistence, so delete/status impossible without new scope), ContentStudio (+sort), Social (+sort), Library (3 tabs, delete-only — no status fields), Interviews (+sort, delete+status).
+- Sort added where missing: Research (asc→desc→none cycle), ContentStudio, Social, Interviews.
+- Verified "already-done" claims: Queue TRUE (untouched) · Publications TRUE (static dataset — added missing gallery select-all) · Pitches PARTIAL (added select-all, bulk set-status, confirm) · Ideas PARTIAL (list view had no checkboxes — fixed; added select-all, set-status, confirm) · **PulsePipeline FALSE** (nothing existed — fully wired; no delete mutation on pulse router, "skipped" status is the archive path).
+- Assessed smaller views: ContentCalendar + Geo projects + Financial earnings got bulk actions; Pipeline is a single-run tool with no collection — skipped by design.
+- Gate: tsc 0 errors · tests pass · build clean.
+
 ## 2026-07-02 — Domain standardization
 
 Canonical domain: **elitewriter.insightprofit.live** (VPS, Docker deploy via GitHub main poll).
