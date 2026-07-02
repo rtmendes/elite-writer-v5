@@ -1,38 +1,50 @@
-import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
-import path from "node:path";
-import { defineConfig } from "vite";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import path from 'path';
+
+// Frost theme HTML injection plugin
+function frostThemePlugin() {
+  return {
+    name: 'frost-theme-inject',
+    transformIndexHtml(html) {
+      return html.replace(
+        '</head>',
+        `  <!-- Frost theme bootstrap: reads saved theme from localStorage before React mounts -->
+  <script>
+    (function() {
+      var t = localStorage.getItem('ip-theme');
+      if (t === 'frost') {
+        document.documentElement.setAttribute('data-theme', 'frost');
+        var l = document.createElement('link');
+        l.rel = 'stylesheet'; l.id = 'frost-css'; l.href = '/frost.css';
+        document.head.appendChild(l);
+      } else if (t === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+</head>`
+      );
+    }
+  };
+}
 
 export default defineConfig({
-  plugins: [
-    react({
-      babel: {
-        plugins: [
-          // React Compiler — auto-memoizes components, hooks, and JSX at build time.
-          // Eliminates the entire class of "unstable reference" bugs that cause #310.
-          // This is what Meta uses on facebook.com and instagram.com.
-          ['babel-plugin-react-compiler', {}],
-        ],
-      },
-    }),
-    tailwindcss(),
-  ],
+  plugins: [react(), tailwindcss(), frostThemePlugin()],
   resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
-    },
+    alias: { '@': path.resolve(__dirname, './client/src') },
   },
-  envDir: path.resolve(import.meta.dirname),
-  root: path.resolve(import.meta.dirname, "client"),
-  publicDir: path.resolve(import.meta.dirname, "client", "public"),
+  root: './client',
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: '../dist',
     emptyOutDir: true,
   },
   server: {
-    host: true,
-    allowedHosts: true,
+    port: 5173,
+    proxy: {
+      '/api': 'http://localhost:3001',
+      '/trpc': 'http://localhost:3001',
+    },
   },
 });
