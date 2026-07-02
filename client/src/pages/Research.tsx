@@ -363,7 +363,7 @@ function LibraryTab() {
 
   const [q, setQ] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [sortKey, setSortKey] = useState<SortKey>("citationCount");
+  const [sortKey, setSortKey] = useState<SortKey | null>("citationCount");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -379,12 +379,14 @@ function LibraryTab() {
       const auth = Array.isArray(r.authors) ? r.authors.join(" ") : "";
       return `${r.title} ${auth} ${r.doi || ""} ${r.source || ""}`.toLowerCase().includes(term);
     });
-    out = [...out].sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === "title") cmp = (a.title || "").localeCompare(b.title || "");
-      else cmp = (Number(a[sortKey]) || 0) - (Number(b[sortKey]) || 0);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
+    if (sortKey) {
+      out = [...out].sort((a, b) => {
+        let cmp = 0;
+        if (sortKey === "title") cmp = (a.title || "").localeCompare(b.title || "");
+        else cmp = (Number(a[sortKey]) || 0) - (Number(b[sortKey]) || 0);
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    }
     return out;
   }, [rows, q, typeFilter, sortKey, sortDir]);
 
@@ -414,7 +416,12 @@ function LibraryTab() {
     setSelected(new Set());
   };
 
-  const setSort = (k: SortKey) => { if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc")); else { setSortKey(k); setSortDir("desc"); } };
+  // Clickable headers cycle asc → desc → none (unsorted = insertion order).
+  const setSort = (k: SortKey) => {
+    if (sortKey !== k) { setSortKey(k); setSortDir("asc"); }
+    else if (sortDir === "asc") setSortDir("desc");
+    else setSortKey(null);
+  };
 
   return (
     <div className="space-y-3">
@@ -463,10 +470,10 @@ function LibraryTab() {
             <thead className="bg-muted/40 text-muted-foreground">
               <tr>
                 <th className="w-10 px-3 py-2"><input type="checkbox" checked={allOnPageSelected} onChange={toggleAllOnPage} className="accent-[var(--primary)] w-4 h-4" /></th>
-                <th className="text-left px-3 py-2 cursor-pointer" onClick={() => setSort("title")}><span className="inline-flex items-center gap-1">Title <ArrowUpDown className="w-3 h-3" /></span></th>
+                <th className="text-left px-3 py-2 cursor-pointer" onClick={() => setSort("title")}><span className="inline-flex items-center gap-1">Title <ArrowUpDown className={`w-3 h-3 ${sortKey === "title" ? "text-primary" : ""}`} /></span></th>
                 <th className="text-left px-3 py-2 hidden lg:table-cell">Authors</th>
-                <th className="text-left px-3 py-2 w-16 cursor-pointer" onClick={() => setSort("year")}><span className="inline-flex items-center gap-1">Year <ArrowUpDown className="w-3 h-3" /></span></th>
-                <th className="text-left px-3 py-2 w-20 cursor-pointer" onClick={() => setSort("citationCount")}><span className="inline-flex items-center gap-1">Cites <ArrowUpDown className="w-3 h-3" /></span></th>
+                <th className="text-left px-3 py-2 w-16 cursor-pointer" onClick={() => setSort("year")}><span className="inline-flex items-center gap-1">Year <ArrowUpDown className={`w-3 h-3 ${sortKey === "year" ? "text-primary" : ""}`} /></span></th>
+                <th className="text-left px-3 py-2 w-20 cursor-pointer" onClick={() => setSort("citationCount")}><span className="inline-flex items-center gap-1">Cites <ArrowUpDown className={`w-3 h-3 ${sortKey === "citationCount" ? "text-primary" : ""}`} /></span></th>
                 <th className="text-left px-3 py-2 w-24">Type</th>
                 <th className="w-20 px-3 py-2" />
               </tr>

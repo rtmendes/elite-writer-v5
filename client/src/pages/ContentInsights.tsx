@@ -10,8 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useSelection } from "@/hooks/useSelection";
+import { SelectionBar } from "@/components/SelectionBar";
 import {
   Lightbulb, Search, Loader2, LayoutGrid, List, ExternalLink,
   BookmarkPlus, Bookmark, TrendingUp, BarChart3, Smile, Frown,
@@ -38,6 +41,9 @@ export default function ContentInsights() {
   const saveMutation = trpc.data.intelligence.save.useMutation({
     onSuccess: () => { toast.success("Saved!"); insightsQuery.refetch(); },
   });
+  const bulkSaveMutation = trpc.data.intelligence.save.useMutation();
+  const deleteMutation = trpc.data.intelligence.delete.useMutation();
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const insights = useMemo(() => {
     let items = (insightsQuery.data || []) as any[];
@@ -104,6 +110,36 @@ export default function ContentInsights() {
       saved: all.filter((i: any) => i.saved).length,
     };
   }, [insightsQuery.data]);
+
+  // Multi-select + bulk actions (shared hook — select-all scoped to visible rows)
+  const visibleIds = useMemo(() => insights.map((i: any) => i.id as number), [insights]);
+  const { selected, selectedList, toggle, allSelected, toggleAll, clear } = useSelection<number>(visibleIds);
+
+  const bulkDelete = async () => {
+    if (selectedList.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selectedList) {
+      try { await deleteMutation.mutateAsync({ id }); ok++; } catch { /* keep going */ }
+    }
+    await insightsQuery.refetch();
+    clear();
+    setBulkBusy(false);
+    toast.success(`${ok} insight(s) deleted`);
+  };
+
+  const bulkSetSaved = async (saved: boolean) => {
+    if (selectedList.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of selectedList) {
+      try { await bulkSaveMutation.mutateAsync({ id, saved }); ok++; } catch { /* keep going */ }
+    }
+    await insightsQuery.refetch();
+    clear();
+    setBulkBusy(false);
+    toast.success(`${ok} insight(s) ${saved ? "saved" : "unsaved"}`);
+  };
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-green-500";
@@ -189,6 +225,28 @@ export default function ContentInsights() {
         </CardContent></Card>
       </div>
 
+      {/* Select-all + bulk action bar */}
+      {!insightsQuery.isLoading && insights.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
+          <span className="text-xs text-muted-foreground">Select all ({insights.length})</span>
+        </div>
+      )}
+      <SelectionBar
+        count={selectedList.length}
+        onDelete={bulkDelete}
+        deleteNoun="insight"
+        onClear={clear}
+        busy={bulkBusy}
+      >
+        <Button variant="outline" size="sm" className="h-9 gap-1.5" disabled={bulkBusy} onClick={() => bulkSetSaved(true)}>
+          <Bookmark className="w-3.5 h-3.5" /> Save
+        </Button>
+        <Button variant="outline" size="sm" className="h-9 gap-1.5" disabled={bulkBusy} onClick={() => bulkSetSaved(false)}>
+          <BookmarkPlus className="w-3.5 h-3.5" /> Unsave
+        </Button>
+      </SelectionBar>
+
       {/* Content */}
       {insightsQuery.isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
@@ -207,10 +265,11 @@ export default function ContentInsights() {
             const SentIcon = sentConf.icon;
             const viralScore = item.metadata?.viral_score || 0;
             return (
-              <Card key={item.id} className="group hover:border-primary/30 transition-colors">
+              <Card key={item.id} className={`group hover:border-primary/30 transition-colors ${selected.has(item.id) ? "border-primary/40 bg-primary/[0.03]" : ""}`}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
+                      <Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggle(item.id)} aria-label={`Select ${item.title}`} />
                       <Badge variant="secondary" className="text-xs">{item.category || "Uncategorized"}</Badge>
                       <div className={`flex items-center gap-1 text-xs ${sentConf.color}`}>
                         <SentIcon className="w-3 h-3" />{sentiment}
@@ -275,8 +334,9 @@ export default function ContentInsights() {
             const sentConf = SENTIMENT_ICONS[sentiment] || SENTIMENT_ICONS.neutral;
             const SentIcon = sentConf.icon;
             return (
-              <Card key={item.id} className="hover:border-primary/30 transition-colors">
+              <Card key={item.id} className={`hover:border-primary/30 transition-colors ${selected.has(item.id) ? "border-primary/40 bg-primary/[0.03]" : ""}`}>
                 <CardContent className="p-4 flex items-center gap-4">
+                  <Checkbox checked={selected.has(item.id)} onCheckedChange={() => toggle(item.id)} aria-label={`Select ${item.title}`} />
                   <div className={`text-lg font-bold min-w-[2.5rem] text-center ${getScoreColor(item.relevanceScore || 0)}`}>
                     {item.relevanceScore || 0}
                   </div>
