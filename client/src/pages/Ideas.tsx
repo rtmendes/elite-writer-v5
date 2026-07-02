@@ -59,12 +59,23 @@ export default function Ideas() {
     return next;
   });
   const bulkDelete = () => {
+    if (!window.confirm(`Delete ${selectedIds.size} idea${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`)) return;
     selectedIds.forEach(id => {
       const dbId = idMap.get(id);
       if (dbId) deleteIdeaDb.mutate({ id: dbId });
       deleteIdea(id);
     });
     toast.success(`${selectedIds.size} ideas deleted`);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  };
+  const bulkSetStatus = (status: (typeof STATUSES)[number]) => {
+    selectedIds.forEach(id => {
+      updateIdea(id, { status: status as any });
+      const dbId = idMap.get(id);
+      if (dbId) updateIdeaDb.mutate({ id: dbId, status });
+    });
+    toast.success(`${selectedIds.size} idea${selectedIds.size === 1 ? '' : 's'} → ${STATUS_CONFIG[status].label}`);
     setSelectedIds(new Set());
     setSelectMode(false);
   };
@@ -265,10 +276,26 @@ export default function Ideas() {
           onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}>
           {selectMode ? 'Done' : 'Select'}
         </Button>
-        {selectMode && selectedIds.size > 0 && (
-          <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={bulkDelete}>
-            Delete {selectedIds.size}
+        {selectMode && (
+          <Button variant="outline" size="sm" className="h-7 text-xs"
+            onClick={() => setSelectedIds(prev => prev.size === filtered.length && filtered.length > 0 ? new Set() : new Set(filtered.map(i => i.id)))}>
+            {selectedIds.size === filtered.length && filtered.length > 0 ? 'Deselect all' : `Select all (${filtered.length})`}
           </Button>
+        )}
+        {selectMode && selectedIds.size > 0 && (
+          <>
+            <select defaultValue="" onChange={e => { if (e.target.value) bulkSetStatus(e.target.value as (typeof STATUSES)[number]); }}
+              className="h-7 text-xs rounded-md border border-input bg-background px-2"
+              title="Set status for selected">
+              <option value="" disabled>Set status…</option>
+              {STATUSES.map(s => (
+                <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+              ))}
+            </select>
+            <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={bulkDelete}>
+              Delete {selectedIds.size}
+            </Button>
+          </>
         )}
         <div className="flex gap-1.5 text-xs text-muted-foreground">
           {STATUSES.map(s => (
@@ -409,6 +436,11 @@ export default function Ideas() {
                 <Card key={idea.id} className="border-border hover:border-primary/20 transition-colors group">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
+                      {selectMode && (
+                        <input type="checkbox" className="mt-1 shrink-0 accent-primary"
+                          checked={selectedIds.has(idea.id)}
+                          onChange={() => toggleSelected(idea.id)} />
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                           <Badge variant="outline" className={`text-[10px] ${config.bgColor} ${config.color}`}>

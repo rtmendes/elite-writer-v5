@@ -178,12 +178,23 @@ export default function Pitches() {
     return next;
   });
   const bulkDelete = () => {
+    if (!window.confirm(`Delete ${selectedIds.size} pitch${selectedIds.size === 1 ? '' : 'es'}? This cannot be undone.`)) return;
     selectedIds.forEach(id => {
       const dbId = pitchIdMap.get(id);
       if (dbId) deletePitchDb.mutate({ id: dbId });
       deletePitch(id);
     });
     toast.success(`${selectedIds.size} pitches deleted`);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  };
+  const bulkSetStatus = (status: string) => {
+    selectedIds.forEach(id => {
+      updatePitch(id, { status: status as any, ...(status === 'sent' ? { sent_at: new Date().toISOString() } : {}) });
+      const dbId = pitchIdMap.get(id);
+      if (dbId) updatePitchDb.mutate({ id: dbId, status: status as any });
+    });
+    toast.success(`${selectedIds.size} pitch${selectedIds.size === 1 ? '' : 'es'} → ${STATUS_CONFIG[status]?.label ?? status}`);
     setSelectedIds(new Set());
     setSelectMode(false);
   };
@@ -339,10 +350,26 @@ export default function Pitches() {
           onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}>
           {selectMode ? 'Done' : 'Select'}
         </Button>
-        {selectMode && selectedIds.size > 0 && (
-          <Button variant="destructive" size="sm" className="text-xs" onClick={bulkDelete}>
-            Delete {selectedIds.size}
+        {selectMode && (
+          <Button variant="outline" size="sm" className="text-xs"
+            onClick={() => setSelectedIds(prev => prev.size === filtered.length && filtered.length > 0 ? new Set() : new Set(filtered.map(p => p.id)))}>
+            {selectedIds.size === filtered.length && filtered.length > 0 ? 'Deselect all' : `Select all (${filtered.length})`}
           </Button>
+        )}
+        {selectMode && selectedIds.size > 0 && (
+          <>
+            <select defaultValue="" onChange={e => { if (e.target.value) bulkSetStatus(e.target.value); }}
+              className="h-8 text-xs rounded-md border border-input bg-background px-2"
+              title="Set status for selected">
+              <option value="" disabled>Set status…</option>
+              {['draft', 'sent', 'accepted', 'rejected', 'no_response'].map(s => (
+                <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>
+              ))}
+            </select>
+            <Button variant="destructive" size="sm" className="text-xs" onClick={bulkDelete}>
+              Delete {selectedIds.size}
+            </Button>
+          </>
         )}
       </div>
 

@@ -13,6 +13,9 @@ import {
   ArrowUpRight, Brain, Send, Loader2,
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useSelection } from '@/hooks/useSelection';
+import { SelectionBar } from '@/components/SelectionBar';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TYPES
@@ -68,6 +71,12 @@ const STATUS_CONFIG: Record<PulseStatus, { label: string; icon: any; color: stri
   published: { label: "Published", icon: CheckCircle2, color: "text-green-400" },
   skipped: { label: "Skipped", icon: XCircle, color: "text-zinc-500" },
 };
+
+// Bulk "set status" options — mirrors the pulse.updateStatus zod enum.
+const PULSE_STATUS_OPTIONS = (Object.keys(STATUS_CONFIG) as PulseStatus[]).map(s => ({
+  value: s,
+  label: STATUS_CONFIG[s].label,
+}));
 
 const BEAT_COLORS: Record<string, string> = {
   "BREAKING": "#ef4444",
@@ -134,6 +143,28 @@ export default function PulsePipeline() {
   }, [stories, selectedBeat, selectedUrgency, selectedStatus]);
 
   const beats = useMemo(() => [...new Set(stories.map(s => s.beat))], [stories]);
+
+  // ── Multi-select + bulk actions (shared components) ──
+  // Note: the pulse router has no delete mutation — "Skipped" status is the
+  // archive path, so the bulk bar offers set-status only.
+  const filteredIds = useMemo(() => filtered.map(s => s.id), [filtered]);
+  const selection = useSelection<number>(filteredIds);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  // Separate mutation instance: no per-call onSuccess toast/refetch spam.
+  const bulkStatusMut = trpc.pulse.updateStatus.useMutation();
+  const bulkSetStatus = useCallback(async (status: string) => {
+    const ids = [...selection.selected];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    let ok = 0;
+    for (const id of ids) {
+      try { await bulkStatusMut.mutateAsync({ id, status: status as PulseStatus }); ok++; } catch { /* keep going */ }
+    }
+    await storiesQuery.refetch();
+    setBulkBusy(false);
+    selection.clear();
+    toast.success(`${ok}/${ids.length} stories → ${STATUS_CONFIG[status as PulseStatus]?.label ?? status}`);
+  }, [selection, bulkStatusMut, storiesQuery]);
 
   // Top picks (ranked stories)
   const topPicks = useMemo(
@@ -243,6 +274,26 @@ export default function PulsePipeline() {
             </select>
           </div>
 
+          {/* Select-all + bulk action bar */}
+          {filtered.length > 0 && (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <Checkbox checked={selection.allSelected} onCheckedChange={selection.toggleAll} aria-label="Select all stories" />
+                Select all ({filtered.length})
+              </label>
+              {selection.selected.size > 0 && (
+                <span className="text-primary font-medium">{selection.selected.size} selected</span>
+              )}
+            </div>
+          )}
+          <SelectionBar
+            count={selection.selected.size}
+            statusOptions={PULSE_STATUS_OPTIONS}
+            onSetStatus={bulkSetStatus}
+            onClear={selection.clear}
+            busy={bulkBusy}
+          />
+
           {/* Story Cards */}
           {storiesQuery.isLoading ? (
             <Card><CardContent className="p-8 text-center">
@@ -262,6 +313,8 @@ export default function PulsePipeline() {
                 <StoryCard
                   key={story.id}
                   story={story}
+                  selected={selection.selected.has(story.id)}
+                  onToggleSelect={() => selection.toggle(story.id)}
                   expanded={expandedStory === story.id}
                   onToggle={() => setExpandedStory(expandedStory === story.id ? null : story.id)}
                   onUpdateStatus={(status) => updateStatusMut.mutate({ id: story.id, status })}
@@ -516,6 +569,7 @@ function StatusBadge({ status }: { status: PulseStatus }) {
 
 function StoryCard({
   story, expanded, onToggle, onUpdateStatus, onPromote, onEnrich, isEnriching, isPromoting,
+  selected, onToggleSelect,
 }: {
   story: PulseStory;
   expanded: boolean;
@@ -525,15 +579,22 @@ function StoryCard({
   onEnrich: () => void;
   isEnriching: boolean;
   isPromoting: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   return (
     <Card className={`border-border transition-all ${
       story.urgency === "breaking" ? "border-l-2 border-l-red-500" :
       story.briefingRank ? "border-l-2 border-l-amber-500" : ""
-    }`}>
+    } ${selected ? "ring-1 ring-primary/40" : ""}`}>
       <CardContent className="p-4">
         {/* Header Row */}
         <div className="flex items-start gap-3 cursor-pointer" onClick={onToggle}>
+          {onToggleSelect && (
+            <span onClick={e => e.stopPropagation()} className="pt-0.5">
+              <Checkbox checked={!!selected} onCheckedChange={() => onToggleSelect()} aria-label={`Select ${story.headline}`} />
+            </span>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <UrgencyBadge urgency={story.urgency} />

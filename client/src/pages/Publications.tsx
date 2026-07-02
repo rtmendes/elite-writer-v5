@@ -325,6 +325,16 @@ export default function Publications() {
           </select>
         )}
         <span className="text-xs text-muted-foreground">{filtered.length} results</span>
+        {view === 'gallery' && filtered.length > 0 && (
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+            <Checkbox
+              checked={allFilteredSelected ? true : someFilteredSelected ? 'indeterminate' : false}
+              onCheckedChange={toggleAllFiltered}
+              aria-label="Select all filtered"
+            />
+            Select all
+          </label>
+        )}
         <div className="flex items-center rounded-md border border-input ml-auto">
           <Button variant={view === 'gallery' ? 'secondary' : 'ghost'} size="sm" className="gap-1.5 text-xs rounded-r-none h-9 min-w-[44px]"
             onClick={() => setView('gallery')} aria-pressed={view === 'gallery'}>
