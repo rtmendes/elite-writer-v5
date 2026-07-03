@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
 import {
   Mic, Plus, Search, Loader2, ChevronDown, ChevronUp,
   MessageSquare, CheckCircle2, Circle, Trash2, Target,
@@ -38,6 +39,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 export default function Interviews() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [sortBy, setSortBy] = useState<"updated" | "title" | "completeness">("updated");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -63,6 +65,9 @@ export default function Interviews() {
   const deleteMutation = trpc.interviews.delete.useMutation({
     onSuccess: () => { toast.success("Deleted"); interviewsQuery.refetch(); },
   });
+  const updateMutation = trpc.interviews.update.useMutation({
+    onSuccess: () => { interviewsQuery.refetch(); },
+  });
 
   const closeDialog = () => {
     setShowCreateDialog(false);
@@ -87,11 +92,32 @@ export default function Interviews() {
   };
 
   const interviews = useMemo(() => {
-    const list = interviewsQuery.data || [];
-    if (!searchQuery) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter((i: any) => i.title?.toLowerCase().includes(q) || i.topic?.toLowerCase().includes(q));
-  }, [interviewsQuery.data, searchQuery]);
+    let list = interviewsQuery.data || [];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((i: any) => i.title?.toLowerCase().includes(q) || i.topic?.toLowerCase().includes(q));
+    }
+    return [...list].sort((a: any, b: any) => {
+      if (sortBy === "title") return (a.title || "").localeCompare(b.title || "");
+      if (sortBy === "completeness") return (b.completeness || 0) - (a.completeness || 0);
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+    });
+  }, [interviewsQuery.data, searchQuery, sortBy]);
+
+  const { selected, toggle, clear } = useSelection(
+    useMemo(() => interviews.map((i: any) => ({ id: i.id as number })), [interviews])
+  );
+
+  const bulkDelete = async () => {
+    if (!selected.size || !confirm(`Delete ${selected.size} interview${selected.size === 1 ? "" : "s"}?`)) return;
+    for (const id of selected) await deleteMutation.mutateAsync({ id: id as number });
+    clear();
+  };
+  const bulkSetStatus = async (status: string) => {
+    for (const id of selected) await updateMutation.mutateAsync({ id: id as number, status });
+    clear();
+    toast.success(`Updated ${selected.size} interview(s)`);
+  };
 
   return (
     <div className="space-y-6">
@@ -170,11 +196,25 @@ export default function Interviews() {
             ))}
           </SelectContent>
         </Select>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+          className="h-9 text-xs rounded-md border border-input bg-background px-2" title="Sort">
+          <option value="updated">Recently updated</option>
+          <option value="title">Title A→Z</option>
+          <option value="completeness">Completeness</option>
+        </select>
         <div className="flex gap-1 border rounded-md p-1">
           <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("grid")}><LayoutGrid className="w-4 h-4" /></Button>
           <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("list")}><List className="w-4 h-4" /></Button>
         </div>
       </div>
+
+      <ListSelectionBar
+        selected={selected}
+        clear={clear}
+        onDelete={bulkDelete}
+        statusOptions={Object.entries(STATUS_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))}
+        onSetStatus={bulkSetStatus}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -217,13 +257,16 @@ export default function Interviews() {
             const questions = (interview.questions as any[]) || [];
 
             return (
-              <Card key={interview.id} className="overflow-hidden">
+              <Card key={interview.id} className={`overflow-hidden ${selected.has(interview.id) ? "ring-1 ring-primary/40" : ""}`}>
                 <CardHeader
                   className="cursor-pointer hover:bg-muted/30 transition-colors"
                   onClick={() => setExpandedId(isExpanded ? null : interview.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
+                      <span onClick={e => e.stopPropagation()}>
+                        <SelectCheck checked={selected.has(interview.id)} onToggle={() => toggle(interview.id)} />
+                      </span>
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${packInfo?.bg || "bg-muted"}`}>
                         <PackIcon className={`w-5 h-5 ${packInfo?.color || "text-muted-foreground"}`} />
                       </div>
