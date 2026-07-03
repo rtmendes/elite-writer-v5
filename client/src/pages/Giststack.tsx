@@ -16,6 +16,7 @@ import { trpc } from '@/lib/trpc';
 import { CURATED_FEEDS, type CuratedFeed, type FeedCategory, FEED_CATEGORY_COLORS, getActiveFeedUrls, getFeedsForPublication } from '@/lib/curated-feeds';
 import ArticleDetailModal, { type FeedItemForModal } from '@/components/giststack/ArticleDetailModal';
 import { quickMatchPublications } from '@/lib/publication-matcher';
+import { ListSelectionBar, SelectCheck, useSelection } from '@/components/list-selection';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TYPES
@@ -58,6 +59,8 @@ export default function Giststack() {
   const [showFeedManager, setShowFeedManager] = useState(false);
   const [sentimentFilter, setSentimentFilter] = useState<string>('all');
   const [hotOnly, setHotOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'title'>('relevance');
+  const [activeTab, setActiveTab] = useState('feed');
   const [modalItem, setModalItem] = useState<FeedItemForModal | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -214,7 +217,7 @@ export default function Giststack() {
   }, [allItems]);
 
   const filtered = useMemo(() => {
-    return allItems.filter(item => {
+    const list = allItems.filter(item => {
       const matchesSearch = !searchQuery || 
         item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.summary.toLowerCase().includes(searchQuery.toLowerCase());
@@ -223,10 +226,40 @@ export default function Giststack() {
       const matchesHot = !hotOnly || item.hot;
       return matchesSearch && matchesCategory && matchesSentiment && matchesHot;
     });
-  }, [allItems, searchQuery, selectedCategory, sentimentFilter, hotOnly]);
+    return [...list].sort((a, b) => {
+      if (sortBy === 'title') return a.title.localeCompare(b.title);
+      if (sortBy === 'date') return new Date(b.publishedAt || b.created_at || 0).getTime() - new Date(a.publishedAt || a.created_at || 0).getTime();
+      return b.relevance_score - a.relevance_score;
+    });
+  }, [allItems, searchQuery, selectedCategory, sentimentFilter, hotOnly, sortBy]);
 
   const savedItems = allItems.filter(i => i.saved);
   const hotItems = allItems.filter(i => i.hot);
+
+  const tabItems = activeTab === 'hot' ? hotItems : activeTab === 'saved' ? savedItems : filtered;
+  const { selected, toggle, allSelected, toggleAll, clear } = useSelection(
+    useMemo(() => tabItems.map(i => ({ id: i.id })), [tabItems])
+  );
+
+  const bulkSave = () => {
+    tabItems.filter(i => selected.has(i.id)).forEach(item => {
+      if (!item.saved) handleSave(item);
+    });
+    clear();
+    toast.success('Saved selected items');
+  };
+  const bulkCreateIdeas = () => {
+    tabItems.filter(i => selected.has(i.id)).forEach(item => handleCreateIdea(item));
+    clear();
+  };
+  const bulkUnsave = () => {
+    tabItems.filter(i => selected.has(i.id) && i.saved).forEach(item => {
+      if (!item.id.startsWith('rss-') && !item.id.startsWith('api-')) toggleGiststackSave(item.id);
+      else toggleGiststackSave(state.giststack.find(g => g.title === item.title)?.id || item.id);
+    });
+    clear();
+    toast.success('Removed from saved collection');
+  };
 
   // ── Handlers ──
   const handleSave = (item: FeedItem) => {
@@ -477,7 +510,7 @@ export default function Giststack() {
       )}
 
       {/* Main Content */}
-      <Tabs defaultValue="feed" className="space-y-4">
+      <Tabs defaultValue="feed" className="space-y-4" onValueChange={setActiveTab}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <TabsList>
             <TabsTrigger value="feed">
@@ -509,8 +542,30 @@ export default function Giststack() {
                 <option key={cat} value={cat}>{cat === 'all' ? 'All Categories' : cat}</option>
               ))}
             </select>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as typeof sortBy)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              title="Sort feed"
+            >
+              <option value="relevance">By relevance</option>
+              <option value="date">By date</option>
+              <option value="title">Title A→Z</option>
+            </select>
           </div>
         </div>
+
+        <ListSelectionBar selected={selected} clear={clear}
+          statusOptions={[
+            { value: 'save', label: 'Save to collection' },
+            { value: 'unsave', label: 'Remove from saved' },
+          ]}
+          onSetStatus={(v) => v === 'save' ? bulkSave() : bulkUnsave()}
+        >
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={bulkCreateIdeas} disabled={selected.size === 0}>
+            <Lightbulb className="w-3.5 h-3.5 mr-1" /> Create ideas
+          </Button>
+        </ListSelectionBar>
 
         {/* All Feed Items */}
         <TabsContent value="feed" className="space-y-3">
@@ -529,9 +584,17 @@ export default function Giststack() {
               </CardContent>
             </Card>
           ) : (
-            filtered.map((item) => (
-              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
-            ))
+            <>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+              <SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all" />
+              <span>Select all</span>
+            </div>
+            {filtered.map((item) => (
+              <FeedItemCard key={item.id} item={item} selected={selected.has(item.id)}
+                onToggleSelect={() => toggle(item.id)}
+                onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
+            ))}
+            </>
           )}
         </TabsContent>
 
@@ -545,9 +608,17 @@ export default function Giststack() {
               </CardContent>
             </Card>
           ) : (
-            hotItems.map((item) => (
-              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
-            ))
+            <>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+              <SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all" />
+              <span>Select all</span>
+            </div>
+            {hotItems.map((item) => (
+              <FeedItemCard key={item.id} item={item} selected={selected.has(item.id)}
+                onToggleSelect={() => toggle(item.id)}
+                onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
+            ))}
+            </>
           )}
         </TabsContent>
 
@@ -561,9 +632,17 @@ export default function Giststack() {
               </CardContent>
             </Card>
           ) : (
-            savedItems.map((item) => (
-              <FeedItemCard key={item.id} item={item} onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
-            ))
+            <>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+              <SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all" />
+              <span>Select all</span>
+            </div>
+            {savedItems.map((item) => (
+              <FeedItemCard key={item.id} item={item} selected={selected.has(item.id)}
+                onToggleSelect={() => toggle(item.id)}
+                onSave={handleSave} onCreateIdea={handleCreateIdea} onOpenDetail={(item) => { setModalItem(item); setModalOpen(true); }} />
+            ))}
+            </>
           )}
         </TabsContent>
       </Tabs>
@@ -582,21 +661,28 @@ export default function Giststack() {
 // FEED ITEM CARD COMPONENT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function FeedItemCard({ item, onSave, onCreateIdea, onOpenDetail }: {
+function FeedItemCard({ item, onSave, onCreateIdea, onOpenDetail, selected, onToggleSelect }: {
   item: FeedItem;
   onSave: (item: FeedItem) => void;
   onCreateIdea: (item: FeedItem) => void;
   onOpenDetail?: (item: FeedItem) => void;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const pubMatches = useMemo(() => 
     quickMatchPublications(item.title, item.summary, item.category, item.source),
     [item.title, item.summary, item.category, item.source]
   );
   return (
-    <Card className={`border-border hover:border-primary/30 transition-colors cursor-pointer ${item.hot ? 'border-l-2 border-l-amber-500' : ''}`}
+    <Card className={`border-border hover:border-primary/30 transition-colors cursor-pointer ${item.hot ? 'border-l-2 border-l-amber-500' : ''} ${selected ? 'ring-1 ring-primary/40 bg-primary/5' : ''}`}
       onClick={() => onOpenDetail?.(item)}>
       <CardContent className="p-3">
         <div className="flex gap-3">
+          {onToggleSelect && (
+            <span onClick={e => e.stopPropagation()} className="pt-1">
+              <SelectCheck checked={!!selected} onToggle={onToggleSelect} className="w-5 h-5 accent-primary" />
+            </span>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge variant="outline" className="text-[10px] shrink-0"

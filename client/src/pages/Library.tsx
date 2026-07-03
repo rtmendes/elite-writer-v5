@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
 import {
   Library, Plus, Search, Loader2, Star, StarOff, Trash2,
   Copy, Image, FileText, Quote, Lightbulb, LayoutTemplate,
@@ -104,6 +105,31 @@ export default function ContentLibrary() {
   const images = imagesQuery.data || [];
   const presets = presetsQuery.data || [];
 
+  const contentSel = useSelection(useMemo(() => contentItems.map(i => ({ id: i.id })), [contentItems]));
+  const imageSel = useSelection(useMemo(() => images.map(i => ({ id: i.id })), [images]));
+  const presetSel = useSelection(useMemo(() => presets.map(p => ({ id: p.id })), [presets]));
+
+  const bulkDeleteContent = async () => {
+    if (!contentSel.selected.size || !confirm(`Delete ${contentSel.selected.size} item(s)?`)) return;
+    for (const id of contentSel.selected) await deleteContentMut.mutateAsync({ id: id as number });
+    contentSel.clear();
+  };
+  const bulkDeleteImages = async () => {
+    if (!imageSel.selected.size || !confirm(`Delete ${imageSel.selected.size} image(s)?`)) return;
+    for (const id of imageSel.selected) await deleteImageMut.mutateAsync({ id: id as number });
+    imageSel.clear();
+  };
+  const bulkDeletePresets = async () => {
+    if (!presetSel.selected.size || !confirm(`Delete ${presetSel.selected.size} preset(s)?`)) return;
+    for (const id of presetSel.selected) await deletePresetMut.mutateAsync({ id: id as number });
+    presetSel.clear();
+  };
+  const bulkStarContent = async (starred: boolean) => {
+    for (const id of contentSel.selected) await toggleStarMut.mutateAsync({ id: id as number });
+    toast.success(starred ? "Star toggled" : "Star toggled");
+    contentSel.clear();
+  };
+
   return (
     <div className="h-full overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -154,6 +180,10 @@ export default function ContentLibrary() {
               <Button onClick={() => setShowSaveDialog(true)}><Plus className="w-4 h-4 mr-1" />Save New</Button>
             </div>
 
+            <ListSelectionBar selected={contentSel.selected} clear={contentSel.clear} onDelete={bulkDeleteContent}
+              statusOptions={[{ value: "star", label: "Toggle star" }]}
+              onSetStatus={() => bulkStarContent(true)} />
+
             {contentQuery.isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
             ) : contentItems.length === 0 ? (
@@ -163,10 +193,13 @@ export default function ContentLibrary() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {contentItems.map(item => (
-                  <Card key={item.id} className="hover:border-primary/30 transition-colors">
+                  <Card key={item.id} className={`hover:border-primary/30 transition-colors ${contentSel.selected.has(item.id) ? "ring-1 ring-primary/40 bg-primary/5" : ""}`}>
                     <CardContent className="pt-4 space-y-2">
                       <div className="flex items-center justify-between">
-                        <Badge variant="secondary" className="text-xs capitalize">{item.type.replace("_", " ")}</Badge>
+                        <div className="flex items-center gap-2">
+                          <SelectCheck checked={contentSel.selected.has(item.id)} onToggle={() => contentSel.toggle(item.id)} />
+                          <Badge variant="secondary" className="text-xs capitalize">{item.type.replace("_", " ")}</Badge>
+                        </div>
                         <div className="flex gap-1">
                           <Button size="sm" variant="ghost" onClick={() => toggleStarMut.mutate({ id: item.id })}>
                             {item.starred ? <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> : <StarOff className="w-3 h-3" />}
@@ -208,6 +241,8 @@ export default function ContentLibrary() {
               <Button onClick={() => setShowImageSave(true)}><Plus className="w-4 h-4 mr-1" />Add Image</Button>
             </div>
 
+            <ListSelectionBar selected={imageSel.selected} clear={imageSel.clear} onDelete={bulkDeleteImages} />
+
             {imagesQuery.isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
             ) : images.length === 0 ? (
@@ -217,8 +252,11 @@ export default function ContentLibrary() {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {images.map(img => (
-                  <Card key={img.id} className="overflow-hidden hover:border-primary/30 transition-colors group">
+                  <Card key={img.id} className={`overflow-hidden hover:border-primary/30 transition-colors group ${imageSel.selected.has(img.id) ? "ring-1 ring-primary/40" : ""}`}>
                     <div className="aspect-square bg-muted relative">
+                      <div className="absolute top-2 left-2 z-10">
+                        <SelectCheck checked={imageSel.selected.has(img.id)} onToggle={() => imageSel.toggle(img.id)} className="w-5 h-5" />
+                      </div>
                       <img src={img.imageUrl} alt={img.name} className="w-full h-full object-cover" loading="lazy" />
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                         <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(img.imageUrl); toast.success("URL copied!"); }}>
@@ -249,6 +287,8 @@ export default function ContentLibrary() {
               <Button onClick={() => setShowPresetSave(true)}><Plus className="w-4 h-4 mr-1" />New Preset</Button>
             </div>
 
+            <ListSelectionBar selected={presetSel.selected} clear={presetSel.clear} onDelete={bulkDeletePresets} />
+
             {presetsQuery.isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
             ) : presets.length === 0 ? (
@@ -258,10 +298,11 @@ export default function ContentLibrary() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {presets.map(preset => (
-                  <Card key={preset.id}>
+                  <Card key={preset.id} className={presetSel.selected.has(preset.id) ? "ring-1 ring-primary/40 bg-primary/5" : ""}>
                     <CardContent className="pt-4 space-y-2">
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm font-medium flex items-center gap-2">
+                          <SelectCheck checked={presetSel.selected.has(preset.id)} onToggle={() => presetSel.toggle(preset.id)} />
                           <Wand2 className="w-4 h-4 text-primary" />{preset.name}
                         </h3>
                         <Button size="sm" variant="ghost" className="text-destructive"

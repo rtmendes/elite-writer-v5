@@ -12,10 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
 import {
   Lightbulb, Search, Loader2, LayoutGrid, List, ExternalLink,
   BookmarkPlus, Bookmark, TrendingUp, BarChart3, Smile, Frown,
-  Meh, Zap, Filter, Star, SortAsc, SortDesc, Sparkles,
+  Meh, Zap, SortAsc, SortDesc,
 } from "lucide-react";
 
 const SENTIMENT_ICONS: Record<string, { icon: any; color: string; bg: string }> = {
@@ -36,7 +37,11 @@ export default function ContentInsights() {
   // tRPC queries — use data.intelligence (intelligenceItems table)
   const insightsQuery = trpc.data.intelligence.list.useQuery();
   const saveMutation = trpc.data.intelligence.save.useMutation({
-    onSuccess: () => { toast.success("Saved!"); insightsQuery.refetch(); },
+    onSuccess: () => { insightsQuery.refetch(); },
+  });
+  const deleteMutation = trpc.data.intelligence.delete.useMutation({
+    onSuccess: () => { toast.success("Deleted"); insightsQuery.refetch(); },
+    onError: (e) => toast.error(e.message),
   });
 
   const insights = useMemo(() => {
@@ -88,6 +93,21 @@ export default function ContentInsights() {
 
     return items;
   }, [insightsQuery.data, searchQuery, filterSentiment, filterCategory, sortBy, sortDir, savedOnly]);
+
+  const { selected, toggle, allSelected, toggleAll, clear } = useSelection(
+    useMemo(() => insights.map((i: any) => ({ id: i.id as number })), [insights])
+  );
+
+  const bulkDelete = async () => {
+    if (!selected.size || !confirm(`Delete ${selected.size} insight${selected.size === 1 ? "" : "s"}?`)) return;
+    for (const id of selected) await deleteMutation.mutateAsync({ id: id as number });
+    clear();
+  };
+  const bulkSetSaved = async (saved: boolean) => {
+    for (const id of selected) await saveMutation.mutateAsync({ id: id as number, saved });
+    toast.success(saved ? `Saved ${selected.size} item(s)` : `Unsaved ${selected.size} item(s)`);
+    clear();
+  };
 
   const categories = useMemo(() => {
     const cats = new Set<string>();
@@ -169,6 +189,17 @@ export default function ContentInsights() {
         </div>
       </div>
 
+      <ListSelectionBar
+        selected={selected}
+        clear={clear}
+        onDelete={bulkDelete}
+        statusOptions={[
+          { value: "saved", label: "Mark saved" },
+          { value: "unsaved", label: "Mark unsaved" },
+        ]}
+        onSetStatus={(v) => bulkSetSaved(v === "saved")}
+      />
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card><CardContent className="p-4 text-center">
@@ -200,6 +231,11 @@ export default function ContentInsights() {
           </p>
         </CardContent></Card>
       ) : viewMode === "grid" ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all" />
+            <span>Select all on page</span>
+          </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {insights.map((item: any) => {
             const sentiment = item.metadata?.sentiment || "neutral";
@@ -207,10 +243,11 @@ export default function ContentInsights() {
             const SentIcon = sentConf.icon;
             const viralScore = item.metadata?.viral_score || 0;
             return (
-              <Card key={item.id} className="group hover:border-primary/30 transition-colors">
+              <Card key={item.id} className={`group hover:border-primary/30 transition-colors ${selected.has(item.id) ? "ring-1 ring-primary/40 bg-primary/5" : ""}`}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
+                      <SelectCheck checked={selected.has(item.id)} onToggle={() => toggle(item.id)} />
                       <Badge variant="secondary" className="text-xs">{item.category || "Uncategorized"}</Badge>
                       <div className={`flex items-center gap-1 text-xs ${sentConf.color}`}>
                         <SentIcon className="w-3 h-3" />{sentiment}
@@ -268,15 +305,21 @@ export default function ContentInsights() {
             );
           })}
         </div>
+        </div>
       ) : (
         <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+            <SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all" />
+            <span>Select all</span>
+          </div>
           {insights.map((item: any) => {
             const sentiment = item.metadata?.sentiment || "neutral";
             const sentConf = SENTIMENT_ICONS[sentiment] || SENTIMENT_ICONS.neutral;
             const SentIcon = sentConf.icon;
             return (
-              <Card key={item.id} className="hover:border-primary/30 transition-colors">
+              <Card key={item.id} className={`hover:border-primary/30 transition-colors ${selected.has(item.id) ? "ring-1 ring-primary/40 bg-primary/5" : ""}`}>
                 <CardContent className="p-4 flex items-center gap-4">
+                  <SelectCheck checked={selected.has(item.id)} onToggle={() => toggle(item.id)} className="accent-[var(--primary)] w-5 h-5 shrink-0" />
                   <div className={`text-lg font-bold min-w-[2.5rem] text-center ${getScoreColor(item.relevanceScore || 0)}`}>
                     {item.relevanceScore || 0}
                   </div>

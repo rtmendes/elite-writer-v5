@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
 import {
   PenTool, Plus, Search, Loader2, LayoutGrid, List, Copy,
   Send, Trash2, Edit, Eye, CheckCircle2, Clock, Archive,
@@ -83,6 +84,7 @@ export default function ContentStudio() {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterBrand, setFilterBrand] = useState("all");
+  const [sortBy, setSortBy] = useState<"updated" | "title" | "status">("updated");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
@@ -173,11 +175,33 @@ export default function ContentStudio() {
   };
 
   const items = useMemo(() => {
-    const list = itemsQuery.data || [];
-    if (!searchQuery) return list;
-    const q = searchQuery.toLowerCase();
-    return list.filter((i: any) => i.title?.toLowerCase().includes(q) || i.body?.toLowerCase().includes(q));
-  }, [itemsQuery.data, searchQuery]);
+    let list = itemsQuery.data || [];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((i: any) => i.title?.toLowerCase().includes(q) || i.body?.toLowerCase().includes(q));
+    }
+    return [...list].sort((a: any, b: any) => {
+      if (sortBy === "title") return (a.title || "").localeCompare(b.title || "");
+      if (sortBy === "status") return (a.status || "").localeCompare(b.status || "");
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+    });
+  }, [itemsQuery.data, searchQuery, sortBy]);
+
+  const { selected, toggle, allSelected, toggleAll, clear } = useSelection(
+    useMemo(() => items.map((i: any) => ({ id: i.id as number })), [items])
+  );
+
+  const bulkDelete = async () => {
+    if (!selected.size || !confirm(`Delete ${selected.size} item${selected.size === 1 ? "" : "s"}?`)) return;
+    for (const id of selected) await deleteMutation.mutateAsync({ id: id as number });
+    clear();
+    toast.success("Deleted");
+  };
+  const bulkSetStatus = async (status: string) => {
+    for (const id of selected) await updateMutation.mutateAsync({ id: id as number, status });
+    clear();
+    toast.success(`Updated ${selected.size} item(s)`);
+  };
 
   const charLimit = PLATFORMS.find(p => p.value === formPlatform)?.charLimit || 3000;
   const charCount = formBody.length;
@@ -245,6 +269,12 @@ export default function ContentStudio() {
             {STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+          className="h-9 text-xs rounded-md border border-input bg-background px-2" title="Sort">
+          <option value="updated">Recently updated</option>
+          <option value="title">Title A→Z</option>
+          <option value="status">Status</option>
+        </select>
         <div className="flex gap-1 border rounded-md p-1">
           <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("grid")}>
             <LayoutGrid className="w-4 h-4" />
@@ -254,6 +284,14 @@ export default function ContentStudio() {
           </Button>
         </div>
       </div>
+
+      <ListSelectionBar
+        selected={selected}
+        clear={clear}
+        onDelete={bulkDelete}
+        statusOptions={STATUSES.map(s => ({ value: s.value, label: s.label }))}
+        onSetStatus={bulkSetStatus}
+      />
 
       {/* Stats row */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
@@ -282,6 +320,11 @@ export default function ContentStudio() {
           </Button>
         </CardContent></Card>
       ) : viewMode === "grid" ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all" />
+            <span>Select all</span>
+          </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((item: any) => {
             const platObj = PLATFORMS.find(p => p.value === item.platform);
@@ -291,16 +334,22 @@ export default function ContentStudio() {
             const brandName = item.brandId ? brandMap[item.brandId] : null;
             const brandColor = brandName ? (BRAND_COLORS[brandName] || "bg-muted text-muted-foreground") : "";
             return (
-              <Card key={item.id} className="group hover:border-primary/30 transition-colors overflow-hidden">
+              <Card key={item.id} className={`group hover:border-primary/30 transition-colors overflow-hidden ${selected.has(item.id) ? "ring-1 ring-primary/40" : ""}`}>
                 {/* Image Preview */}
                 {item.imageUrl && (
-                  <div className="h-40 w-full overflow-hidden bg-muted">
+                  <div className="h-40 w-full overflow-hidden bg-muted relative">
+                    <div className="absolute top-2 left-2 z-10" onClick={e => e.stopPropagation()}>
+                      <SelectCheck checked={selected.has(item.id)} onToggle={() => toggle(item.id)} />
+                    </div>
                     <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
                   </div>
                 )}
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {!item.imageUrl && (
+                        <SelectCheck checked={selected.has(item.id)} onToggle={() => toggle(item.id)} />
+                      )}
                       <PlatIcon className="w-4 h-4 text-muted-foreground shrink-0" />
                       <Badge variant="outline" className="text-xs">{item.contentType}</Badge>
                       {brandName && (
@@ -374,9 +423,14 @@ export default function ContentStudio() {
             );
           })}
         </div>
+        </div>
       ) : (
         /* ─── List View ──────────────────────────────────── */
         <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+            <SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all" />
+            <span>Select all</span>
+          </div>
           {items.map((item: any) => {
             const platObj = PLATFORMS.find(p => p.value === item.platform);
             const PlatIcon = platObj?.icon || Globe;
@@ -385,8 +439,9 @@ export default function ContentStudio() {
             const brandName = item.brandId ? brandMap[item.brandId] : null;
             const brandColor = brandName ? (BRAND_COLORS[brandName] || "bg-muted text-muted-foreground") : "";
             return (
-              <Card key={item.id} className="hover:border-primary/30 transition-colors">
+              <Card key={item.id} className={`hover:border-primary/30 transition-colors ${selected.has(item.id) ? "ring-1 ring-primary/40 bg-primary/5" : ""}`}>
                 <CardContent className="p-4 flex items-center gap-4">
+                  <SelectCheck checked={selected.has(item.id)} onToggle={() => toggle(item.id)} className="shrink-0" />
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt="" className="w-12 h-12 rounded object-cover shrink-0" />
                   ) : (

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2, X } from "lucide-react";
+import { SelectCheck, useSelection } from "@/components/list-selection";
 import { createRow, deleteRow, setRowValue } from "../db";
 import type { Database, Field, Row, View } from "../types";
 import { Menu, Tag, formatCurrency, formatDate } from "../ui";
@@ -17,32 +18,7 @@ interface ViewProps {
   compact?: boolean;
 }
 
-// ── Shared row multi-select (UI standard: every view gets it) ───────────────
-function useSelection(rows: Row[]) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const toggle = (id: string) => {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setSelected(next);
-  };
-  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
-  const clear = () => setSelected(new Set());
-  return { selected, toggle, allSelected, toggleAll, clear };
-}
-
-function SelectCheck({ checked, onToggle }: { checked: boolean; onToggle: () => void }) {
-  return (
-    <input
-      type="checkbox"
-      className="checkbox-dot"
-      checked={checked}
-      onClick={(e) => e.stopPropagation()}
-      onChange={onToggle}
-    />
-  );
-}
-
+// ── Database bulk bar (uses shared useSelection + SelectCheck) ─────────────
 function SelectionBar({ database, selected, clear }: { database: Database; selected: Set<string>; clear: () => void }) {
   const [statusAnchor, setStatusAnchor] = useState<HTMLElement | null>(null);
   const statusField = database.fields.find((f) => f.type === "select" && f.name.toLowerCase() === "status");

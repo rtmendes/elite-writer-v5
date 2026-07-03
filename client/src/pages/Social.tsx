@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
 import {
   MessageSquare, Plus, Search, Loader2, Twitter, Linkedin,
   Facebook, Send, Trash2, Copy, Sparkles, Hash, Globe,
@@ -36,6 +37,7 @@ export default function Social() {
   const [tab, setTab] = useState("create");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPlatform, setFilterPlatform] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"newest" | "platform" | "status">("newest");
 
   // Create form state
   const [platform, setPlatform] = useState<string>("twitter");
@@ -81,8 +83,35 @@ export default function Social() {
 
   const posts = postsQuery.data || [];
   const filteredPosts = useMemo(() => {
-    return posts.filter(p => !searchQuery || p.content.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [posts, searchQuery]);
+    let list = posts.filter(p => !searchQuery || p.content.toLowerCase().includes(searchQuery.toLowerCase()));
+    return [...list].sort((a, b) => {
+      if (sortBy === "platform") return (a.platform || "").localeCompare(b.platform || "");
+      if (sortBy === "status") return (a.status || "").localeCompare(b.status || "");
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+  }, [posts, searchQuery, sortBy]);
+
+  const { selected, toggle, allSelected, toggleAll, clear } = useSelection(
+    useMemo(() => filteredPosts.map(p => ({ id: p.id })), [filteredPosts])
+  );
+
+  const bulkDelete = async () => {
+    if (!selected.size || !confirm(`Delete ${selected.size} post${selected.size === 1 ? "" : "s"}?`)) return;
+    for (const id of selected) await deleteMutation.mutateAsync({ id: id as number });
+    clear();
+  };
+  const bulkSetStatus = async (status: string) => {
+    for (const id of selected) await updateMutation.mutateAsync({ id: id as number, status: status as any });
+    clear();
+    toast.success(`Updated ${selected.size} post(s)`);
+  };
+
+  const POST_STATUSES = [
+    { value: "draft", label: "Draft" },
+    { value: "approved", label: "Approved" },
+    { value: "scheduled", label: "Scheduled" },
+    { value: "published", label: "Published" },
+  ];
 
   const handleGenerate = () => {
     if (!sourceContent.trim()) { toast.error("Provide source content"); return; }
@@ -346,7 +375,21 @@ export default function Social() {
                   {PLATFORMS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+                className="h-9 text-xs rounded-md border border-input bg-background px-2" title="Sort">
+                <option value="newest">Newest</option>
+                <option value="platform">Platform</option>
+                <option value="status">Status</option>
+              </select>
             </div>
+
+            <ListSelectionBar
+              selected={selected}
+              clear={clear}
+              onDelete={bulkDelete}
+              statusOptions={POST_STATUSES}
+              onSetStatus={bulkSetStatus}
+            />
 
             {postsQuery.isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
@@ -355,14 +398,20 @@ export default function Social() {
                 No posts yet. Create your first social post!
               </CardContent></Card>
             ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all" />
+                  <span>Select all</span>
+                </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {filteredPosts.map(post => {
                   const pInfo = getPlatformInfo(post.platform);
                   return (
-                    <Card key={post.id} className="hover:border-primary/30 transition-colors">
+                    <Card key={post.id} className={`hover:border-primary/30 transition-colors ${selected.has(post.id) ? "ring-1 ring-primary/40 bg-primary/5" : ""}`}>
                       <CardContent className="pt-4 space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
+                            <SelectCheck checked={selected.has(post.id)} onToggle={() => toggle(post.id)} />
                             <Badge className={pInfo.bg + " " + pInfo.color}>{pInfo.label}</Badge>
                             <Badge variant="outline" className="text-xs capitalize">{post.postType}</Badge>
                           </div>
@@ -418,6 +467,7 @@ export default function Social() {
                     </Card>
                   );
                 })}
+              </div>
               </div>
             )}
           </TabsContent>
