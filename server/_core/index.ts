@@ -38,6 +38,9 @@ async function startServer() {
 
   // Stripe webhook MUST receive raw body for signature verification.
   // Register BEFORE express.json() so it gets the raw Buffer.
+  const { registerZimmwriterIngestRoute } = await import("./zimmwriter-ingest-route");
+  registerZimmwriterIngestRoute(app);
+
   app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), async (req, res) => {
     const { ENV: e } = await import("./env");
     if (!e.stripeSecretKey) { res.status(503).json({ error: "Stripe not configured" }); return; }
@@ -99,7 +102,7 @@ async function startServer() {
   app.use("/api", (req, res, next) => {
     res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-api-key");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-api-key, x-ingest-signature, x-ingest-token");
     res.header("Access-Control-Allow-Credentials", "true");
     if (req.method === "OPTIONS") {
       res.sendStatus(204);

@@ -45,33 +45,51 @@ export type Idea = typeof ideas.$inferSelect;
 export type InsertIdea = typeof ideas.$inferInsert;
 
 // ─── Articles ─────────────────────────────────────────────
-export const articles = pgTable("articles", {
-  id: serial("id").primaryKey(),
-  userId: integer("userId").notNull(),
-  title: varchar("title", { length: 500 }).notNull(),
-  content: text("content"),
-  template: varchar("template", { length: 100 }),
-  brandVoice: varchar("brandVoice", { length: 100 }),
-  wordCount: integer("wordCount"),
-  status: varchar("status", { length: 32, enum: ["draft", "review", "scored", "pitched", "published"] }).default("draft").notNull(),
-  overallScore: integer("overallScore"),
-  scoreData: jsonb("scoreData"),
-  targetPublication: varchar("targetPublication", { length: 200 }),
-  brandId: varchar("brandId", { length: 100 }),
-  productId: varchar("productId", { length: 100 }),
-  // Style analysis data from old app
-  styleProfile: jsonb("styleProfile"),
-  // Source registry: [{title, url, note, addedAt}] — research provenance per article
-  sources: jsonb("sources"),
-  importedFrom: varchar("importedFrom", { length: 500 }),
-  // P3a: Research → Article bridge fields
-  articleNumber: integer("article_number"),
-  seriesId: integer("series_id"),
-  isMoneyPage: integer("is_money_page").default(0).notNull(),
-  primaryOfferId: integer("primary_offer_id"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+export const articles = pgTable(
+  "articles",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("userId").notNull(),
+    title: varchar("title", { length: 500 }).notNull(),
+    content: text("content"),
+    template: varchar("template", { length: 100 }),
+    brandVoice: varchar("brandVoice", { length: 100 }),
+    wordCount: integer("wordCount"),
+    status: varchar("status", { length: 32, enum: ["draft", "review", "scored", "pitched", "published"] }).default("draft").notNull(),
+    overallScore: integer("overallScore"),
+    scoreData: jsonb("scoreData"),
+    targetPublication: varchar("targetPublication", { length: 200 }),
+    brandId: varchar("brandId", { length: 100 }),
+    productId: varchar("productId", { length: 100 }),
+    // Style analysis data from old app
+    styleProfile: jsonb("styleProfile"),
+    // Source registry: [{title, url, note, addedAt}] — research provenance per article
+    sources: jsonb("sources"),
+    importedFrom: varchar("importedFrom", { length: 500 }),
+    // ZimmWriter / external ingest provenance
+    source: text("source"),
+    sourceId: text("source_id"),
+    bodyMarkdown: text("body_markdown"),
+    bodyHtml: text("body_html"),
+    excerpt: text("excerpt"),
+    category: varchar("category", { length: 200 }),
+    tags: jsonb("tags"),
+    featuredImageUrl: text("featured_image_url"),
+    featuredImageB64: text("featured_image_b64"),
+    needsScoring: boolean("needs_scoring").default(false).notNull(),
+    complianceFlag: boolean("compliance_flag").default(false).notNull(),
+    neuronScore: integer("neuron_score"),
+    neuronShareUrl: text("neuron_share_url"),
+    // P3a: Research → Article bridge fields
+    articleNumber: integer("article_number"),
+    seriesId: integer("series_id"),
+    isMoneyPage: integer("is_money_page").default(0).notNull(),
+    primaryOfferId: integer("primary_offer_id"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+  },
+  (t) => [uniqueIndex("articles_source_source_id_uidx").on(t.source, t.sourceId)]
+);
 
 export type Article = typeof articles.$inferSelect;
 export type InsertArticle = typeof articles.$inferInsert;

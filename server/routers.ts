@@ -41,6 +41,7 @@ import { acceleratorRouter } from "./routers/accelerator";
 import { stripeRouter } from "./routers/stripe";
 import { templateSopsRouter } from "./routers/templateSops";
 import { researchLibraryRouter } from "./routers/researchLibrary";
+import { ingestRouter } from "./routers/ingest";
 
 export const appRouter = router({
   system: systemRouter,
@@ -111,6 +112,7 @@ export const appRouter = router({
   stripe: stripeRouter,
   templateSops: templateSopsRouter,
   researchLibrary: researchLibraryRouter,
+  ingest: ingestRouter,
 });
 
 export type AppRouter = typeof appRouter;

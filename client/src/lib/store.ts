@@ -59,6 +59,8 @@ export interface ArticleScores {
   conclusion_cta: number;
   reader_resonance?: number;
   editor_alignment?: number;
+  healthClaimsSafety?: number;
+  healthClaimsFlaggedPhrases?: string[];
   suggestions?: { category: string; title: string; impact: number; action_items: string[] }[];
 }
 

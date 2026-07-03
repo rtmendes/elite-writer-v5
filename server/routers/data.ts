@@ -1,8 +1,14 @@
 import { z } from "zod";
 import { eq, desc, and, isNotNull, max, sql } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { syncArticleToPipeline } from "../lib/supabase-sync";
+import {
+  blocksApproval,
+  HEALTH_CLAIMS_SAFETY_THRESHOLD,
+  scoreHealthClaimsSafety,
+} from "../../shared/health-claims-safety";
 import {
   ideas, articles, pitches, researchNotes, generatedImages,
   brands, products, earnings, intelligenceItems, userSettings,
@@ -138,6 +144,28 @@ const articlesRouter = router({
     const db = await getDb();
     if (!db) throw new Error("Database unavailable");
     const { id, isMoneyPage: isMoneyPageBool, ...updates } = input;
+
+    if (input.status === "pitched" || input.status === "published") {
+      const [row] = await db
+        .select({ content: articles.content, bodyMarkdown: articles.bodyMarkdown, bodyHtml: articles.bodyHtml, scoreData: articles.scoreData })
+        .from(articles)
+        .where(and(eq(articles.id, id), eq(articles.userId, ctx.user.id)))
+        .limit(1);
+      if (row) {
+        const stored = (row.scoreData as { healthClaimsSafety?: number } | null)?.healthClaimsSafety;
+        const healthScore =
+          typeof stored === "number"
+            ? stored
+            : scoreHealthClaimsSafety(row.bodyMarkdown ?? row.content ?? "", row.bodyHtml).score;
+        if (blocksApproval(healthScore, HEALTH_CLAIMS_SAFETY_THRESHOLD)) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Health-Claims Safety score ${healthScore} is below threshold ${HEALTH_CLAIMS_SAFETY_THRESHOLD}. Fix flagged health claims before approval.`,
+          });
+        }
+      }
+    }
+
     const setObj: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(updates)) { if (v !== undefined) setObj[k] = v; }
     if (isMoneyPageBool !== undefined) setObj.isMoneyPage = isMoneyPageBool ? 1 : 0;

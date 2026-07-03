@@ -29,6 +29,8 @@ export function createMemoryDb() {
     }
     if (w.left?.name === "userId") return row.userId === w.right;
     if (w.left?.name === "id") return row.id === w.right;
+    if (w.left?.name === "source") return row.source === w.right;
+    if (w.left?.name === "sourceId") return row.sourceId === w.right;
     return true;
   }
 
