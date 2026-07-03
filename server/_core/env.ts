@@ -53,6 +53,8 @@ export const ENV = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  zimmwriterIngestSecret: process.env.ZIMMWRITER_INGEST_SECRET ?? "",
+  zimmwriterIngestToken: process.env.ZIMMWRITER_INGEST_TOKEN ?? "",
   isProduction: process.env.NODE_ENV === "production",
   // Affine (optional)
   affineWorkspaceUrl: process.env.AFFINE_WORKSPACE_URL ?? "",

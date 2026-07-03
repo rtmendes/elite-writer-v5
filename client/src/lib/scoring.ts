@@ -5,12 +5,19 @@
 
 import type { ArticleScores } from './store';
 import { getScoringWeights, checkContentFilters, getEnhancementPrompt } from './publication-sops';
+import {
+  HEALTH_CLAIMS_SAFETY_THRESHOLD,
+  scoreHealthClaimsSafety,
+  blocksApproval,
+} from '@shared/health-claims-safety';
+
+export { HEALTH_CLAIMS_SAFETY_THRESHOLD, blocksApproval };
 
 const DIMENSIONS = [
   'clarity_structure', 'hook_engagement', 'voice_tone', 'data_evidence',
   'originality_angle', 'publication_fit', 'timeliness', 'actionability',
-  'expertise_depth', 'readability', 'conclusion_cta',
-  'reader_resonance', 'editor_alignment'
+  'expertise_depth',   'readability', 'conclusion_cta',
+  'reader_resonance', 'editor_alignment', 'healthClaimsSafety'
 ] as const;
 
 const DIMENSION_LABELS: Record<string, string> = {
@@ -27,6 +34,7 @@ const DIMENSION_LABELS: Record<string, string> = {
   conclusion_cta: 'Conclusion & CTA',
   reader_resonance: 'Reader Resonance',
   editor_alignment: 'Editor Alignment',
+  healthClaimsSafety: 'Health-Claims Safety',
 };
 
 export { DIMENSIONS, DIMENSION_LABELS };
@@ -127,6 +135,9 @@ export function scoreArticleLocally(content: string, targetPublication?: string)
   if (/in conclusion|ultimately|the bottom line|looking ahead/i.test(lastParagraph)) conclusion += 1;
   conclusion = Math.min(10, conclusion);
 
+  const healthResult = scoreHealthClaimsSafety(content);
+  const healthClaimsSafety = healthResult.score;
+
   const scores: ArticleScores = {
     overall: 0,
     clarity_structure: Math.round(clarity * 10) / 10,
@@ -144,6 +155,8 @@ export function scoreArticleLocally(content: string, targetPublication?: string)
     // blend voice + publication fit as a neutral proxy until AI scoring runs.
     reader_resonance: Math.round(((voice + pubFit) / 2) * 10) / 10,
     editor_alignment: Math.round(pubFit * 10) / 10,
+    healthClaimsSafety,
+    healthClaimsFlaggedPhrases: healthResult.flaggedPhrases,
   };
 
   // Calculate overall as weighted average — now uses publication-specific weights
@@ -159,6 +172,7 @@ export function scoreArticleLocally(content: string, targetPublication?: string)
   let weightedSum = 0;
   let totalWeight = 0;
   for (const dim of DIMENSIONS) {
+    if (dim === "healthClaimsSafety") continue;
     const w = weights[dim] ?? 1;
     weightedSum += (scores[dim] ?? 0) * w;
     totalWeight += w;

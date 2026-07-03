@@ -25,7 +25,7 @@ import {
   Timer, Focus, Check, X, Users, ExternalLink, DollarSign, Lightbulb,
 } from 'lucide-react';
 import { PUBLICATIONS, matchPublications, type Publication } from '@/lib/publications-data';
-import { scoreArticleLocally, DIMENSION_LABELS, getScoreColor, getScoreBgColor, getTierFromScore } from '@/lib/scoring';
+import { scoreArticleLocally, DIMENSION_LABELS, getScoreColor, getScoreBgColor, getTierFromScore, HEALTH_CLAIMS_SAFETY_THRESHOLD, blocksApproval } from '@/lib/scoring';
 import { TEMPLATES, BRAND_VOICES, type WritingTemplate } from '@/lib/templates';
 import type { ArticleScores } from '@/lib/store';
 import { AgenticPanel } from '@/components/writer/AgenticPanel';
@@ -1159,13 +1159,32 @@ ${editorHtml}
           <div className="space-y-2.5">
             {Object.entries(DIMENSION_LABELS).map(([key, label]) => {
               const score = scores[key as keyof ArticleScores] as number;
+              const isHealth = key === 'healthClaimsSafety';
+              const displayScore = isHealth ? score : score;
+              const progressValue = isHealth ? score : score * 10;
+              const colorScore = isHealth ? score / 10 : score;
+              const flagged = isHealth ? scores.healthClaimsFlaggedPhrases : undefined;
               return (
                 <div key={key}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-muted-foreground">{label}</span>
-                    <span className={`font-mono font-semibold ${getScoreColor(score)}`}>{score}</span>
+                    <span className={`font-mono font-semibold ${getScoreColor(colorScore)}`}>
+                      {displayScore}{isHealth ? '/100' : ''}
+                    </span>
                   </div>
-                  <Progress value={score * 10} className="h-1.5" />
+                  <Progress value={progressValue} className="h-1.5" />
+                  {isHealth && blocksApproval(score, HEALTH_CLAIMS_SAFETY_THRESHOLD) && (
+                    <p className="text-[10px] text-red-400 mt-1">
+                      Below {HEALTH_CLAIMS_SAFETY_THRESHOLD} — blocks approval
+                    </p>
+                  )}
+                  {flagged && flagged.length > 0 && (
+                    <ul className="mt-1 space-y-0.5">
+                      {flagged.slice(0, 5).map((phrase, i) => (
+                        <li key={i} className="text-[10px] text-amber-400/90">• {phrase}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               );
             })}
