@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { PUBLICATIONS } from '@/lib/publications-data';
 import { trpc } from '@/lib/trpc';
+import { ListSelectionBar, SelectCheck, useSelection } from '@/components/list-selection';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   draft: { label: 'Draft', color: 'bg-secondary text-secondary-foreground', icon: Clock },
@@ -170,29 +171,36 @@ export default function Pitches() {
   };
 
   const [sortBy, setSortBy] = useState<'newest' | 'publication' | 'status'>('newest');
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const toggleSelected = (id: string) => setSelectedIds(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const bulkDelete = () => {
-    selectedIds.forEach(id => {
-      const dbId = pitchIdMap.get(id);
-      if (dbId) deletePitchDb.mutate({ id: dbId });
-      deletePitch(id);
-    });
-    toast.success(`${selectedIds.size} pitches deleted`);
-    setSelectedIds(new Set());
-    setSelectMode(false);
-  };
   const filtered = useMemo(() => {
     const list = state.pitches.filter(p => filterStatus === 'all' || p.status === filterStatus);
     if (sortBy === 'publication') return [...list].sort((a, b) => (a.publication_name || '').localeCompare(b.publication_name || ''));
     if (sortBy === 'status') return [...list].sort((a, b) => (a.status || '').localeCompare(b.status || ''));
     return list;
   }, [state.pitches, filterStatus, sortBy]);
+
+  const { selected, toggle, clear } = useSelection(
+    useMemo(() => filtered.map(p => ({ id: p.id })), [filtered])
+  );
+
+  const bulkDelete = () => {
+    if (!selected.size || !confirm(`Delete ${selected.size} pitch(es)?`)) return;
+    selected.forEach(id => {
+      const dbId = pitchIdMap.get(id as string);
+      if (dbId) deletePitchDb.mutate({ id: dbId });
+      deletePitch(id as string);
+    });
+    toast.success(`${selected.size} pitches deleted`);
+    clear();
+  };
+  const bulkSetStatus = (status: string) => {
+    selected.forEach(id => {
+      updatePitch(id as string, { status: status as any });
+      const dbId = pitchIdMap.get(id as string);
+      if (dbId) updatePitchDb.mutate({ id: dbId, status: status as any });
+    });
+    toast.success(`Updated ${selected.size} pitch(es)`);
+    clear();
+  };
   const viewingPitch = state.pitches.find(p => p.id === viewPitch);
 
   const stats = useMemo(() => ({
@@ -335,16 +343,15 @@ export default function Pitches() {
           <option value="publication">Publication A→Z</option>
           <option value="status">Status</option>
         </select>
-        <Button variant={selectMode ? 'default' : 'outline'} size="sm" className="text-xs"
-          onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}>
-          {selectMode ? 'Done' : 'Select'}
-        </Button>
-        {selectMode && selectedIds.size > 0 && (
-          <Button variant="destructive" size="sm" className="text-xs" onClick={bulkDelete}>
-            Delete {selectedIds.size}
-          </Button>
-        )}
       </div>
+
+      <ListSelectionBar
+        selected={selected}
+        clear={clear}
+        onDelete={bulkDelete}
+        statusOptions={Object.keys(STATUS_CONFIG).map(k => ({ value: k, label: STATUS_CONFIG[k].label }))}
+        onSetStatus={bulkSetStatus}
+      />
 
       {/* Pitches List */}
       <div className="space-y-3">
@@ -362,14 +369,10 @@ export default function Pitches() {
             const config = STATUS_CONFIG[pitch.status] || STATUS_CONFIG.draft;
             const StatusIcon = config.icon;
             return (
-              <Card key={pitch.id} className="border-border hover:border-primary/20 transition-colors group">
+              <Card key={pitch.id} className={`border-border hover:border-primary/20 transition-colors group ${selected.has(pitch.id) ? 'ring-1 ring-primary/40 bg-primary/5' : ''}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
-                    {selectMode && (
-                      <input type="checkbox" className="mt-1 shrink-0 accent-primary"
-                        checked={selectedIds.has(pitch.id)}
-                        onChange={() => toggleSelected(pitch.id)} />
-                    )}
+                    <SelectCheck checked={selected.has(pitch.id)} onToggle={() => toggle(pitch.id)} className="mt-1 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Badge variant="outline" className={`text-[10px] ${config.color}`}>

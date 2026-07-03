@@ -13,6 +13,7 @@ import {
   ArrowUpRight, Brain, Send, Loader2,
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
+import { ListSelectionBar, SelectCheck, useSelection } from '@/components/list-selection';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TYPES
@@ -89,6 +90,7 @@ export default function PulsePipeline() {
   const [selectedBeat, setSelectedBeat] = useState<string>("all");
   const [selectedUrgency, setSelectedUrgency] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"rank" | "urgency" | "headline">("rank");
   const [expandedStory, setExpandedStory] = useState<number | null>(null);
 
   // ── Queries ──
@@ -130,8 +132,24 @@ export default function PulsePipeline() {
     if (selectedBeat !== "all") items = items.filter(s => s.beat === selectedBeat);
     if (selectedUrgency !== "all") items = items.filter(s => s.urgency === selectedUrgency);
     if (selectedStatus !== "all") items = items.filter(s => s.status === selectedStatus);
-    return items;
-  }, [stories, selectedBeat, selectedUrgency, selectedStatus]);
+    return [...items].sort((a, b) => {
+      if (sortBy === "headline") return a.headline.localeCompare(b.headline);
+      if (sortBy === "urgency") {
+        const order: Record<Urgency, number> = { breaking: 0, this_week: 1, evergreen: 2 };
+        return order[a.urgency] - order[b.urgency];
+      }
+      return (a.briefingRank ?? 999) - (b.briefingRank ?? 999);
+    });
+  }, [stories, selectedBeat, selectedUrgency, selectedStatus, sortBy]);
+
+  const { selected, toggle, allSelected, toggleAll, clear } = useSelection(
+    useMemo(() => filtered.map(s => ({ id: s.id })), [filtered])
+  );
+
+  const bulkSetStatus = async (status: PulseStatus) => {
+    for (const id of selected) await updateStatusMut.mutateAsync({ id: id as number, status });
+    clear();
+  };
 
   const beats = useMemo(() => [...new Set(stories.map(s => s.beat))], [stories]);
 
@@ -241,6 +259,24 @@ export default function PulsePipeline() {
               <option value="published">Published</option>
               <option value="skipped">Skipped</option>
             </select>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)}
+              className="h-8 rounded-md border border-input bg-background px-2 text-xs" title="Sort">
+              <option value="rank">Briefing rank</option>
+              <option value="urgency">Urgency</option>
+              <option value="headline">Headline A→Z</option>
+            </select>
+          </div>
+
+          <ListSelectionBar
+            selected={selected}
+            clear={clear}
+            statusOptions={Object.entries(STATUS_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))}
+            onSetStatus={(v) => bulkSetStatus(v as PulseStatus)}
+          />
+
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all" />
+            <span>Select all stories</span>
           </div>
 
           {/* Story Cards */}
@@ -262,6 +298,8 @@ export default function PulsePipeline() {
                 <StoryCard
                   key={story.id}
                   story={story}
+                  selected={selected.has(story.id)}
+                  onToggleSelect={() => toggle(story.id)}
                   expanded={expandedStory === story.id}
                   onToggle={() => setExpandedStory(expandedStory === story.id ? null : story.id)}
                   onUpdateStatus={(status) => updateStatusMut.mutate({ id: story.id, status })}
@@ -516,6 +554,7 @@ function StatusBadge({ status }: { status: PulseStatus }) {
 
 function StoryCard({
   story, expanded, onToggle, onUpdateStatus, onPromote, onEnrich, isEnriching, isPromoting,
+  selected, onToggleSelect,
 }: {
   story: PulseStory;
   expanded: boolean;
@@ -525,15 +564,22 @@ function StoryCard({
   onEnrich: () => void;
   isEnriching: boolean;
   isPromoting: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   return (
     <Card className={`border-border transition-all ${
       story.urgency === "breaking" ? "border-l-2 border-l-red-500" :
       story.briefingRank ? "border-l-2 border-l-amber-500" : ""
-    }`}>
+    } ${selected ? "ring-1 ring-primary/40 bg-primary/5" : ""}`}>
       <CardContent className="p-4">
         {/* Header Row */}
         <div className="flex items-start gap-3 cursor-pointer" onClick={onToggle}>
+          {onToggleSelect && (
+            <span onClick={e => e.stopPropagation()}>
+              <SelectCheck checked={!!selected} onToggle={onToggleSelect} className="mt-1" />
+            </span>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <UrgencyBadge urgency={story.urgency} />

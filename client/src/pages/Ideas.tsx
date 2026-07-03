@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from 'sonner';
 import { Link } from 'wouter';
 import { trpc } from '@/lib/trpc';
+import { ListSelectionBar, SelectCheck, useSelection } from '@/components/list-selection';
 import {
   Lightbulb, Plus, Search, ArrowRight, PenTool, Trash2,
   Calendar, Tag, Target, Sparkles, LayoutGrid, List, Loader2, GripVertical
@@ -51,23 +52,6 @@ export default function Ideas() {
   }).length;
 
   const [sortBy, setSortBy] = useState<'newest' | 'score' | 'title'>('newest');
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const toggleSelected = (id: string) => setSelectedIds(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const bulkDelete = () => {
-    selectedIds.forEach(id => {
-      const dbId = idMap.get(id);
-      if (dbId) deleteIdeaDb.mutate({ id: dbId });
-      deleteIdea(id);
-    });
-    toast.success(`${selectedIds.size} ideas deleted`);
-    setSelectedIds(new Set());
-    setSelectMode(false);
-  };
   const filtered = useMemo(() => {
     const list = state.ideas.filter(idea => {
       const matchesSearch = !searchQuery ||
@@ -79,6 +63,30 @@ export default function Ideas() {
     if (sortBy === 'title') return [...list].sort((a, b) => a.title.localeCompare(b.title));
     return list;
   }, [state.ideas, searchQuery, sortBy]);
+
+  const { selected, toggle, allSelected, toggleAll, clear } = useSelection(
+    useMemo(() => filtered.map(i => ({ id: i.id })), [filtered])
+  );
+
+  const bulkDelete = () => {
+    if (!selected.size || !confirm(`Delete ${selected.size} idea(s)?`)) return;
+    selected.forEach(id => {
+      const dbId = idMap.get(id as string);
+      if (dbId) deleteIdeaDb.mutate({ id: dbId });
+      deleteIdea(id as string);
+    });
+    toast.success(`${selected.size} ideas deleted`);
+    clear();
+  };
+  const bulkSetStatus = (status: string) => {
+    selected.forEach(id => {
+      updateIdea(id as string, { status: status as any });
+      const dbId = idMap.get(id as string);
+      if (dbId) updateIdeaDb.mutate({ id: dbId, status: status as any });
+    });
+    toast.success(`Updated ${selected.size} idea(s)`);
+    clear();
+  };
 
   const groupedByStatus = useMemo(() => {
     const groups: Record<string, typeof filtered> = {};
@@ -261,15 +269,6 @@ export default function Ideas() {
           <option value="score">Score high→low</option>
           <option value="title">Title A→Z</option>
         </select>
-        <Button variant={selectMode ? 'default' : 'outline'} size="sm" className="h-7 text-xs"
-          onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}>
-          {selectMode ? 'Done' : 'Select'}
-        </Button>
-        {selectMode && selectedIds.size > 0 && (
-          <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={bulkDelete}>
-            Delete {selectedIds.size}
-          </Button>
-        )}
         <div className="flex gap-1.5 text-xs text-muted-foreground">
           {STATUSES.map(s => (
             <span key={s} className="flex items-center gap-0.5" title={STATUS_CONFIG[s].label}>
@@ -279,6 +278,14 @@ export default function Ideas() {
           ))}
         </div>
       </div>
+
+      <ListSelectionBar
+        selected={selected}
+        clear={clear}
+        onDelete={bulkDelete}
+        statusOptions={STATUSES.map(s => ({ value: s, label: STATUS_CONFIG[s].label }))}
+        onSetStatus={bulkSetStatus}
+      />
 
       {/* Kanban Board */}
       {viewMode === 'kanban' ? (
@@ -327,12 +334,7 @@ export default function Ideas() {
                       }`}
                     >
                       <div className="flex items-start gap-1.5">
-                        {selectMode && (
-                          <input type="checkbox" className="mt-0.5 shrink-0 accent-primary"
-                            checked={selectedIds.has(idea.id)}
-                            onChange={() => toggleSelected(idea.id)}
-                            onClick={e => e.stopPropagation()} />
-                        )}
+                        <SelectCheck checked={selected.has(idea.id)} onToggle={() => toggle(idea.id)} className="mt-0.5 shrink-0" />
                         <GripVertical className="w-3 h-3 text-muted-foreground/30 mt-0.5 shrink-0 group-hover:text-muted-foreground" />
                         <div className="flex-1 min-w-0">
                           <h4 className="text-xs font-medium leading-snug line-clamp-2">{idea.title}</h4>
@@ -406,9 +408,10 @@ export default function Ideas() {
             filtered.map(idea => {
               const config = STATUS_CONFIG[idea.status];
               return (
-                <Card key={idea.id} className="border-border hover:border-primary/20 transition-colors group">
+                <Card key={idea.id} className={`border-border hover:border-primary/20 transition-colors group ${selected.has(idea.id) ? 'ring-1 ring-primary/40 bg-primary/5' : ''}`}>
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
+                      <SelectCheck checked={selected.has(idea.id)} onToggle={() => toggle(idea.id)} className="mt-1 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                           <Badge variant="outline" className={`text-[10px] ${config.bgColor} ${config.color}`}>
