@@ -35,29 +35,32 @@ on the operator's machine; keep the two in sync.
 - Table view: search ✓ filter ✓ sort ✓ multi-select+bulk ✓
 - Kanban/Gallery/List: search ✓ filter ✓ sort ✓ multi-select+bulk ✓ (PR #40)
 
-## Status (v5 core pages — marker audit June 12, 2026)
-Grep-marker audit (search/filter, sort, multi-select usage per page). Most list
-pages have search+filter; **multi-select with bulk actions is the systematic
-gap**. Tracked in the "UI-standards gaps" GitHub issue.
+## Status (v5 core pages — marker audit June 12, 2026; bulk-select pass July 2, 2026 — Issue #44)
+Grep-marker audit (search/filter, sort, multi-select usage per page). Multi-select with
+bulk actions (delete + set-status minimum) rolled out via shared `useSelection` +
+`ListSelectionBar` (`client/src/components/list-selection.tsx`, extracted from PR #40).
 
-| Page | Search/Filter | Sort | Multi-select | Notes |
-|---|---|---|---|---|
-| Agents | ✓ | ✓ | ✓ | compliant |
-| Pitches | ✓ | ✓ | partial | verify bulk actions |
-| Publications | ✓ | ✓ | partial | verify bulk actions |
-| PulsePipeline | ✓ | weak | partial | sort thin |
-| Ideas | ✓ | ✓ | partial | verify bulk actions |
-| Giststack | ✓ | ✓ | ✗ | needs multi-select |
-| Queue | ✓ | ✓ | ✗ | needs multi-select |
-| Research | ✓ | ✗ | ✗ | needs sort + multi-select |
-| ContentInsights | ✓ | ✓ | ✗ | needs multi-select |
-| ContentStudio | ✓ | ✗ | ✗ | needs sort + multi-select |
-| Library | ✓ | ✓ | ✗ | needs multi-select |
-| Interviews | ✓ | ✗ | ✗ | needs sort + multi-select |
-| Social | ✓ | ✗ | ✗ | needs sort + multi-select |
-| Brands / BrandVoice | weak | ✗ | ✗ | data entry first (brands empty) |
-| Pipeline / ContentCalendar / Geo / Financial | weak–partial | ✗ | ✗ | smaller views |
-| Dashboard / Home / Settings / Login / Writer | n/a | n/a | n/a | not list views |
+| Page | Search/Filter | Sort | Multi-select | Bulk actions | Notes |
+|---|---|---|---|---|---|
+| Agents | ✓ | ✓ | ✓ | ✓ | compliant |
+| Pitches | ✓ | ✓ | ✓ | ✓ | delete + set-status |
+| Publications | ✓ | ✓ | ✓ | partial | export/copy (static ref DB — no delete) |
+| PulsePipeline | ✓ | ✓ | ✓ | partial | set-status only (no delete API) |
+| Ideas | ✓ | ✓ | ✓ | ✓ | delete + set-status |
+| Giststack | ✓ | ✓ | ✓ | partial | save/unsave + create ideas (ephemeral feed) |
+| Queue | ✓ | ✓ | ✓ | ✓ | full bulk bar (pre-existing) |
+| Research | ✓ | ✓ | ✓ | partial | delete + save-to-KB (no status field) |
+| ContentInsights | ✓ | ✓ | ✓ | ✓ | delete + mark saved/unsaved |
+| ContentStudio | ✓ | ✓ | ✓ | ✓ | delete + set-status |
+| Library | ✓ | ✓ | ✓ | ✓ | delete (+ star toggle on content tab) |
+| Interviews | ✓ | ✓ | ✓ | ✓ | delete + set-status |
+| Social | ✓ | ✓ | ✓ | ✓ | delete + set-status (posts tab) |
+| Pipeline | partial | ✗ | ✗ | n/a | single-run wizard — not a list view |
+| ContentCalendar | partial | ✗ | ✗ | n/a | calendar grid — per-day events, not row list |
+| Geo | partial | ✗ | ✗ | n/a | project cards + tool tabs — assess per-tab later |
+| Financial | partial | ✗ | ✗ | n/a | earnings ledger + dashboards — not bulk-list |
+| Brands / BrandVoice | weak | ✗ | ✗ | ✗ | data entry first (brands empty) |
+| Dashboard / Home / Settings / Login / Writer | n/a | n/a | n/a | n/a | not list views |
 
 ## Imported from Manus (June 12, 2026 — deduped from ~95 knowledge entries)
 

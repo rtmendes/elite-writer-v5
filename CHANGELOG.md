@@ -27,3 +27,13 @@ Canonical domain: **elitewriter.insightprofit.live** (VPS, Docker deploy via Git
 - Phase 5: founder approved cutover same day.
 - **Phase 6 CUTOVER complete — 2026-07-02 16:36 UTC**: fresh backup → final data copy (56/56 match again) → prod DATABASE_URL → Supabase → PR #76 merged (`adb651a`) → cron deploy → verified (both docker networks, live PG connections, site 200, real login write landed in Postgres). MySQL left running untouched as hot rollback for 24-48h. Rollback: restore `.env.production.pre-supabase-backup` + redeploy `a1d9343`.
 - 2026-07-02 — fix: corrected gate template (auto typecheck, remove ponytail lint, add secrets-scan).
+
+## 2026-07-02 — Issue #44: multi-select + bulk actions (branch `feat/issue-44-bulk-select`)
+
+Extracted shared `useSelection` + `ListSelectionBar` from workspace `views.tsx` into
+`client/src/components/list-selection.tsx` (PR #40 pattern). Wired delete + set-status
+(or domain-equivalent bulk actions) on: Giststack, ContentInsights, ContentStudio,
+Library, Interviews, Social. Verified/fixed: Queue (already complete), Research (already
+had sort + bulk delete/KB), Pitches, Ideas, PulsePipeline (added bulk set-status + sort).
+Assessed smaller views — Pipeline, ContentCalendar, Geo, Financial: not row-list UIs;
+bulk select deferred. Gate: tsc 0 · tests 76/76 · build clean.
