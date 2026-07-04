@@ -13,7 +13,16 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "validate": "tsc --noEmit && eslint ."
+    "validate": "tsc --noEmit && eslint .",
+    "dev:secrets": "infisical run --env=dev -- pnpm dev",
+    "db:push:secrets": "infisical run --env=dev -- pnpm db:push",
+    "test:secrets": "infisical run --env=dev -- pnpm test",
+    "build:secrets": "infisical run --env=prod -- pnpm build",
+    "start:secrets": "infisical run --env=prod -- pnpm start",
+    "secrets:login": "infisical login",
+    "secrets:init": "infisical init",
+    "secrets:list:dev": "infisical secrets --env=dev",
+    "secrets:pull:dev": "infisical export --env=dev --format=dotenv > .env"
   },
   "dependencies": {
     "@ariakit/react": "^0.4.29",

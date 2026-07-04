@@ -2,6 +2,10 @@
 
 All notable operational and code changes to Elite Writer.
 
+## 2026-07-03 — Infisical run scripts
+
+- chore: add `pnpm *:secrets` Infisical wrappers for dev/test/build/start and ignore `.cursor/` in git.
+
 ## 2026-07-02 — Domain standardization
 
 Canonical domain: **elitewriter.insightprofit.live** (VPS, Docker deploy via GitHub main poll).
