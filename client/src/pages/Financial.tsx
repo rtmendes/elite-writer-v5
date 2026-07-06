@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { ListSelectionBar, SelectCheck, useSelection } from '@/components/list-selection';
 import {
   DollarSign, TrendingUp, Target, Plus, Calendar,
   BarChart3, PieChart, ArrowUpRight, Trash2, Building2,
@@ -93,6 +94,27 @@ export default function Financial() {
       return { ...brand, content, product, total: content + product };
     });
   }, [state.brands, state.earnings]);
+
+  const visibleEarnings = useMemo(() =>
+    [...state.earnings]
+      .filter(e => activeView === 'overview' || e.type === activeView)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [state.earnings, activeView]);
+
+  const { selected, toggle, clear } = useSelection(
+    useMemo(() => visibleEarnings.map(e => ({ id: e.id })), [visibleEarnings])
+  );
+
+  const bulkDelete = () => {
+    if (!selected.size || !confirm(`Delete ${selected.size} earning(s)?`)) return;
+    selected.forEach(id => {
+      const dbId = earningIdMap.get(id as string);
+      if (dbId) deleteEarningDb.mutate({ id: dbId });
+      deleteEarning(id as string);
+    });
+    toast.success(`${selected.size} earnings deleted`);
+    clear();
+  };
 
   const handleCreate = () => {
     const amt = parseFloat(amount);
@@ -375,15 +397,24 @@ export default function Financial() {
                     <p className="text-[10px] text-muted-foreground mt-1">Click "Record Earning" to start tracking revenue</p>
                   </div>
                 ) : (
+                  <div className="space-y-2">
+                  <ListSelectionBar
+                    selected={selected}
+                    clear={clear}
+                    onDelete={bulkDelete}
+                  />
                   <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {[...state.earnings]
-                      .filter(e => activeView === 'overview' || e.type === activeView)
-                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    {visibleEarnings
                       .map(earning => {
                         const stream = ALL_STREAMS.find(rs => rs.id === earning.source);
                         const brand = state.brands.find(b => b.id === earning.brand_id);
                         return (
                           <div key={earning.id} className="flex items-center gap-3 p-2.5 rounded-md bg-secondary/30 group">
+                            <SelectCheck
+                              checked={selected.has(earning.id)}
+                              onToggle={() => toggle(earning.id)}
+                              className="accent-[var(--primary)] w-4 h-4 shrink-0"
+                            />
                             <span className="text-sm">{stream?.icon || '💰'}</span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
@@ -412,6 +443,7 @@ export default function Financial() {
                           </div>
                         );
                       })}
+                  </div>
                   </div>
                 )}
               </CardContent>
