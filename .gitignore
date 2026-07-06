@@ -117,3 +117,6 @@ client/public/__manus__/version.json
 !.env.example
 !.env.*.template
 !.env.production.template
+
+# Self-audit screenshots
+audit-artifacts/
