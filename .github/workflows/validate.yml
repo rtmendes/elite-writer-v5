@@ -36,3 +36,6 @@ jobs:
 
       - name: Build check
         run: pnpm build
+        env:
+          # vite build exceeds Node's default ~2GB heap on runners
+          NODE_OPTIONS: --max-old-space-size=4096
