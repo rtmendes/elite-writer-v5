@@ -19,7 +19,11 @@ git reset --hard origin/main
 if docker compose build --no-cache elite-writer && docker compose up -d elite-writer; then
   sleep 12
   STATUS=$(curl -s -o /dev/null -w '%{http_code}' https://elitewriter.insightprofit.live || echo 000)
-  echo "$(date '+%F %T') deployed $REMOTE — HTTP $STATUS"
+  NEWS=$(curl -s --max-time 10 https://elitewriter.insightprofit.live/api/trpc/news.status || echo '(unreachable)')
+  echo "$(date '+%F %T') deployed $REMOTE — HTTP $STATUS — news.status: $NEWS"
+  if [ "$STATUS" != "200" ]; then
+    echo "$(date '+%F %T') HEALTH CHECK FAILED — HTTP $STATUS for $REMOTE"
+  fi
 else
   echo "$(date '+%F %T') BUILD FAILED for $REMOTE — keeping previous container running"
 fi
