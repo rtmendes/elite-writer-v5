@@ -9,7 +9,7 @@
  * - AI Humanizer & Content Quality Suite
  * - GEO/AEO Content Writer
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
 import {
   Globe, Plus, Loader2, Trash2, Search, Eye, Brain,
   Target, BarChart3, Shield, Sparkles, FileText, Wand2,
@@ -102,6 +103,17 @@ export default function Geo() {
 
   const projects = projectsQuery.data || [];
 
+  const { selected, toggle, allSelected, toggleAll, clear } = useSelection(
+    useMemo(() => projects.map(p => ({ id: p.id })), [projects])
+  );
+
+  const bulkDelete = () => {
+    if (!selected.size || !confirm(`Delete ${selected.size} project(s)?`)) return;
+    selected.forEach(id => deleteProject.mutate({ id }));
+    toast.success(`${selected.size} project(s) deleted`);
+    clear();
+  };
+
   return (
     <div className="h-full overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -128,9 +140,16 @@ export default function Geo() {
           {/* ─── GEO Projects ────────────────────────────── */}
           <TabsContent value="projects" className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Track your brand's visibility across AI search engines</p>
+              <div className="flex items-center gap-2">
+                {projects.length > 0 && (
+                  <SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all projects" />
+                )}
+                <p className="text-sm text-muted-foreground">Track your brand's visibility across AI search engines</p>
+              </div>
               <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4 mr-1" />New Project</Button>
             </div>
+
+            <ListSelectionBar selected={selected} clear={clear} onDelete={bulkDelete} deleteLabel="Delete" />
 
             {projectsQuery.isLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
@@ -146,9 +165,17 @@ export default function Geo() {
                     <Card key={project.id}>
                       <CardContent className="pt-4">
                         <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="font-medium text-foreground">{project.name}</h3>
-                            <p className="text-xs text-muted-foreground">{project.websiteUrl}</p>
+                          <div className="flex items-start gap-2">
+                            <SelectCheck
+                              checked={selected.has(project.id)}
+                              onToggle={() => toggle(project.id)}
+                              title={`Select ${project.name}`}
+                              className="mt-1 checkbox-dot accent-[var(--primary)] w-4 h-4"
+                            />
+                            <div>
+                              <h3 className="font-medium text-foreground">{project.name}</h3>
+                              <p className="text-xs text-muted-foreground">{project.websiteUrl}</p>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             {project.overallGeoScore !== null && (

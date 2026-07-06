@@ -10,9 +10,10 @@ import {
 } from '@/components/ui/table';
 import {
   BookOpen, Search, ExternalLink, Globe, Mail, DollarSign, TrendingUp, Download, Send,
-  LayoutGrid, List as ListIcon, ArrowUp, ArrowDown, ArrowUpDown, Copy, X,
+  LayoutGrid, List as ListIcon, ArrowUp, ArrowDown, ArrowUpDown, Copy,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
+import { ListSelectionBar, useSelection } from '@/components/list-selection';
 import { useLocation } from 'wouter';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -124,7 +125,6 @@ export default function Publications() {
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [colFilters, setColFilters] = useState<Record<string, string>>({});
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [selectedPub, setSelectedPub] = useState<Publication | null>(null);
@@ -213,13 +213,10 @@ export default function Publications() {
     }
   }
 
-  // ---- selection ----
-  const toggleOne = (id: string) => setSelected(prev => {
-    const n = new Set(prev);
-    n.has(id) ? n.delete(id) : n.add(id);
-    return n;
-  });
-  const allFilteredSelected = filtered.length > 0 && filtered.every(p => selected.has(p.id));
+  // ---- selection (shared list-selection hook — UI standard) ----
+  const {
+    selected, toggle: toggleOne, allSelected: allFilteredSelected, clear, setSelected,
+  } = useSelection(useMemo(() => filtered.map(p => ({ id: p.id })), [filtered]));
   const someFilteredSelected = !allFilteredSelected && filtered.some(p => selected.has(p.id));
   const toggleAllFiltered = () => setSelected(prev => {
     const n = new Set(prev);
@@ -340,21 +337,15 @@ export default function Publications() {
         </Button>
       </div>
 
-      {/* Bulk action bar — appears when ≥1 selected */}
-      {selected.size > 0 && (
-        <div className="flex items-center gap-2 flex-wrap rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
-          <span className="text-sm font-medium">{selected.size} selected</span>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => exportCSV(selectedPubs, '-selected')}>
-            <Download className="w-3.5 h-3.5" /> Export selected
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={copyEmails}>
-            <Copy className="w-3.5 h-3.5" /> Copy editor emails
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs ml-auto" onClick={() => setSelected(new Set())}>
-            <X className="w-3.5 h-3.5" /> Clear
-          </Button>
-        </div>
-      )}
+      {/* Bulk action bar — appears when ≥1 selected (no delete/status: static reference DB) */}
+      <ListSelectionBar selected={selected} clear={clear}>
+        <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => exportCSV(selectedPubs, '-selected')}>
+          <Download className="w-3.5 h-3.5" /> Export selected
+        </Button>
+        <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={copyEmails}>
+          <Copy className="w-3.5 h-3.5" /> Copy editor emails
+        </Button>
+      </ListSelectionBar>
 
       {/* Empty state */}
       {filtered.length === 0 && (
