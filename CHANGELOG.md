@@ -2,6 +2,15 @@
 
 All notable operational and code changes to Elite Writer.
 
+## 2026-07-06 — Issue #44 completion: shared list-selection on the 5 remaining pages
+
+Wired `client/src/components/list-selection.tsx` (canonical Ideas.tsx usage) onto
+ContentCalendar (bulk delete + set-status), Financial earnings (bulk delete),
+Geo projects (bulk delete + select-all), Publications (local selection migrated to
+shared hook, export/copy actions preserved, still non-destructive), Research references
+(local plumbing migrated, page-scoped select-all + save-to-KB preserved).
+Gate: tsc 0 · tests 87/87 · build clean. PR #85.
+
 ## 2026-07-03 — Infisical run scripts
 
 - chore: add `pnpm *:secrets` Infisical wrappers for dev/test/build/start and ignore `.cursor/` in git.
