@@ -255,6 +255,7 @@ export default function Settings() {
                 { key: 'newsapi_key' as const, label: 'NewsAPI', desc: 'newsapi.org — 100 req/day free', placeholder: 'Your NewsAPI key' },
                 { key: 'gnews_key' as const, label: 'GNews', desc: 'gnews.io — 100 req/day free', placeholder: 'Your GNews key' },
                 { key: 'mediastack_key' as const, label: 'MediaStack', desc: 'mediastack.com — 100 req/month free', placeholder: 'Your MediaStack key' },
+                { key: 'perigon_key' as const, label: 'Perigon', desc: 'perigon.io — AI-enriched news API', placeholder: 'Your Perigon API key' },
               ].map(api => (
                 <div key={api.key} className="flex items-center gap-4">
                   <div className="w-32 shrink-0">
