@@ -80,6 +80,36 @@ async function fetchGNews(apiKey: string, query?: string, category?: string, lim
   }));
 }
 
+const PERIGON_CATEGORY_MAP: Record<string, string> = {
+  technology: "Tech", tech: "Tech", business: "Business", finance: "Finance",
+  politics: "Politics", sports: "Sports", entertainment: "Entertainment",
+  health: "Health", science: "Science", travel: "Travel", world: "World",
+  lifestyle: "Lifestyle", environment: "Environment", general: "General",
+};
+
+async function fetchPerigon(apiKey: string, query?: string, category?: string, limit = 10) {
+  let url = `https://api.perigon.io/v1/all?apiKey=${apiKey}&size=${limit}&language=en&sortBy=date&showReprints=false`;
+  if (query) url += `&q=${encodeURIComponent(query)}`;
+  if (category) {
+    const mapped = PERIGON_CATEGORY_MAP[category.toLowerCase()];
+    if (mapped) url += `&category=${mapped}`;
+  }
+
+  const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  const data = await response.json() as any;
+  if (!response.ok) throw new Error(data.message || "Perigon request failed");
+
+  return (data.articles || []).map((a: any) => ({
+    source: "Perigon",
+    title: a.title,
+    description: a.description,
+    url: a.url,
+    imageUrl: a.imageUrl,
+    publishedAt: a.pubDate,
+    sourceName: a.source?.domain,
+  }));
+}
+
 async function fetchRSSFeed(feedUrl: string, limit = 20) {
   try {
     const response = await fetch(feedUrl, { signal: AbortSignal.timeout(8000) });
@@ -113,7 +143,7 @@ export const newsRouter = router({
   // POST /api/news/fetch — Fetch news from configured APIs
   fetch: protectedProcedure
     .input(z.object({
-      source: z.enum(["newsapi", "mediastack", "gnews", "all"]).default("all"),
+      source: z.enum(["newsapi", "mediastack", "gnews", "perigon", "all"]).default("all"),
       query: z.string().optional(),
       category: z.string().optional(),
       limit: z.number().min(1).max(100).default(10),
@@ -137,6 +167,11 @@ export const newsRouter = router({
           try { articles.push(...await fetchGNews(ENV.gnewsKey, query, category, limit)); } catch { /* skip */ }
         }
       }
+      if (source === "perigon" || source === "all") {
+        if (ENV.perigonApiKey) {
+          try { articles.push(...await fetchPerigon(ENV.perigonApiKey, query, category, limit)); } catch { /* skip */ }
+        }
+      }
 
       return { success: true, articles, count: articles.length };
     }),
@@ -147,8 +182,9 @@ export const newsRouter = router({
       newsapi: !!ENV.newsapiKey,
       mediastack: !!ENV.mediastackKey,
       gnews: !!ENV.gnewsKey,
+      perigon: !!ENV.perigonApiKey,
     },
-    total: [ENV.newsapiKey, ENV.mediastackKey, ENV.gnewsKey].filter(Boolean).length,
+    total: [ENV.newsapiKey, ENV.mediastackKey, ENV.gnewsKey, ENV.perigonApiKey].filter(Boolean).length,
   })),
 
   // Fetch and store news to DB
@@ -172,6 +208,9 @@ export const newsRouter = router({
       }
       if (ENV.mediastackKey) {
         try { allArticles.push(...await fetchMediaStack(ENV.mediastackKey, input.query, input.category, input.limit)); } catch { /* skip */ }
+      }
+      if (ENV.perigonApiKey) {
+        try { allArticles.push(...await fetchPerigon(ENV.perigonApiKey, input.query, input.category, input.limit)); } catch { /* skip */ }
       }
 
       // Store to DB
@@ -273,6 +312,11 @@ export const newsRouter = router({
       if (ENV.gnewsKey) {
         for (const topic of (input.topics || ["business"])) {
           try { articles.push(...await fetchGNews(ENV.gnewsKey, topic, undefined, 5)); } catch { /* skip */ }
+        }
+      }
+      if (ENV.perigonApiKey) {
+        for (const topic of (input.topics || ["business", "technology"])) {
+          try { articles.push(...await fetchPerigon(ENV.perigonApiKey, topic, undefined, 5)); } catch { /* skip */ }
         }
       }
 
@@ -509,7 +553,12 @@ export const intelligenceRouter = router({
     .mutation(async ({ ctx, input }) => {
       // Fetch recent news first
       const recentNews: any[] = [];
-      if (ENV.gnewsKey) {
+      if (ENV.perigonApiKey) {
+        for (const topic of (input.topics || ["business", "technology", "finance"])) {
+          try { recentNews.push(...await fetchPerigon(ENV.perigonApiKey, topic, undefined, 3)); } catch { /* skip */ }
+        }
+      }
+      if (ENV.gnewsKey && recentNews.length === 0) {
         for (const topic of (input.topics || ["business", "technology", "finance"])) {
           try { recentNews.push(...await fetchGNews(ENV.gnewsKey, topic, undefined, 3)); } catch { /* skip */ }
         }

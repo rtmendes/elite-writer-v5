@@ -188,6 +188,7 @@ async function startServer() {
       newsapi_key: ENV.newsapiKey || "",
       gnews_key: ENV.gnewsKey || "",
       mediastack_key: ENV.mediastackKey || "",
+      perigon_key: ENV.perigonApiKey || "",
       perplexity_key: ENV.perplexityApiKey || "",
       youtube_key: ENV.youtubeApiKey || "",
       google_client_id: ENV.googleClientId || "",

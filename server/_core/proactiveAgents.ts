@@ -323,6 +323,16 @@ async function fetchUsNews(): Promise<Array<{ title: string; source: string; url
       }
     } catch { /* best effort */ }
   }
+  // Perigon — US English, reprints filtered
+  if (ENV.perigonApiKey) {
+    try {
+      const r = await fetch(`https://api.perigon.io/v1/all?apiKey=${ENV.perigonApiKey}&country=us&language=en&size=40&sortBy=date&showReprints=false`);
+      if (r.ok) {
+        const d = await r.json();
+        for (const a of d.articles ?? []) out.push({ title: a.title ?? "", source: a.source?.domain ?? "", url: a.url ?? "" });
+      }
+    } catch { /* best effort */ }
+  }
   // GNews — US English
   if (ENV.gnewsKey && out.length < 30) {
     try {

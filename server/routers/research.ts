@@ -443,6 +443,7 @@ Return this exact JSON structure:
       newsapi: !!ENV.newsapiKey,
       gnews: !!ENV.gnewsKey,
       mediastack: !!ENV.mediastackKey,
+      perigon: !!ENV.perigonApiKey,
       newsdata: !!ENV.newsdataKey,
       piapi: !!ENV.piapiKey,
       kie: !!ENV.kieApiKey,

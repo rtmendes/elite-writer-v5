@@ -14,6 +14,7 @@ export interface LLMConfig {
   newsapi_key: string;
   gnews_key: string;
   mediastack_key: string;
+  perigon_key: string;
   preferred_provider: LLMProvider | 'auto';
   cost_mode: 'minimum' | 'balanced' | 'quality';
 }
@@ -84,7 +85,7 @@ const AI_USAGE_KEY = 'elite_writer_ai_usage';
 export function getDefaultAIConfig(): LLMConfig {
   return {
     openai_key: '', anthropic_key: '', openrouter_key: '', gemini_key: '',
-    newsapi_key: '', gnews_key: '', mediastack_key: '',
+    newsapi_key: '', gnews_key: '', mediastack_key: '', perigon_key: '',
     preferred_provider: 'auto', cost_mode: 'balanced',
   };
 }
@@ -300,6 +301,7 @@ export function getProviderStatus(): Record<string, { configured: boolean; label
     newsapi: { configured: !!config.newsapi_key, label: 'NewsAPI' },
     gnews: { configured: !!config.gnews_key, label: 'GNews' },
     mediastack: { configured: !!config.mediastack_key, label: 'MediaStack' },
+    perigon: { configured: !!config.perigon_key, label: 'Perigon' },
   };
 }
 
@@ -361,6 +363,7 @@ export async function syncFromServer(): Promise<LLMConfig | null> {
       ['newsapi_key', 'newsapi_key'],
       ['gnews_key', 'gnews_key'],
       ['mediastack_key', 'mediastack_key'],
+      ['perigon_key', 'perigon_key'],
     ];
 
     for (const [configKey, serverKey] of keyMap) {
