@@ -76,6 +76,9 @@ importers:
       '@platejs/dnd':
         specifier: ^53.1.0
         version: 53.1.0(platejs@53.1.2(@types/react@19.2.1)(immer@10.2.0)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(scheduler@0.27.0)(use-sync-external-store@1.6.0(react@19.2.1)))(react-dnd-html5-backend@16.0.1)(react-dnd@16.0.1(@types/node@24.7.0)(@types/react@19.2.1)(react@19.2.1))(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      '@platejs/docx':
+        specifier: ^53.0.0
+        version: 53.0.0(platejs@53.1.2(@types/react@19.2.1)(immer@10.2.0)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(scheduler@0.27.0)(use-sync-external-store@1.6.0(react@19.2.1)))(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       '@platejs/docx-io':
         specifier: ^53.1.0
         version: 53.1.0(@platejs/docx@53.0.0(platejs@53.1.2(@types/react@19.2.1)(immer@10.2.0)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(scheduler@0.27.0)(use-sync-external-store@1.6.0(react@19.2.1)))(react-dom@19.2.1(react@19.2.1))(react@19.2.1))(@platejs/markdown@53.1.1(platejs@53.1.2(@types/react@19.2.1)(immer@10.2.0)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(scheduler@0.27.0)(use-sync-external-store@1.6.0(react@19.2.1)))(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(typescript@5.9.3))(platejs@53.1.2(@types/react@19.2.1)(immer@10.2.0)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(scheduler@0.27.0)(use-sync-external-store@1.6.0(react@19.2.1)))(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
@@ -4336,6 +4339,7 @@ packages:
 
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
+    deprecated: Potential CWE-502 - Update to 1.3.1 or higher
 
   '@uploadthing/mime-types@0.3.6':
     resolution: {integrity: sha512-t3tTzgwFV9+1D7lNDYc7Lr7kBwotHaX0ZsvoCGe7xGnXKo9z0jG2Sjl/msll12FeoLj77nyhsxevXyGpQDBvLg==}
@@ -7578,6 +7582,7 @@ packages:
   recharts@2.15.4:
     resolution: {integrity: sha512-UT/q6fwS3c1dHbXv2uFgYJ9BMFHu3fwnd7AYZaEQhXuYQ4hgsxLvsUXzGdKeZrW5xopzDCvuA2N41WJ88I7zIw==}
     engines: {node: '>=14'}
+    deprecated: 1.x and 2.x branches are no longer active. Bump to Recharts v3 to receive latest features and bugfixes. See https://github.com/recharts/recharts/wiki/3.0-migration-guide
     peerDependencies:
       react: ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
@@ -8016,6 +8021,7 @@ packages:
   tar@7.5.1:
     resolution: {integrity: sha512-nlGpxf+hv0v7GkWBK2V9spgactGOp0qvfWRxUMjqHyzrt3SgwE48DIv/FhqPHJYLHpgW1opq3nERbz5Anq7n1g==}
     engines: {node: '>=18'}
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   text-segmentation@1.0.3:
     resolution: {integrity: sha512-iOiPUo/BGnZ6+54OsWxZidGCsdU8YbE4PSpdPinp7DeMtUJNJBoJ/ouUSTJjHkh1KntHaltHl/gDs2FC4i5+Nw==}
@@ -8388,6 +8394,7 @@ packages:
 
   uuid@8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   uuid@9.0.1:
