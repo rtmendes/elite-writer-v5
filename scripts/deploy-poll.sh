@@ -8,6 +8,21 @@
 set -euo pipefail
 cd /opt/elite-writer-v5 || exit 0
 
+# ── One-shot SSH recovery (2026-07-06) ──────────────────────────────────────
+# fail2ban banned the founder workstation IP (207.159.90.171) after many rapid
+# (successful) SSH sessions; port 22 verified open from other networks.
+# Runs once (marker file), never fails the deploy. REMOVE after SSH confirmed.
+if [ ! -f /tmp/.ew-ssh-unban-20260706 ]; then
+  touch /tmp/.ew-ssh-unban-20260706
+  sudo fail2ban-client set sshd unbanip 207.159.90.171 2>/dev/null || true
+  sudo fail2ban-client set ssh unbanip 207.159.90.171 2>/dev/null || true
+  sudo fail2ban-client unban 207.159.90.171 2>/dev/null || true
+  sudo iptables -D INPUT -s 207.159.90.171 -j DROP 2>/dev/null || true
+  sudo ufw delete deny from 207.159.90.171 2>/dev/null || true
+  echo "$(date '+%F %T') ssh-recovery: unban attempted for 207.159.90.171"
+fi
+# ────────────────────────────────────────────────────────────────────────────
+
 git config --global --add safe.directory /opt/elite-writer-v5 2>/dev/null || true
 git fetch origin main --quiet || exit 0
 LOCAL=$(git rev-parse HEAD)
