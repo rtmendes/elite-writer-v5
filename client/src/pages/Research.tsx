@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { trpc } from "@/lib/trpc";
+import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
 import {
   Search, Sparkles, Loader2, BookOpen, FileText, ExternalLink, Save, Trash2,
   Plus, Upload, Download, MessageSquare, Library as LibraryIcon, Globe,
@@ -366,7 +367,6 @@ function LibraryTab() {
   const [sortKey, setSortKey] = useState<SortKey>("citationCount");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const rows: RefRow[] = (list.data?.references ?? []) as RefRow[];
   const types = useMemo(() => Array.from(new Set(rows.map((r) => r.type))).sort(), [rows]);
@@ -390,20 +390,16 @@ function LibraryTab() {
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageRows = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-  const allOnPageSelected = pageRows.length > 0 && pageRows.every((r) => selected.has(r.id));
 
-  const toggle = (id: number) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const toggleAllOnPage = () => setSelected((s) => {
-    const n = new Set(s);
-    if (allOnPageSelected) pageRows.forEach((r) => n.delete(r.id));
-    else pageRows.forEach((r) => n.add(r.id));
-    return n;
-  });
+  // Select-all stays scoped to the current pagination page.
+  const { selected, toggle, allSelected, toggleAll, clear } = useSelection(
+    useMemo(() => pageRows.map((r) => ({ id: r.id })), [pageRows])
+  );
 
   const bulkDelete = async () => {
     if (!selected.size || !confirm(`Delete ${selected.size} reference(s)?`)) return;
     await remove.mutateAsync({ ids: [...selected] });
-    setSelected(new Set());
+    clear();
     await utils.researchHub.references.list.invalidate();
     toast.success("Deleted");
   };
@@ -411,7 +407,7 @@ function LibraryTab() {
     if (!selected.size) return;
     for (const id of selected) await saveKb.mutateAsync({ id });
     toast.success(`Saved ${selected.size} to Knowledge Base`);
-    setSelected(new Set());
+    clear();
   };
 
   const setSort = (k: SortKey) => { if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc")); else { setSortKey(k); setSortDir("desc"); } };
@@ -434,15 +430,11 @@ function LibraryTab() {
       </div>
 
       {/* Bulk action bar */}
-      {selected.size > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
-          <span className="text-sm text-foreground">{selected.size} selected</span>
-          <div className="flex-1" />
-          <Button size="sm" variant="outline" onClick={bulkSaveKb} disabled={saveKb.isPending}><Save className="w-3.5 h-3.5 mr-1" /> Save to KB</Button>
-          <Button size="sm" variant="outline" onClick={bulkDelete} className="text-red-400 hover:text-red-300"><Trash2 className="w-3.5 h-3.5 mr-1" /> Delete</Button>
-          <button onClick={() => setSelected(new Set())} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
-        </div>
-      )}
+      <ListSelectionBar selected={selected} clear={clear} onDelete={bulkDelete}>
+        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={bulkSaveKb} disabled={saveKb.isPending}>
+          <Save className="w-3.5 h-3.5 mr-1" /> Save to KB
+        </Button>
+      </ListSelectionBar>
 
       {/* Loading / empty */}
       {list.isLoading && <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-muted/40" />)}</div>}
@@ -462,7 +454,7 @@ function LibraryTab() {
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr>
-                <th className="w-10 px-3 py-2"><input type="checkbox" checked={allOnPageSelected} onChange={toggleAllOnPage} className="accent-[var(--primary)] w-4 h-4" /></th>
+                <th className="w-10 px-3 py-2"><SelectCheck checked={allSelected} onToggle={toggleAll} title="Select all on page" /></th>
                 <th className="text-left px-3 py-2 cursor-pointer" onClick={() => setSort("title")}><span className="inline-flex items-center gap-1">Title <ArrowUpDown className="w-3 h-3" /></span></th>
                 <th className="text-left px-3 py-2 hidden lg:table-cell">Authors</th>
                 <th className="text-left px-3 py-2 w-16 cursor-pointer" onClick={() => setSort("year")}><span className="inline-flex items-center gap-1">Year <ArrowUpDown className="w-3 h-3" /></span></th>
@@ -474,7 +466,7 @@ function LibraryTab() {
             <tbody>
               {pageRows.map((r) => (
                 <tr key={r.id} className={`border-t border-border ${selected.has(r.id) ? "bg-primary/5" : "hover:bg-accent/40"}`}>
-                  <td className="px-3 py-2"><input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} className="accent-[var(--primary)] w-4 h-4" /></td>
+                  <td className="px-3 py-2"><SelectCheck checked={selected.has(r.id)} onToggle={() => toggle(r.id)} /></td>
                   <td className="px-3 py-2">
                     {r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-primary inline-flex items-center gap-1">{r.title}<ExternalLink className="w-3 h-3 opacity-50" /></a> : <span className="text-foreground">{r.title}</span>}
                     {r.doi && <span className="block text-[10px] text-muted-foreground">{r.doi}</span>}
@@ -502,7 +494,7 @@ function LibraryTab() {
           {pageRows.map((r) => (
             <div key={r.id} className={`rounded-lg border p-3 ${selected.has(r.id) ? "border-primary/40 bg-primary/5" : "border-border"}`}>
               <div className="flex items-start gap-2">
-                <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} className="accent-[var(--primary)] w-5 h-5 mt-0.5" />
+                <SelectCheck checked={selected.has(r.id)} onToggle={() => toggle(r.id)} className="accent-[var(--primary)] w-5 h-5 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   {r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-foreground">{r.title}</a> : <span className="text-sm font-medium text-foreground">{r.title}</span>}
                   <div className="flex items-center gap-2 mt-1 flex-wrap text-[11px] text-muted-foreground">

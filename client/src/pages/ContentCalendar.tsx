@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
 import {
   Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight,
   Loader2, Trash2, Edit, Linkedin, Twitter, Instagram,
@@ -82,6 +83,27 @@ export default function ContentCalendar() {
   const deleteMutation = trpc.calendar.delete.useMutation({
     onSuccess: () => { toast.success("Removed"); eventsQuery.refetch(); },
   });
+  // Silent instances for bulk loops (avoid per-item toasts/refetches)
+  const bulkDeleteMutation = trpc.calendar.delete.useMutation();
+  const bulkUpdateMutation = trpc.calendar.update.useMutation();
+
+  const { selected, toggle, clear } = useSelection(
+    useMemo(() => (eventsQuery.data || []).map((e: any) => ({ id: e.id as number })), [eventsQuery.data])
+  );
+
+  const bulkDelete = async () => {
+    if (!selected.size || !confirm(`Delete ${selected.size} event(s)?`)) return;
+    await Promise.all([...selected].map(id => bulkDeleteMutation.mutateAsync({ id: id as number })));
+    toast.success(`${selected.size} events deleted`);
+    clear();
+    eventsQuery.refetch();
+  };
+  const bulkSetStatus = async (status: string) => {
+    await Promise.all([...selected].map(id => bulkUpdateMutation.mutateAsync({ id: id as number, status })));
+    toast.success(`Updated ${selected.size} event(s)`);
+    clear();
+    eventsQuery.refetch();
+  };
 
   const closeDialog = () => {
     setShowDialog(false); setEditingEvent(null); setSelectedDate(null);
@@ -198,6 +220,15 @@ export default function ContentCalendar() {
       {/* Month title */}
       <h2 className="text-xl font-semibold text-center">{monthName}</h2>
 
+      {/* Bulk actions */}
+      <ListSelectionBar
+        selected={selected}
+        clear={clear}
+        onDelete={bulkDelete}
+        statusOptions={Object.keys(STATUS_COLORS).map(s => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }))}
+        onSetStatus={bulkSetStatus}
+      />
+
       {/* Calendar Grid */}
       {eventsQuery.isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
@@ -238,6 +269,11 @@ export default function ContentCalendar() {
                           className="flex items-center gap-1 px-1 py-0.5 rounded text-[10px] bg-muted/60 hover:bg-muted truncate"
                           onClick={(e) => { e.stopPropagation(); openEdit(event); }}
                         >
+                          <SelectCheck
+                            checked={selected.has(event.id)}
+                            onToggle={() => toggle(event.id)}
+                            className="accent-[var(--primary)] w-3 h-3 shrink-0"
+                          />
                           <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor}`} />
                           <span className="truncate">{event.title}</span>
                         </div>
