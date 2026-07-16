@@ -77,7 +77,26 @@ tsc 0 · vitest green · build clean · local flow test (open each collection, e
 via drawer, autosave persists to DB, media upload lands in R2, saved view
 round-trips). PR to main; founder merges.
 
-## Rollout (one branch, staged commits)
+## Build status (2026-07-16)
+- [x] Phase 1 — saved_views table + router + media fields (PR #88, merged)
+- [x] Phase 2/3 — EditDrawer (autosave) + SavedViewBar (branch feat/admin-ux-cms)
+- [x] Phase 4 — Media library (/media): grid, search, tags, drag-drop R2 upload
+      + content-hash dedup, click-to-edit; MediaPicker attaches article covers
+- [x] Phase 5 — drawer + saved-views rolled across 8 collections: Queue,
+      Library, ContentStudio, Social, Ideas, Pitches, Research, Media
+- [x] Phase 6 — saved-views UI live on every wired collection
+- Server: data.articles.update + excerpt/category/tags/featuredImageUrl;
+  data.pitches.update + publication/editor; library.images + upload/update.
+- Gate: tsc 0 · vitest 87/87 · build clean.
+- NOT yet done: live browser flow test — blocked on the VPS SSH outage (dev
+  server can't reach Supabase via the tunnel). Verify post-merge when the app
+  runs against the real DB, or once SSH is restored.
+
+Field-level notes (mutations that don't accept a field render it readonly, by
+design — no silent data loss): Social.platform, Research reference
+authors/doi/url. Everything else round-trips.
+
+## Original rollout plan (one branch, staged commits)
 1. Schema migration + saved_views router + media alt/hash fields.
 2. `<CollectionList>` extracted from list-selection; Library adopts it first (proof).
 3. `<EditDrawer>` + autosave; wire Library + Queue.

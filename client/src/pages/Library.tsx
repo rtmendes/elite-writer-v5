@@ -18,11 +18,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
+import { EditDrawer, type FieldDef } from "@/components/admin/EditDrawer";
+import { SavedViewBar, type ViewConfig } from "@/components/admin/SavedViewBar";
 import {
   Library, Plus, Search, Loader2, Star, StarOff, Trash2,
   Copy, Image, FileText, Quote, Lightbulb, LayoutTemplate,
   Palette, Wand2, Tag,
 } from "lucide-react";
+
+// Payload-style edit-drawer field schema for a saved content item.
+// Persisted via library.content.update (title / content / tags).
+const CONTENT_FIELDS: FieldDef[] = [
+  { key: "title", label: "Title", type: "text", group: "Content" },
+  { key: "content", label: "Content", type: "textarea", rows: 8, group: "Content", placeholder: "The saved copy…" },
+  { key: "tags", label: "Tags", type: "tags", group: "Content" },
+  { key: "type", label: "Type", type: "readonly", group: "Meta", format: (v) => String(v ?? "").replace("_", " ") },
+  { key: "createdAt", label: "Created", type: "readonly", group: "Meta", format: (v) => (v ? new Date(String(v)).toLocaleDateString() : "—") },
+];
 
 const CONTENT_TYPES = [
   { value: "social_post", label: "Social Posts", icon: FileText },
@@ -37,6 +49,10 @@ export default function ContentLibrary() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+
+  // Edit-drawer + saved-views state for the content collection.
+  const [editingContent, setEditingContent] = useState<any>(null);
+  const [activeContentViewId, setActiveContentViewId] = useState<number | null>(null);
 
   // Save form
   const [saveType, setSaveType] = useState<string>("idea");
@@ -78,6 +94,7 @@ export default function ContentLibrary() {
   const toggleStarMut = trpc.library.content.toggleStar.useMutation({
     onSuccess: () => contentQuery.refetch(),
   });
+  const updateContentMut = trpc.library.content.update.useMutation();
   const saveImageMut = trpc.library.images.save.useMutation({
     onSuccess: () => { toast.success("Image saved!"); imagesQuery.refetch(); setShowImageSave(false); },
     onError: (e) => toast.error(e.message),
@@ -130,6 +147,26 @@ export default function ContentLibrary() {
     contentSel.clear();
   };
 
+  // ─── Saved views (content tab): snapshot search/filter/sort + apply ───
+  const contentViewConfig: ViewConfig = {
+    search,
+    filters: { type: filterType },
+    sort: { field: sortBy, dir: sortBy === "newest" ? "desc" : "asc" },
+  };
+  const applyContentView = (id: number | null, config: ViewConfig | null) => {
+    setActiveContentViewId(id);
+    if (!config) {
+      setSearch("");
+      setFilterType("all");
+      setSortBy("newest");
+      return;
+    }
+    setSearch(config.search ?? "");
+    setFilterType((config.filters?.type as string) ?? "all");
+    const sf = config.sort?.field;
+    if (sf === "newest" || sf === "title" || sf === "type") setSortBy(sf);
+  };
+
   return (
     <div className="h-full overflow-auto">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -180,6 +217,8 @@ export default function ContentLibrary() {
               <Button onClick={() => setShowSaveDialog(true)}><Plus className="w-4 h-4 mr-1" />Save New</Button>
             </div>
 
+            <SavedViewBar page="library" currentConfig={contentViewConfig} activeViewId={activeContentViewId} onApply={applyContentView} />
+
             <ListSelectionBar selected={contentSel.selected} clear={contentSel.clear} onDelete={bulkDeleteContent}
               statusOptions={[{ value: "star", label: "Toggle star" }]}
               onSetStatus={() => bulkStarContent(true)} />
@@ -214,8 +253,10 @@ export default function ContentLibrary() {
                           </Button>
                         </div>
                       </div>
-                      {item.title && <p className="text-sm font-medium">{item.title}</p>}
-                      <p className="text-sm text-muted-foreground line-clamp-3">{item.content}</p>
+                      <button type="button" className="w-full text-left" onClick={() => setEditingContent(item)} title="Edit details">
+                        {item.title && <p className="text-sm font-medium hover:underline">{item.title}</p>}
+                        <p className="text-sm text-muted-foreground line-clamp-3">{item.content}</p>
+                      </button>
                       {(item.tags as string[])?.length > 0 && (
                         <div className="flex flex-wrap gap-1">
                           {(item.tags as string[]).map((tag, i) => (
@@ -393,6 +434,25 @@ export default function ContentLibrary() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Content edit drawer (Payload-style, autosave) */}
+        <EditDrawer
+          open={!!editingContent}
+          onClose={() => setEditingContent(null)}
+          title={(editingContent?.title as string) || "Content"}
+          record={editingContent as Record<string, unknown> | null}
+          fields={CONTENT_FIELDS}
+          onSave={async (patch) => {
+            if (!editingContent) return;
+            await updateContentMut.mutateAsync({
+              id: editingContent.id,
+              title: patch.title as string | undefined,
+              content: patch.content as string | undefined,
+              tags: patch.tags as string[] | undefined,
+            });
+            await contentQuery.refetch();
+          }}
+        />
       </div>
     </div>
   );

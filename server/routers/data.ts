@@ -139,6 +139,11 @@ const articlesRouter = router({
     seriesId: z.number().nullable().optional(),
     isMoneyPage: z.boolean().optional(),
     articleNumber: z.number().optional(),
+    // Admin UX edit-drawer metadata fields (map 1:1 to article columns).
+    excerpt: z.string().nullable().optional(),
+    category: z.string().nullable().optional(),
+    tags: z.array(z.string()).nullable().optional(),
+    featuredImageUrl: z.string().nullable().optional(),
     sources: z.array(z.object({ title: z.string(), url: z.string().optional(), note: z.string().optional(), addedAt: z.string().optional() }).passthrough()).optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
@@ -367,6 +372,9 @@ const pitchesRouter = router({
     subject: z.string().optional(),
     body: z.string().optional(),
     status: z.enum(["draft", "sent", "accepted", "rejected", "no_response"]).optional(),
+    publicationName: z.string().optional(),
+    editorName: z.string().optional(),
+    editorEmail: z.string().optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database unavailable");

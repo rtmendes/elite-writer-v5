@@ -9,9 +9,11 @@
  * 5. Usage tracking and starring
  */
 import { z } from "zod";
+import { createHash } from "crypto";
 import { eq, desc, and, like, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { uploadDataUrl } from "../_core/storage";
 import {
   contentLibrary, imageLibrary, imagePresets,
   type InsertContentLibraryItem, type InsertImageLibraryItem, type InsertImagePreset,
@@ -171,6 +173,62 @@ const imagesRouter = router({
         metadata: input.metadata || {},
       }).returning({ id: imageLibrary.id });
       return { id: inserted.id };
+    }),
+
+  // Edit metadata in place (Admin UX media library): name / altText / tags.
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      name: z.string().optional(),
+      altText: z.string().nullable().optional(),
+      tags: z.array(z.string()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const { id, ...rest } = input;
+      const set: Record<string, unknown> = {};
+      if (rest.name !== undefined) set.name = rest.name;
+      if (rest.altText !== undefined) set.altText = rest.altText;
+      if (rest.tags !== undefined) set.tags = rest.tags;
+      if (Object.keys(set).length > 0) {
+        await db.update(imageLibrary).set(set)
+          .where(and(eq(imageLibrary.id, id), eq(imageLibrary.userId, ctx.user.id)));
+      }
+      return { success: true };
+    }),
+
+  // Drag-drop upload → R2 → library, with content-hash dedup per user.
+  upload: protectedProcedure
+    .input(z.object({
+      dataUrl: z.string().min(1),   // data:image/...;base64,....
+      name: z.string().min(1),
+      altText: z.string().optional(),
+      tags: z.array(z.string()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const b64 = input.dataUrl.split(",")[1] ?? "";
+      const hash = createHash("sha256").update(b64).digest("hex");
+      // Dedup: same bytes already in this user's library → return it.
+      const existing = await db.select({ id: imageLibrary.id, imageUrl: imageLibrary.imageUrl })
+        .from(imageLibrary)
+        .where(and(eq(imageLibrary.userId, ctx.user.id), eq(imageLibrary.contentHash, hash)))
+        .limit(1);
+      if (existing[0]) return { id: existing[0].id, imageUrl: existing[0].imageUrl, deduped: true };
+
+      const url = await uploadDataUrl(input.dataUrl, "library");
+      if (!url) throw new Error("Object storage not configured (R2 env vars missing)");
+      const [inserted] = await db.insert(imageLibrary).values({
+        userId: ctx.user.id,
+        name: input.name,
+        imageUrl: url,
+        altText: input.altText || null,
+        tags: input.tags || [],
+        contentHash: hash,
+      }).returning({ id: imageLibrary.id });
+      return { id: inserted.id, imageUrl: url, deduped: false };
     }),
 
   delete: protectedProcedure

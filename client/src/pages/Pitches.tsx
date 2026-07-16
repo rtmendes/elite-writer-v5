@@ -14,6 +14,9 @@ import {
 import { PUBLICATIONS } from '@/lib/publications-data';
 import { trpc } from '@/lib/trpc';
 import { ListSelectionBar, SelectCheck, useSelection } from '@/components/list-selection';
+import { EditDrawer, type FieldDef } from '@/components/admin/EditDrawer';
+import { SavedViewBar } from '@/components/admin/SavedViewBar';
+import type { Pitch } from '@/lib/store';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   draft: { label: 'Draft', color: 'bg-secondary text-secondary-foreground', icon: Clock },
@@ -73,6 +76,14 @@ Thank you,
 [Your Name]`,
 };
 
+const PITCH_FIELDS: FieldDef[] = [
+  { key: 'subject', label: 'Subject', type: 'text', group: 'Content' },
+  { key: 'body', label: 'Body', type: 'textarea', rows: 10, group: 'Content' },
+  { key: 'status', label: 'Status', type: 'select', group: 'Meta', options: Object.keys(STATUS_CONFIG).map(k => ({ value: k, label: STATUS_CONFIG[k].label })) },
+  { key: 'publication_name', label: 'Publication', type: 'text', group: 'Meta' },
+  { key: 'editor_email', label: 'Editor Email', type: 'text', group: 'Meta' },
+];
+
 export default function Pitches() {
   const { state, addPitch, updatePitch, deletePitch } = useApp();
   const [showNew, setShowNew] = useState(false);
@@ -85,6 +96,8 @@ export default function Pitches() {
   const [pitchTemplate, setPitchTemplate] = useState('standard');
   const [viewPitch, setViewPitch] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [editing, setEditing] = useState<Pitch | null>(null);
+  const [activeViewId, setActiveViewId] = useState<number | null>(null);
   const pitchMutation = trpc.ai.pitch.useMutation();
   const createPitchDb = trpc.data.pitches.create.useMutation();
   const updatePitchDb = trpc.data.pitches.update.useMutation();
@@ -345,6 +358,19 @@ export default function Pitches() {
         </select>
       </div>
 
+      <SavedViewBar
+        page="pitches"
+        activeViewId={activeViewId}
+        currentConfig={{ filters: { status: filterStatus }, sort: { field: sortBy, dir: 'desc' } }}
+        onApply={(id, config) => {
+          setActiveViewId(id);
+          if (config) {
+            if (config.filters?.status) setFilterStatus(String(config.filters.status));
+            if (config.sort?.field) setSortBy(config.sort.field as typeof sortBy);
+          }
+        }}
+      />
+
       <ListSelectionBar
         selected={selected}
         clear={clear}
@@ -373,7 +399,7 @@ export default function Pitches() {
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     <SelectCheck checked={selected.has(pitch.id)} onToggle={() => toggle(pitch.id)} className="mt-1 shrink-0" />
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setEditing(pitch)}>
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Badge variant="outline" className={`text-[10px] ${config.color}`}>
                           <StatusIcon className="w-2.5 h-2.5 mr-1" />{config.label}
@@ -452,6 +478,31 @@ export default function Pitches() {
           )}
         </DialogContent>
       </Dialog>
+
+      <EditDrawer
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title={editing?.subject ?? 'Pitch'}
+        record={editing as unknown as Record<string, unknown> | null}
+        fields={PITCH_FIELDS}
+        onSave={async (patch) => {
+          if (!editing) return;
+          updatePitch(editing.id, patch as Partial<Pitch>);
+          const dbId = pitchIdMap.get(editing.id);
+          if (dbId) {
+            const p = patch as Record<string, unknown>;
+            // Drawer uses local store keys (snake_case); map to the DB mutation.
+            updatePitchDb.mutate({
+              id: dbId,
+              subject: p.subject as string | undefined,
+              body: p.body as string | undefined,
+              status: p.status as Pitch['status'] | undefined,
+              publicationName: p.publication_name as string | undefined,
+              editorEmail: p.editor_email as string | undefined,
+            });
+          }
+        }}
+      />
     </div>
   );
 }

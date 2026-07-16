@@ -16,6 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
+import { EditDrawer, type FieldDef } from "@/components/admin/EditDrawer";
+import { SavedViewBar, type ViewConfig } from "@/components/admin/SavedViewBar";
 import {
   PenTool, Plus, Search, Loader2, LayoutGrid, List, Copy,
   Send, Trash2, Edit, Eye, CheckCircle2, Clock, Archive,
@@ -65,6 +67,17 @@ const BRAND_COLORS: Record<string, string> = {
   "Second Spring": "bg-violet-500/10 text-violet-600 border-violet-500/20",
 };
 
+/* ─── EditDrawer fields (short-content: full record incl. body) ─── */
+const STUDIO_FIELDS: FieldDef[] = [
+  { key: "title", label: "Title", type: "text", group: "Content" },
+  { key: "body", label: "Body", type: "textarea", rows: 10, group: "Content", placeholder: "Write the full content…" },
+  { key: "tags", label: "Tags", type: "tags", group: "Content" },
+  { key: "status", label: "Status", type: "select", group: "Meta", options: STATUSES.map(s => ({ value: s.value, label: s.label })) },
+  { key: "platform", label: "Platform", type: "select", group: "Meta", options: PLATFORMS.map(p => ({ value: p.value, label: p.label })) },
+  { key: "contentType", label: "Content Type", type: "select", group: "Meta", options: CONTENT_TYPES.map(t => ({ value: t.value, label: t.label })) },
+  { key: "createdAt", label: "Created", type: "readonly", group: "Pipeline", format: (v) => (v ? new Date(String(v)).toLocaleString() : "—") },
+];
+
 /* ─── Helper: parse studioMeta safely ────────────────────── */
 function parseMeta(item: any) {
   if (!item) return null;
@@ -89,6 +102,8 @@ export default function ContentStudio() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [detailItem, setDetailItem] = useState<any>(null);
+  const [drawerItem, setDrawerItem] = useState<any>(null);
+  const [activeViewId, setActiveViewId] = useState<number | null>(null);
 
   // Form state
   const [formTitle, setFormTitle] = useState("");
@@ -191,6 +206,36 @@ export default function ContentStudio() {
     useMemo(() => items.map((i: any) => ({ id: i.id as number })), [items])
   );
 
+  // Stable drawer record — synthesize `tags` from metadata.hashtags for editing.
+  const drawerRecord = useMemo(
+    () => (drawerItem ? { ...drawerItem, tags: parseMeta(drawerItem)?.hashtags ?? [] } : null),
+    [drawerItem]
+  );
+
+  // Saved-views: current snapshot + apply handler wired to page state.
+  const currentConfig: ViewConfig = {
+    search: searchQuery,
+    filters: { platform: filterPlatform, contentType: filterType, status: filterStatus, brand: filterBrand },
+    sort: { field: sortBy, dir: "desc" },
+    mode: viewMode === "grid" ? "gallery" : "list",
+  };
+  const applyView = (id: number | null, config: ViewConfig | null) => {
+    setActiveViewId(id);
+    if (!config) {
+      setSearchQuery(""); setFilterPlatform("all"); setFilterType("all");
+      setFilterStatus("all"); setFilterBrand("all"); setSortBy("updated"); setViewMode("grid");
+      return;
+    }
+    setSearchQuery(config.search ?? "");
+    const f = config.filters ?? {};
+    setFilterPlatform((f.platform as string) ?? "all");
+    setFilterType((f.contentType as string) ?? "all");
+    setFilterStatus((f.status as string) ?? "all");
+    setFilterBrand((f.brand as string) ?? "all");
+    if (config.sort?.field) setSortBy(config.sort.field as typeof sortBy);
+    if (config.mode) setViewMode(config.mode === "list" ? "list" : "grid");
+  };
+
   const bulkDelete = async () => {
     if (!selected.size || !confirm(`Delete ${selected.size} item${selected.size === 1 ? "" : "s"}?`)) return;
     for (const id of selected) await deleteMutation.mutateAsync({ id: id as number });
@@ -284,6 +329,13 @@ export default function ContentStudio() {
           </Button>
         </div>
       </div>
+
+      <SavedViewBar
+        page="content-studio"
+        currentConfig={currentConfig}
+        activeViewId={activeViewId}
+        onApply={applyView}
+      />
 
       <ListSelectionBar
         selected={selected}
@@ -403,7 +455,7 @@ export default function ContentStudio() {
                   </div>
 
                   <div className="flex gap-2 pt-2">
-                    <Button size="sm" variant="outline" className="flex-1" onClick={() => openEdit(item)}>
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => setDrawerItem(item)}>
                       <Edit className="w-3 h-3 mr-1" />Edit
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(item.body || ""); toast.success("Copied!"); }}>
@@ -459,7 +511,7 @@ export default function ContentStudio() {
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <Button size="sm" variant="outline" onClick={() => openEdit(item)}><Edit className="w-3 h-3" /></Button>
+                    <Button size="sm" variant="outline" onClick={() => setDrawerItem(item)}><Edit className="w-3 h-3" /></Button>
                     <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(item.body || ""); toast.success("Copied!"); }}>
                       <Copy className="w-3 h-3" />
                     </Button>
@@ -689,6 +741,27 @@ export default function ContentStudio() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ─── Edit Drawer (Payload-style, autosave) ───────── */}
+      <EditDrawer
+        open={!!drawerItem}
+        onClose={() => setDrawerItem(null)}
+        title={drawerItem?.title ?? "Content"}
+        record={drawerRecord as unknown as Record<string, unknown> | null}
+        fields={STUDIO_FIELDS}
+        onSave={async (patch) => {
+          if (!drawerItem) return;
+          const upd: any = { id: drawerItem.id };
+          if ("title" in patch) upd.title = patch.title;
+          if ("body" in patch) upd.body = patch.body;
+          if ("status" in patch) upd.status = patch.status;
+          if ("platform" in patch) upd.platform = patch.platform;
+          if ("contentType" in patch) upd.contentType = patch.contentType;
+          if ("tags" in patch) upd.metadata = { ...(parseMeta(drawerItem) || {}), hashtags: patch.tags };
+          await updateMutation.mutateAsync(upd);
+          await itemsQuery.refetch();
+        }}
+      />
     </div>
   );
 }

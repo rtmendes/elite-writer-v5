@@ -16,6 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
+import { EditDrawer, type FieldDef } from "@/components/admin/EditDrawer";
+import { SavedViewBar, type ViewConfig } from "@/components/admin/SavedViewBar";
 import {
   MessageSquare, Plus, Search, Loader2, Twitter, Linkedin,
   Facebook, Send, Trash2, Copy, Sparkles, Hash, Globe,
@@ -58,6 +60,10 @@ export default function Social() {
   // Publish state
   const [publishPostId, setPublishPostId] = useState<number | null>(null);
   const [webhookUrl, setWebhookUrl] = useState("");
+
+  // Edit-drawer + saved-views state
+  const [drawerPost, setDrawerPost] = useState<any>(null);
+  const [activeViewId, setActiveViewId] = useState<number | null>(null);
 
   // tRPC queries & mutations
   const postsQuery = trpc.social.list.useQuery({ platform: filterPlatform !== "all" ? filterPlatform : undefined });
@@ -138,6 +144,33 @@ export default function Social() {
   };
 
   const getPlatformInfo = (p: string) => PLATFORMS.find(x => x.value === p) || PLATFORMS[0];
+
+  // EditDrawer fields (short-content: edits the full record incl. body).
+  // Platform is read-only — the social.update mutation cannot change it.
+  const POST_FIELDS: FieldDef[] = [
+    { key: "content", label: "Content", type: "textarea", rows: 8, group: "Content", placeholder: "Post copy…" },
+    { key: "status", label: "Status", type: "select", group: "Meta", options: POST_STATUSES },
+    { key: "platform", label: "Platform", type: "readonly", group: "Meta", format: (v) => getPlatformInfo(String(v)).label },
+    { key: "createdAt", label: "Created", type: "readonly", group: "Meta", format: (v) => (v ? new Date(String(v)).toLocaleString() : "—") },
+  ];
+
+  // Saved-views: current snapshot + apply handler wired to page state.
+  const currentConfig: ViewConfig = {
+    search: searchQuery,
+    filters: { platform: filterPlatform },
+    sort: { field: sortBy, dir: "desc" },
+    mode: "gallery",
+  };
+  const applyView = (id: number | null, config: ViewConfig | null) => {
+    setActiveViewId(id);
+    if (!config) {
+      setSearchQuery(""); setFilterPlatform("all"); setSortBy("newest");
+      return;
+    }
+    setSearchQuery(config.search ?? "");
+    setFilterPlatform((config.filters?.platform as string) ?? "all");
+    if (config.sort?.field) setSortBy(config.sort.field as typeof sortBy);
+  };
 
   return (
     <div className="h-full overflow-auto">
@@ -383,6 +416,13 @@ export default function Social() {
               </select>
             </div>
 
+            <SavedViewBar
+              page="social"
+              currentConfig={currentConfig}
+              activeViewId={activeViewId}
+              onApply={applyView}
+            />
+
             <ListSelectionBar
               selected={selected}
               clear={clear}
@@ -430,7 +470,7 @@ export default function Social() {
                             </Badge>
                           </div>
                         </div>
-                        <p className="text-sm whitespace-pre-wrap line-clamp-4">{post.content}</p>
+                        <p className="text-sm whitespace-pre-wrap line-clamp-4 cursor-pointer hover:text-primary" onClick={() => setDrawerPost(post)}>{post.content}</p>
                         {(post.hashtags as string[])?.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {(post.hashtags as string[]).map((tag, i) => (
@@ -498,6 +538,23 @@ export default function Social() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* ─── Edit Drawer (Payload-style, autosave) ───────── */}
+        <EditDrawer
+          open={!!drawerPost}
+          onClose={() => setDrawerPost(null)}
+          title={drawerPost ? `${getPlatformInfo(drawerPost.platform).label} post` : "Post"}
+          record={drawerPost as unknown as Record<string, unknown> | null}
+          fields={POST_FIELDS}
+          onSave={async (patch) => {
+            if (!drawerPost) return;
+            const upd: any = { id: drawerPost.id };
+            if ("content" in patch) upd.content = patch.content;
+            if ("status" in patch) upd.status = patch.status;
+            await updateMutation.mutateAsync(upd);
+            await postsQuery.refetch();
+          }}
+        />
       </div>
     </div>
   );

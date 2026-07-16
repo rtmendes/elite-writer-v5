@@ -22,6 +22,7 @@ import Brands from "./pages/Brands";
 import Queue from "./pages/Queue";
 import Social from "./pages/Social";
 import ContentLibrary from "./pages/Library";
+import MediaLibrary from "./pages/Media";
 import Geo from "./pages/Geo";
 import Strategy from "./pages/Strategy";
 import Pipeline from "./pages/Pipeline";
@@ -79,6 +80,7 @@ function Router() {
             <Route path="/accelerator" component={Accelerator} />
             <Route path="/social" component={Social} />
             <Route path="/library" component={ContentLibrary} />
+            <Route path="/media" component={MediaLibrary} />
             <Route path="/knowledge-hub" component={KnowledgeHub} />
             <Route path="/geo" component={Geo} />
             <Route path="/strategy" component={Strategy} />
