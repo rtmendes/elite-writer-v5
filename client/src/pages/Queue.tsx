@@ -51,6 +51,7 @@ import {
   buildCoverMap, coverVisual, articlesToRows, rowsToCsv, type QueueExportRow,
 } from '@/lib/queue-tools';
 import { EditDrawer, type FieldDef } from '@/components/admin/EditDrawer';
+import { MediaPicker } from '@/components/admin/MediaPicker';
 import { SavedViewBar, type ViewConfig } from '@/components/admin/SavedViewBar';
 
 // Article status in the queue pipeline
@@ -806,14 +807,28 @@ export default function Queue() {
         openInWriter={(r) => navigate(`/writer/${(r as any).id}`)}
         onSave={async (patch) => {
           if (!editing) return;
-          // data.articles.update takes the supported subset; any keys it does
-          // not accept (excerpt/category/tags) are stripped server-side by zod.
           await updateArticle.mutateAsync(
             { id: editing.id, ...patch } as Parameters<typeof updateArticle.mutateAsync>[0]
           );
           await articlesQuery.refetch();
         }}
-      />
+      >
+        {editing && (
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Media</h3>
+            <MediaPicker
+              value={editing.featuredImageUrl as string | null | undefined}
+              onChange={async (url) => {
+                setEditing((e: any) => (e ? { ...e, featuredImageUrl: url } : e));
+                await updateArticle.mutateAsync(
+                  { id: editing.id, featuredImageUrl: url } as Parameters<typeof updateArticle.mutateAsync>[0]
+                );
+                await articlesQuery.refetch();
+              }}
+            />
+          </section>
+        )}
+      </EditDrawer>
 
       {/* ─── AI Image Generator dialog ─── */}
       <ImageGeneratorDialog
