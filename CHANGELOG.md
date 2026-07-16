@@ -17,6 +17,15 @@ All notable operational and code changes to Elite Writer.
   outbound port 22; cleared on its own. The two one-shot recovery blocks in
   deploy-poll.sh (PRs #86/#87) are removed — they were harmless no-ops.
 
+## 2026-07-16 — ZimmWriter integration: full-functionality wiring
+
+Verified the end-to-end path and closed three gaps:
+- `/api/health` now reports `zimmwriterIngest` (true when SECRET or TOKEN is set)
+  — standing rule: every integration gets a health boolean for outside checks.
+- Queue surfaces the previously-dead `needsScoring` flag as a "Needs scoring"
+  badge (auto-hides once an article is scored) + a "ZimmWriter" imported badge,
+  so ingested drafts are visible and actionable (score via the existing Re-score).
+
 ## 2026-07-16 — Payload-style CMS admin UX (branch feat/admin-ux-cms)
 
 In-app content management overhaul — no CMS platform adopted; the engine

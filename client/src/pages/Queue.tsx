@@ -79,6 +79,8 @@ type QueueItem = {
   tags: string[];
   previewSnippet: string;
   coverUrl: string | null;
+  needsScoring: boolean;
+  importedFrom: string | null;
 };
 
 const STATUS_CONFIG: Record<QueueStatus, { label: string; color: string; icon: any }> = {
@@ -189,6 +191,10 @@ export default function Queue() {
         tags: [article.brandVoice].filter(Boolean),
         previewSnippet: getPreviewSnippet(content),
         coverUrl: coverMap.get(article.id) ?? null,
+        // needsScoring is set on external ingest (ZimmWriter); show it until the
+        // article actually gets a score, so imported drafts are actionable.
+        needsScoring: Boolean(article.needsScoring) && !article.overallScore,
+        importedFrom: article.importedFrom ?? null,
       };
     });
   }, [articles, coverMap]);
@@ -963,6 +969,8 @@ function GalleryCard({ item, selected, onToggleSelect, onOpenInWriter, onDelete,
         </button>
         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
           <Badge variant="outline" className={`text-[10px] ${config.color}`}><StatusIcon className="w-2.5 h-2.5 mr-1" />{config.label}</Badge>
+          {item.needsScoring && <Badge variant="outline" className="text-[10px] bg-yellow-500/10 text-yellow-500 border-yellow-500/20"><Sparkles className="w-2.5 h-2.5 mr-1" />Needs scoring</Badge>}
+          {item.importedFrom?.startsWith('zimmwriter') && <Badge variant="outline" className="text-[10px]"><Download className="w-2.5 h-2.5 mr-1" />ZimmWriter</Badge>}
           {item.qualityGrade && <Badge className={`text-[10px] font-mono ${getGradeBgColor(item.qualityGrade as any)}`}>{item.qualityGrade}</Badge>}
           {item.targetPublication && <Badge variant="outline" className="text-[10px]"><BookOpen className="w-2.5 h-2.5 mr-1" />{item.targetPublication}</Badge>}
         </div>
@@ -1006,6 +1014,8 @@ function ListRow({ item, selected, onToggleSelect, onOpenInWriter, onDelete, onU
           </button>
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
             <Badge variant="outline" className={`text-[10px] ${config.color}`}><StatusIcon className="w-2.5 h-2.5 mr-1" />{config.label}</Badge>
+            {item.needsScoring && <Badge variant="outline" className="text-[10px] bg-yellow-500/10 text-yellow-500 border-yellow-500/20"><Sparkles className="w-2.5 h-2.5 mr-1" />Needs scoring</Badge>}
+            {item.importedFrom?.startsWith('zimmwriter') && <Badge variant="outline" className="text-[10px]"><Download className="w-2.5 h-2.5 mr-1" />ZimmWriter</Badge>}
             {item.targetPublication && <Badge variant="outline" className="text-[10px]"><BookOpen className="w-2.5 h-2.5 mr-1" />{item.targetPublication}</Badge>}
             <span className="text-[10px] text-muted-foreground">{item.wordCount.toLocaleString()} words · {formatRelativeTime(item.createdAt)}</span>
           </div>
