@@ -502,6 +502,24 @@ export const savedViews = pgTable("saved_views", {
 export type SavedView = typeof savedViews.$inferSelect;
 export type InsertSavedView = typeof savedViews.$inferInsert;
 
+// ─── Nav Layout (per-user customizable left navigation) ───
+// One row per user. config = the operator's section order, per-section item
+// order + membership (by path), and hidden item paths. The code defines the
+// canonical items/icons; this only overlays order/grouping/visibility, and new
+// code-added items are merged in on load so shipping a feature never hides it.
+export const userNavLayout = pgTable("user_nav_layout", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().unique(),
+  config: jsonb("config").$type<{
+    sections: Array<{ title: string; items: string[] }>;
+    hidden: string[];
+  }>().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+
+export type UserNavLayout = typeof userNavLayout.$inferSelect;
+export type InsertUserNavLayout = typeof userNavLayout.$inferInsert;
+
 // ═══════════════════════════════════════════════════════════
 // NEW TABLES — Blazly + GistStack Feature Integration
 // ═══════════════════════════════════════════════════════════

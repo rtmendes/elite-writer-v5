@@ -41,6 +41,7 @@ import { acceleratorRouter } from "./routers/accelerator";
 import { stripeRouter } from "./routers/stripe";
 import { templateSopsRouter } from "./routers/templateSops";
 import { savedViewsRouter } from "./routers/savedViews";
+import { navLayoutRouter } from "./routers/navLayout";
 import { researchLibraryRouter } from "./routers/researchLibrary";
 import { ingestRouter } from "./routers/ingest";
 
@@ -113,6 +114,7 @@ export const appRouter = router({
   stripe: stripeRouter,
   templateSops: templateSopsRouter,
   savedViews: savedViewsRouter,
+  navLayout: navLayoutRouter,
   researchLibrary: researchLibraryRouter,
   ingest: ingestRouter,
 });

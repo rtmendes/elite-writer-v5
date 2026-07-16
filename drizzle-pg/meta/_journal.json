@@ -15,6 +15,13 @@
       "when": 1784168240438,
       "tag": "0001_slippery_shadow_king",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784235515396,
+      "tag": "0002_rich_ultimates",
+      "breakpoints": true
     }
   ]
 }

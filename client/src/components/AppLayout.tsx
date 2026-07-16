@@ -1,85 +1,23 @@
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { AppProvider } from '@/contexts/AppContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/_core/hooks/useAuth';
 import {
-  LayoutDashboard, Newspaper, Lightbulb, Search, PenTool,
-  BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
-  Zap, Menu, Building2, Inbox, Loader2,
-  MessageSquare, Library, Globe, Map, Users, Image as ImageIcon,
-  Flame, Calendar, Mic, Palette, ChevronDown,
-  LayoutGrid, Rss, Clapperboard, FileText, ListChecks, Network, Rocket,
+  Search, Zap, Menu, Loader2, ChevronLeft, ChevronRight, ChevronDown,
+  GripVertical, Eye, EyeOff, SlidersHorizontal, RotateCcw, Plus, Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { trpc } from '@/lib/trpc';
+import {
+  NAV_SECTIONS, NAV_ITEMS, resolveLayout, serializeLayout,
+  type NavSection, type NavItem,
+} from '@/lib/nav-config';
 import { ThemeSelector } from './ThemeSelector';
 import {
   CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from '@/components/ui/command';
 
-type NavItem = {
-  path: string;
-  label: string;
-  icon: any;
-  description: string;
-  subItems?: Array<{ path: string; label: string; icon: any }>;
-};
-
-const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
-  {
-    title: 'Writing Studio',
-    items: [
-      { path: '/', label: 'Dashboard', icon: LayoutDashboard, description: 'Overview & metrics' },
-      { path: '/giststack', label: 'Intelligence', icon: Newspaper, description: 'Content curation & trends' },
-      { path: '/sources', label: 'Feed Sources', icon: Rss, description: 'YouTube, Reddit & feeds to follow' },
-      { path: '/pulse', label: 'Pulse Pipeline', icon: Zap, description: 'AI stories → matched articles' },
-      { path: '/ideas', label: 'Ideas', icon: Lightbulb, description: 'Article idea pipeline' },
-      { path: '/research', label: 'Research', icon: Search, description: 'Search · Library · Projects · Chat', subItems: [
-        { path: '/research-library', label: 'Library', icon: Library },
-        { path: '/research-projects', label: 'Projects', icon: LayoutGrid },
-      ] },
-      { path: '/writer', label: 'Writer', icon: PenTool, description: 'AI-enhanced editor' },
-      { path: '/workspace', label: 'Workspace', icon: LayoutGrid, description: 'Pages, databases & boards' },
-      { path: '/queue', label: 'Queue', icon: Inbox, description: 'Pre-written article pipeline' },
-      { path: '/agents', label: 'Agents', icon: Users, description: 'AI editorial team — chat & assign' },
-      { path: '/tasks', label: 'Task Center', icon: ListChecks, description: 'Run agent jobs & one-off tasks' },
-    ],
-  },
-  {
-    title: 'Publish & Distribute',
-    items: [
-      { path: '/publications', label: 'Publications', icon: BookOpen, description: '174+ publication database' },
-      { path: '/pitches', label: 'Pitches', icon: Send, description: 'Pitch management' },
-      { path: '/social', label: 'Social Engine', icon: MessageSquare, description: 'Multi-platform content' },
-      { path: '/trending', label: 'Trending', icon: Flame, description: 'Trending topics discovery' },
-      { path: '/content-studio', label: 'Content Studio', icon: PenTool, description: 'Multi-platform content creation' },
-      { path: '/video-scripts', label: 'Video Scripts', icon: Clapperboard, description: 'VSL, TikTok, YouTube, UGC scripts' },
-      { path: '/content-calendar', label: 'Calendar', icon: Calendar, description: 'Content scheduling calendar' },
-      { path: '/content-insights', label: 'Insights', icon: Lightbulb, description: 'Smart content curation' },
-      { path: '/interviews', label: 'AI Interviews', icon: Mic, description: 'Guided Q&A expertise extraction' },
-    ],
-  },
-  {
-    title: 'Growth & Operations',
-    items: [
-      { path: '/brand-voice', label: 'Brand Voice', icon: Palette, description: 'Voice profile training' },
-      { path: '/library', label: 'Library', icon: Library, description: 'Content & asset library' },
-      { path: '/media', label: 'Media', icon: ImageIcon, description: 'Unified image library + uploads' },
-      { path: '/documentation', label: 'Documentation AI', icon: FileText, description: 'Generate docs & SOPs' },
-      { path: '/knowledge-hub', label: 'Knowledge Hub', icon: BookOpen, description: 'Reading view over your knowledge' },
-      { path: '/geo', label: 'GEO Suite', icon: Globe, description: 'AI visibility & humanizer' },
-      { path: '/strategy', label: 'Strategy', icon: Map, description: 'Keywords & content strategy' },
-      { path: '/pipeline', label: 'Pipeline', icon: Zap, description: 'One-click article production' },
-      { path: '/brands', label: 'Brands', icon: Building2, description: 'Brand & product engine' },
-      { path: '/planning-board', label: 'Planning Board', icon: Network, description: 'Org & data-flow map' },
-      { path: '/financial', label: 'Financial', icon: DollarSign, description: 'Revenue tracking' },
-      { path: '/accelerator', label: 'Accelerator', icon: Rocket, description: '$100K–$200K/mo goal engine' },
-      { path: '/settings', label: 'Settings', icon: Settings, description: 'API keys & preferences' },
-    ],
-  },
-];
-
-const NAV_ITEMS = NAV_SECTIONS.flatMap(section => section.items);
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -89,6 +27,68 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem("ew_nav_sections") ?? "{}"); } catch { return {}; }
   });
+
+  // ── Customizable nav: per-user order / grouping / visibility (navLayout router).
+  const [editMode, setEditMode] = useState(false);
+  const [sections, setSections] = useState<NavSection[]>(NAV_SECTIONS);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const navLayoutQuery = trpc.navLayout.get.useQuery(undefined, { staleTime: 60_000 });
+  const saveLayout = trpc.navLayout.save.useMutation();
+  const resetLayout = trpc.navLayout.reset.useMutation();
+  const utils = trpc.useUtils();
+
+  // Hydrate once the saved layout loads (merges over the canonical nav).
+  useEffect(() => {
+    if (navLayoutQuery.data !== undefined) {
+      const r = resolveLayout(navLayoutQuery.data);
+      setSections(r.sections);
+      setHidden(r.hidden);
+    }
+  }, [navLayoutQuery.data]);
+
+  // Persist the current layout (debounced) after any edit.
+  const persist = (nextSections: NavSection[], nextHidden: Set<string>) => {
+    saveLayout.mutate(serializeLayout(nextSections, nextHidden));
+  };
+
+  // Drag state: what's being dragged (an item at [s,i] or a whole section).
+  const dragItem = useRef<{ s: number; i: number } | null>(null);
+  const dragSection = useRef<number | null>(null);
+
+  const applyMove = (next: NavSection[]) => { setSections(next); persist(next, hidden); };
+
+  const moveItem = (from: { s: number; i: number }, to: { s: number; i: number }) => {
+    const next = sections.map(sec => ({ ...sec, items: [...sec.items] }));
+    const [moved] = next[from.s].items.splice(from.i, 1);
+    if (!moved) return;
+    const insertAt = Math.min(to.i, next[to.s].items.length);
+    next[to.s].items.splice(insertAt, 0, moved);
+    applyMove(next.filter(s => s.items.length > 0));
+  };
+
+  const moveSection = (from: number, to: number) => {
+    const next = [...sections];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    applyMove(next);
+  };
+
+  const setItemHidden = (path: string, hide: boolean) => {
+    const next = new Set(hidden);
+    hide ? next.add(path) : next.delete(path);
+    setHidden(next);
+    persist(sections, next);
+  };
+
+  const resetNav = () => {
+    resetLayout.mutate(undefined, { onSuccess: () => utils.navLayout.get.invalidate() });
+    const r = resolveLayout(null);
+    setSections(r.sections);
+    setHidden(new Set());
+  };
+
+  const hiddenItems = NAV_ITEMS.filter(i => hidden.has(i.path));
+
   // useTheme retained for components that may need it; ThemeSelector manages theme switching
   const { loading: authLoading, isAuthenticated } = useAuth({ redirectOnUnauthenticated: true });
 
@@ -157,30 +157,100 @@ export function AppLayout({ children }: { children: ReactNode }) {
             )}
           </div>
 
+          {/* Customize toggle (hidden when the rail is collapsed) */}
+          {!collapsed && (
+            <div className="flex items-center justify-between px-3 pt-2">
+              <button
+                onClick={() => setEditMode(v => !v)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
+                  editMode ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/60"
+                )}
+              >
+                {editMode ? <Check className="w-3.5 h-3.5" /> : <SlidersHorizontal className="w-3.5 h-3.5" />}
+                {editMode ? 'Done' : 'Customize'}
+              </button>
+              {editMode && (
+                <button onClick={resetNav} title="Reset to default"
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:text-destructive">
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-3">
-            {NAV_SECTIONS.map(section => {
-              const sectionOpen = collapsed || openSections[section.title] !== false;
+            {sections.map((section, sIdx) => {
+              const sectionOpen = collapsed || editMode || openSections[section.title] !== false;
+              const visibleItems = section.items.filter(i => editMode || !hidden.has(i.path));
+              if (visibleItems.length === 0 && !editMode) return null;
               return (
-              <div key={section.title} className="space-y-1.5">
+              <div
+                key={section.title}
+                className={cn("space-y-1.5", editMode && "rounded-lg border border-dashed border-sidebar-border/60 p-1")}
+                onDragOver={editMode ? (e) => e.preventDefault() : undefined}
+                onDrop={editMode ? (e) => {
+                  e.preventDefault();
+                  if (dragSection.current !== null && dragSection.current !== sIdx) { moveSection(dragSection.current, sIdx); dragSection.current = null; }
+                  else if (dragItem.current && dragItem.current.s !== sIdx) { moveItem(dragItem.current, { s: sIdx, i: section.items.length }); dragItem.current = null; }
+                } : undefined}
+              >
                 {!collapsed && (
                   <button
+                    draggable={editMode}
+                    onDragStart={editMode ? () => { dragSection.current = sIdx; } : undefined}
                     onClick={() => {
+                      if (editMode) return;
                       const next = { ...openSections, [section.title]: openSections[section.title] === false };
                       setOpenSections(next);
                       try { localStorage.setItem("ew_nav_sections", JSON.stringify(next)); } catch { /* ignore */ }
                     }}
-                    className="w-full flex items-center justify-between px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors"
+                    className={cn(
+                      "w-full flex items-center justify-between px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-colors",
+                      editMode && "cursor-grab active:cursor-grabbing"
+                    )}
                   >
-                    <span>{section.title}</span>
-                    <ChevronDown className={cn("w-3 h-3 transition-transform duration-200", !sectionOpen && "-rotate-90")} />
+                    <span className="flex items-center gap-1.5">
+                      {editMode && <GripVertical className="w-3 h-3 opacity-60" />}
+                      {section.title}
+                    </span>
+                    {!editMode && <ChevronDown className={cn("w-3 h-3 transition-transform duration-200", !sectionOpen && "-rotate-90")} />}
                   </button>
                 )}
-                {sectionOpen && section.items.map((item) => {
+                {sectionOpen && visibleItems.map((item) => {
+                  const iIdx = section.items.indexOf(item);
+                  const isHidden = hidden.has(item.path);
                   const subActive = item.subItems?.some(s => location.startsWith(s.path)) ?? false;
                   const isActive = item.path === '/' ? location === '/' : location.startsWith(item.path) || subActive;
                   return (
-                    <div key={item.path}>
+                    <div
+                      key={item.path}
+                      draggable={editMode}
+                      onDragStart={editMode ? (e) => { dragItem.current = { s: sIdx, i: iIdx }; e.stopPropagation(); } : undefined}
+                      onDragOver={editMode ? (e) => { e.preventDefault(); e.stopPropagation(); } : undefined}
+                      onDrop={editMode ? (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        if (dragItem.current) { moveItem(dragItem.current, { s: sIdx, i: iIdx }); dragItem.current = null; }
+                      } : undefined}
+                    >
+                      {editMode ? (
+                        <div className={cn(
+                          "group flex items-center gap-2 rounded-xl px-2 py-2 text-sm cursor-grab active:cursor-grabbing",
+                          isHidden ? "opacity-40" : "text-sidebar-foreground/85 hover:bg-sidebar-accent/60"
+                        )}>
+                          <GripVertical className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                          <item.icon className="w-4 h-4 shrink-0" />
+                          <span className="flex-1 truncate">{item.label}</span>
+                          <button
+                            title={isHidden ? 'Show' : 'Hide'}
+                            onClick={(e) => { e.stopPropagation(); setItemHidden(item.path, !isHidden); }}
+                            className="text-muted-foreground hover:text-sidebar-foreground"
+                          >
+                            {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      ) : (
                       <Link
                         href={item.path}
                         onClick={() => setMobileOpen(false)}
@@ -202,7 +272,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
                           </div>
                         )}
                       </Link>
-                      {!collapsed && isActive && item.subItems && (
+                      )}
+                      {!collapsed && !editMode && isActive && item.subItems && (
                         <div className="ml-7 mt-0.5 space-y-0.5">
                           {item.subItems.map(sub => {
                             const subIsActive = location.startsWith(sub.path);
