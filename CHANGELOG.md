@@ -2,6 +2,21 @@
 
 All notable operational and code changes to Elite Writer.
 
+## 2026-07-16 — Customizable left navigation (drag, regroup, hide, per-user)
+
+- New `user_nav_layout` table + `navLayout` router (get/save/reset), per user.
+- AppLayout: a "Customize" toggle turns the sidebar into edit mode — drag items
+  within a section, drag items between sections, drag whole sections to reorder,
+  and hide/show items (dimmed inline with an eye toggle). "Reset" restores the
+  code default. Layout saves to the server and syncs across devices.
+- Canonical nav moved to `client/src/lib/nav-config.tsx`; `resolveLayout()`
+  merges the saved layout over code so newly-shipped items always appear (a
+  saved layout can never permanently hide a future feature). ⌘K palette still
+  lists every destination regardless of customization.
+- Verified live: hide persists + survives reload + removes the item; section
+  reorder persists; reset restores default. Gate: tsc 0 · tests 87/87 · build clean.
+- (Collapse-to-rail + section accordion already existed and are unchanged.)
+
 ## 2026-07-16 — Schema migrations now auto-apply at boot (permanent drift fix)
 
 Root cause of both recent prod bugs (ZimmWriter #81 columns, saved_views):
