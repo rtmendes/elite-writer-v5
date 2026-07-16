@@ -2,6 +2,21 @@
 
 All notable operational and code changes to Elite Writer.
 
+## 2026-07-16 — Ops: migration 0001 applied, ZimmWriter armed, SSH postmortem
+
+- **Migration 0001 applied to prod Supabase** (founder-approved): saved_views
+  table, image altText/contentHash, the 13 ZimmWriter article columns. All
+  IF NOT EXISTS; verified object-by-object. Saved views + drawer autosave +
+  media fields confirmed working end-to-end against the live DB.
+- **ZimmWriter webhook armed** (founder-approved): ZIMMWRITER_INGEST_TOKEN set
+  in .env.production (token value never in chat/git; founder copy on Desktop),
+  app container recreated. Verified live: 401 without token, 201 created with
+  token, resend → exists (idempotent), probe article cleaned up.
+- **SSH outage postmortem**: founder IP was never banned (fail2ban list checked,
+  iptables clean, no CrowdSec) — outage was the local ISP/router blocking
+  outbound port 22; cleared on its own. The two one-shot recovery blocks in
+  deploy-poll.sh (PRs #86/#87) are removed — they were harmless no-ops.
+
 ## 2026-07-16 — Payload-style CMS admin UX (branch feat/admin-ux-cms)
 
 In-app content management overhaul — no CMS platform adopted; the engine
