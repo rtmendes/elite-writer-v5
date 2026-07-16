@@ -120,3 +120,12 @@ client/public/__manus__/version.json
 
 # Self-audit screenshots
 audit-artifacts/
+
+# ZimmWriter temp/output files
+ZimmWriter/
+zimmwriter-temp/
+zimmwriter-output/
+*.zimm
+*.zimm.bak
+1clickprompts*.txt
+zimm_bulk_*.csv
