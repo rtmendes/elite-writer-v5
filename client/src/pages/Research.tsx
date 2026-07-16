@@ -22,6 +22,8 @@ import * as pdfjsLib from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { trpc } from "@/lib/trpc";
 import { ListSelectionBar, SelectCheck, useSelection } from "@/components/list-selection";
+import { EditDrawer, type FieldDef } from "@/components/admin/EditDrawer";
+import { SavedViewBar } from "@/components/admin/SavedViewBar";
 import {
   Search, Sparkles, Loader2, BookOpen, FileText, ExternalLink, Save, Trash2,
   Plus, Upload, Download, MessageSquare, Library as LibraryIcon, Globe,
@@ -354,12 +356,25 @@ type RefRow = {
 type SortKey = "title" | "year" | "citationCount";
 const PAGE_SIZE = 25;
 
+// Only title / year / notes / tags persist via references.update; authors / doi /
+// url are shown read-only (the mutation can't store them without a server change).
+const REF_FIELDS: FieldDef[] = [
+  { key: "title", label: "Title", type: "text", group: "Reference" },
+  { key: "authors", label: "Authors", type: "readonly", group: "Reference", format: (v) => (Array.isArray(v) ? v.join(", ") : v ? String(v) : "—") },
+  { key: "year", label: "Year", type: "number", group: "Reference" },
+  { key: "doi", label: "DOI", type: "readonly", group: "Reference", format: (v) => (v ? String(v) : "—") },
+  { key: "url", label: "URL", type: "readonly", group: "Reference", format: (v) => (v ? String(v) : "—") },
+  { key: "notes", label: "Notes", type: "textarea", rows: 4, group: "Reference" },
+  { key: "tags", label: "Tags", type: "tags", group: "Reference" },
+];
+
 function LibraryTab() {
   const list = trpc.researchHub.references.list.useQuery({});
   const create = trpc.researchHub.references.create.useMutation();
   const remove = trpc.researchHub.references.remove.useMutation();
   const doImport = trpc.researchHub.references.import.useMutation();
   const saveKb = trpc.researchHub.references.saveToKb.useMutation();
+  const update = trpc.researchHub.references.update.useMutation();
   const utils = trpc.useUtils();
 
   const [q, setQ] = useState("");
@@ -367,6 +382,8 @@ function LibraryTab() {
   const [sortKey, setSortKey] = useState<SortKey>("citationCount");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
+  const [editingRef, setEditingRef] = useState<RefRow | null>(null);
+  const [activeViewId, setActiveViewId] = useState<number | null>(null);
 
   const rows: RefRow[] = (list.data?.references ?? []) as RefRow[];
   const types = useMemo(() => Array.from(new Set(rows.map((r) => r.type))).sort(), [rows]);
@@ -429,6 +446,21 @@ function LibraryTab() {
         <ImportDialog onImport={async (format, text) => { const r = await doImport.mutateAsync({ format, text }); await utils.researchHub.references.list.invalidate(); toast.success(`Imported ${r.imported}`); }} />
       </div>
 
+      <SavedViewBar
+        page="research"
+        activeViewId={activeViewId}
+        currentConfig={{ search: q, filters: { type: typeFilter }, sort: { field: sortKey, dir: sortDir } }}
+        onApply={(id, config) => {
+          setActiveViewId(id);
+          if (config) {
+            if (config.search !== undefined) setQ(config.search);
+            if (config.filters?.type) setTypeFilter(String(config.filters.type));
+            if (config.sort?.field) { setSortKey(config.sort.field as SortKey); if (config.sort.dir) setSortDir(config.sort.dir); }
+            setPage(0);
+          }
+        }}
+      />
+
       {/* Bulk action bar */}
       <ListSelectionBar selected={selected} clear={clear} onDelete={bulkDelete}>
         <Button size="sm" variant="outline" className="h-8 text-xs" onClick={bulkSaveKb} disabled={saveKb.isPending}>
@@ -465,17 +497,17 @@ function LibraryTab() {
             </thead>
             <tbody>
               {pageRows.map((r) => (
-                <tr key={r.id} className={`border-t border-border ${selected.has(r.id) ? "bg-primary/5" : "hover:bg-accent/40"}`}>
-                  <td className="px-3 py-2"><SelectCheck checked={selected.has(r.id)} onToggle={() => toggle(r.id)} /></td>
+                <tr key={r.id} onClick={() => setEditingRef(r)} className={`cursor-pointer border-t border-border ${selected.has(r.id) ? "bg-primary/5" : "hover:bg-accent/40"}`}>
+                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}><SelectCheck checked={selected.has(r.id)} onToggle={() => toggle(r.id)} /></td>
                   <td className="px-3 py-2">
-                    {r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-primary inline-flex items-center gap-1">{r.title}<ExternalLink className="w-3 h-3 opacity-50" /></a> : <span className="text-foreground">{r.title}</span>}
+                    {r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-foreground hover:text-primary inline-flex items-center gap-1">{r.title}<ExternalLink className="w-3 h-3 opacity-50" /></a> : <span className="text-foreground">{r.title}</span>}
                     {r.doi && <span className="block text-[10px] text-muted-foreground">{r.doi}</span>}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground hidden lg:table-cell truncate max-w-[180px]">{Array.isArray(r.authors) ? r.authors.slice(0, 3).join(", ") : ""}</td>
                   <td className="px-3 py-2 text-muted-foreground">{r.year ?? "—"}</td>
                   <td className="px-3 py-2 text-muted-foreground">{r.citationCount ? r.citationCount.toLocaleString() : "—"}</td>
                   <td className="px-3 py-2"><Badge variant="outline" className="text-[10px]">{r.type}</Badge></td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1 justify-end">
                       <button title="Save to KB" onClick={async () => { await saveKb.mutateAsync({ id: r.id }); toast.success("Saved to KB"); }} className="text-muted-foreground hover:text-primary p-1"><Save className="w-3.5 h-3.5" /></button>
                       <button title="Delete" onClick={async () => { if (confirm("Delete this reference?")) { await remove.mutateAsync({ ids: [r.id] }); await utils.researchHub.references.list.invalidate(); } }} className="text-muted-foreground hover:text-red-400 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -495,8 +527,8 @@ function LibraryTab() {
             <div key={r.id} className={`rounded-lg border p-3 ${selected.has(r.id) ? "border-primary/40 bg-primary/5" : "border-border"}`}>
               <div className="flex items-start gap-2">
                 <SelectCheck checked={selected.has(r.id)} onToggle={() => toggle(r.id)} className="accent-[var(--primary)] w-5 h-5 mt-0.5" />
-                <div className="min-w-0 flex-1">
-                  {r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-foreground">{r.title}</a> : <span className="text-sm font-medium text-foreground">{r.title}</span>}
+                <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setEditingRef(r)}>
+                  {r.url ? <a href={r.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-sm font-medium text-foreground">{r.title}</a> : <span className="text-sm font-medium text-foreground">{r.title}</span>}
                   <div className="flex items-center gap-2 mt-1 flex-wrap text-[11px] text-muted-foreground">
                     <Badge variant="outline" className="text-[10px]">{r.type}</Badge>
                     {r.year ? <span>{r.year}</span> : null}
@@ -524,6 +556,26 @@ function LibraryTab() {
           </div>
         </div>
       )}
+
+      <EditDrawer
+        open={!!editingRef}
+        onClose={() => setEditingRef(null)}
+        title={editingRef?.title ?? "Reference"}
+        record={editingRef as unknown as Record<string, unknown> | null}
+        fields={REF_FIELDS}
+        onSave={async (patch) => {
+          if (!editingRef) return;
+          const p = patch as Record<string, unknown>;
+          await update.mutateAsync({
+            id: editingRef.id,
+            title: p.title as string | undefined,
+            tags: p.tags as string[] | undefined,
+            notes: p.notes as string | undefined,
+            year: p.year as number | null | undefined,
+          });
+          await utils.researchHub.references.list.invalidate();
+        }}
+      />
     </div>
   );
 }

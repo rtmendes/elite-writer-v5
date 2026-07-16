@@ -10,6 +10,9 @@ import { toast } from 'sonner';
 import { Link } from 'wouter';
 import { trpc } from '@/lib/trpc';
 import { ListSelectionBar, SelectCheck, useSelection } from '@/components/list-selection';
+import { EditDrawer, type FieldDef } from '@/components/admin/EditDrawer';
+import { SavedViewBar } from '@/components/admin/SavedViewBar';
+import type { ArticleIdea } from '@/lib/store';
 import {
   Lightbulb, Plus, Search, ArrowRight, PenTool, Trash2,
   Calendar, Tag, Target, Sparkles, LayoutGrid, List, Loader2, GripVertical
@@ -27,6 +30,15 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: str
   published: { label: 'Published', color: 'text-green-400', bgColor: 'bg-green-500/10 border-green-500/20', icon: '🏆' },
 };
 
+const IDEA_FIELDS: FieldDef[] = [
+  { key: 'title', label: 'Title', type: 'text', group: 'Content' },
+  { key: 'angle', label: 'Angle', type: 'textarea', rows: 3, group: 'Content' },
+  { key: 'news_peg', label: 'News Peg', type: 'textarea', rows: 2, group: 'Content', placeholder: 'Why now?' },
+  { key: 'category', label: 'Category', type: 'text', group: 'Content' },
+  { key: 'status', label: 'Status', type: 'select', group: 'Meta', options: STATUSES.map(s => ({ value: s, label: STATUS_CONFIG[s].label })) },
+  { key: 'score', label: 'Score', type: 'number', group: 'Meta' },
+];
+
 export default function Ideas() {
   const { state, addIdea, updateIdea, deleteIdea } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,6 +50,8 @@ export default function Ideas() {
   const [newNewsPeg, setNewNewsPeg] = useState('');
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+  const [editing, setEditing] = useState<ArticleIdea | null>(null);
+  const [activeViewId, setActiveViewId] = useState<number | null>(null);
 
   // tRPC mutations
   const ideasMutation = trpc.ai.ideas.useMutation();
@@ -279,6 +293,20 @@ export default function Ideas() {
         </div>
       </div>
 
+      <SavedViewBar
+        page="ideas"
+        activeViewId={activeViewId}
+        currentConfig={{ search: searchQuery, sort: { field: sortBy, dir: 'desc' }, mode: viewMode }}
+        onApply={(id, config) => {
+          setActiveViewId(id);
+          if (config) {
+            if (config.search !== undefined) setSearchQuery(config.search);
+            if (config.sort?.field) setSortBy(config.sort.field as typeof sortBy);
+            if (config.mode) setViewMode(config.mode === 'kanban' ? 'kanban' : 'list');
+          }
+        }}
+      />
+
       <ListSelectionBar
         selected={selected}
         clear={clear}
@@ -336,7 +364,7 @@ export default function Ideas() {
                       <div className="flex items-start gap-1.5">
                         <SelectCheck checked={selected.has(idea.id)} onToggle={() => toggle(idea.id)} className="mt-0.5 shrink-0" />
                         <GripVertical className="w-3 h-3 text-muted-foreground/30 mt-0.5 shrink-0 group-hover:text-muted-foreground" />
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setEditing(idea)}>
                           <h4 className="text-xs font-medium leading-snug line-clamp-2">{idea.title}</h4>
                           {idea.angle && (
                             <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{idea.angle}</p>
@@ -412,7 +440,7 @@ export default function Ideas() {
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       <SelectCheck checked={selected.has(idea.id)} onToggle={() => toggle(idea.id)} className="mt-1 shrink-0" />
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setEditing(idea)}>
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                           <Badge variant="outline" className={`text-[10px] ${config.bgColor} ${config.color}`}>
                             {config.icon} {config.label}
@@ -461,6 +489,31 @@ export default function Ideas() {
           )}
         </div>
       )}
+
+      <EditDrawer
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title={editing?.title ?? 'Idea'}
+        record={editing as unknown as Record<string, unknown> | null}
+        fields={IDEA_FIELDS}
+        onSave={async (patch) => {
+          if (!editing) return;
+          updateIdea(editing.id, patch as Partial<ArticleIdea>);
+          const dbId = idMap.get(editing.id);
+          if (dbId) {
+            const p = patch as Record<string, unknown>;
+            updateIdeaDb.mutate({
+              id: dbId,
+              title: p.title as string | undefined,
+              angle: p.angle as string | undefined,
+              category: p.category as string | undefined,
+              newsPeg: p.news_peg as string | undefined,
+              status: p.status as ArticleIdea['status'] | undefined,
+              score: typeof p.score === 'number' ? p.score : undefined,
+            });
+          }
+        }}
+      />
     </div>
   );
 }
