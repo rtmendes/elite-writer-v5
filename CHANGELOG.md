@@ -2,6 +2,24 @@
 
 All notable operational and code changes to Elite Writer.
 
+## 2026-07-16 — Schema migrations now auto-apply at boot (permanent drift fix)
+
+Root cause of both recent prod bugs (ZimmWriter #81 columns, saved_views):
+deploys only rebuilt the container — nothing ever ran drizzle-pg SQL.
+
+- `server/_core/migrations.ts`: at startup, before serving traffic, applies any
+  not-yet-applied drizzle-pg migration in journal order; tracked in
+  `ew_migrations`; one transaction per migration.
+- Baseline-aware: an existing untracked DB gets the current set STAMPED (not
+  re-run) — verified live against prod (stamped 0000/0001, applied 0). Fresh
+  DBs build everything — verified on a scratch DB (57+19 statements, 58 tables).
+- Fail-open: a migration error logs loudly + shows in `/api/health` as
+  `migrations: {state:"error"}` — the app keeps serving on the current schema
+  (no crash-loop). `migrations` state is now in health for outside monitoring.
+- Dockerfile ships `drizzle-pg/` into the runtime image.
+- POLICY: merging a PR that contains a drizzle-pg migration IS the approval to
+  apply it — the founder migration gate moves to PR review.
+
 ## 2026-07-16 — Ops: migration 0001 applied, ZimmWriter armed, SSH postmortem
 
 - **Migration 0001 applied to prod Supabase** (founder-approved): saved_views

@@ -47,6 +47,8 @@ COPY --from=builder /app/dist ./dist
 # Copy Drizzle config for migrations
 COPY drizzle.config.ts ./
 COPY drizzle/ ./drizzle/
+# Postgres migration set — applied automatically at boot (server/_core/migrations.ts)
+COPY drizzle-pg/ ./drizzle-pg/
 
 # Expose port
 ENV PORT=3000

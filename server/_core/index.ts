@@ -11,6 +11,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { streamLLM, warmAnthropicModels } from "./llm";
+import { getMigrationStatus } from "./migrations";
 import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -33,6 +34,12 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Apply any pending drizzle-pg migrations BEFORE serving traffic, so new
+  // code never runs against an older schema. Fail-open: an error is logged +
+  // surfaced in /api/health, and the app still starts (see migrations.ts).
+  const { runMigrations } = await import("./migrations");
+  await runMigrations();
+
   const app = express();
   const server = createServer(app);
 
@@ -117,6 +124,9 @@ async function startServer() {
     res.json({
       ok: true,
       ts: Date.now(),
+      // Schema migration state from boot (see migrations.ts): ok | skipped |
+      // error — lets drift be spotted from outside without SSH.
+      migrations: getMigrationStatus(),
       integrations: {
         openrouter: Boolean(process.env.OPENROUTER_API_KEY),
         r2: Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY),
