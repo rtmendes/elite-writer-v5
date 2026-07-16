@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Newspaper, Lightbulb, Search, PenTool,
   BookOpen, Send, DollarSign, Settings, ChevronLeft, ChevronRight,
   Zap, Menu, Building2, Inbox, Loader2,
-  MessageSquare, Library, Globe, Map, Users,
+  MessageSquare, Library, Globe, Map, Users, Image as ImageIcon,
   Flame, Calendar, Mic, Palette, ChevronDown,
   LayoutGrid, Rss, Clapperboard, FileText, ListChecks, Network, Rocket,
 } from 'lucide-react';
@@ -64,6 +64,7 @@ const NAV_SECTIONS: Array<{ title: string; items: NavItem[] }> = [
     items: [
       { path: '/brand-voice', label: 'Brand Voice', icon: Palette, description: 'Voice profile training' },
       { path: '/library', label: 'Library', icon: Library, description: 'Content & asset library' },
+      { path: '/media', label: 'Media', icon: ImageIcon, description: 'Unified image library + uploads' },
       { path: '/documentation', label: 'Documentation AI', icon: FileText, description: 'Generate docs & SOPs' },
       { path: '/knowledge-hub', label: 'Knowledge Hub', icon: BookOpen, description: 'Reading view over your knowledge' },
       { path: '/geo', label: 'GEO Suite', icon: Globe, description: 'AI visibility & humanizer' },
