@@ -21,6 +21,46 @@ function adminOpenId(email: string): string {
   return "admin_" + crypto.createHash("md5").update(email).digest("hex").slice(0, 16);
 }
 
+// Self-heal the ZimmWriter article columns. PR #81's migration was written to
+// the retired drizzle/ (MySQL) dir and never reached the Postgres set after the
+// Supabase cutover, so these columns are missing on prod and every ingest was
+// throwing "column does not exist". Idempotent ADD COLUMN IF NOT EXISTS, run
+// once per process — same resilience idiom used in products.ts / workspace.ts.
+// Redundant (harmless) once drizzle-pg migration 0001 is applied.
+let _ingestColsEnsured = false;
+async function ensureIngestColumns(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>
+): Promise<void> {
+  if (_ingestColsEnsured) return;
+  _ingestColsEnsured = true;
+  const cols: Array<[string, string]> = [
+    ["source", "text"],
+    ["source_id", "text"],
+    ["body_markdown", "text"],
+    ["body_html", "text"],
+    ["excerpt", "text"],
+    ["category", "varchar(200)"],
+    ["tags", "jsonb"],
+    ["featured_image_url", "text"],
+    ["featured_image_b64", "text"],
+    ["needs_scoring", "boolean DEFAULT false NOT NULL"],
+    ["compliance_flag", "boolean DEFAULT false NOT NULL"],
+    ["neuron_score", "integer"],
+    ["neuron_share_url", "text"],
+  ];
+  try {
+    for (const [name, type] of cols) {
+      await db.execute(sql.raw(`ALTER TABLE "articles" ADD COLUMN IF NOT EXISTS "${name}" ${type}`));
+    }
+    await db.execute(
+      sql.raw(`CREATE UNIQUE INDEX IF NOT EXISTS "articles_source_source_id_uidx" ON "articles" ("source","source_id")`)
+    );
+  } catch {
+    // Best-effort: if the DB role lacks ALTER (or a transient error), ingest
+    // still proceeds; a later process retries (flag is per-process).
+  }
+}
+
 async function resolveIngestUserId(): Promise<number> {
   const email = ENV.adminEmail || "admin@elitewriter.app";
   const openId = adminOpenId(email);
@@ -91,6 +131,7 @@ export async function ingestZimmwriterArticle(
 ): Promise<ZimmwriterIngestResult> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+  await ensureIngestColumns(db);
 
   const userId = await resolveIngestUserId();
   const source = "zimmwriter";
