@@ -2,6 +2,30 @@
 
 All notable operational and code changes to Elite Writer.
 
+## 2026-07-16 — Payload-style CMS admin UX (branch feat/admin-ux-cms)
+
+In-app content management overhaul — no CMS platform adopted; the engine
+(tRPC + drizzle + agents + Plate Writer) stays the single source of truth.
+
+- **EditDrawer** — generic, config-driven side panel with debounced autosave
+  (no Save button), field groups, save indicator, Open-in-Writer.
+- **SavedViewBar** — per-user saved collection views (search/filter/sort/mode),
+  on the Phase 1 savedViews router.
+- **Media Library** (`/media`) — unified image grid, search, tag filter,
+  drag-drop upload → R2 with content-hash dedup, multi-select delete,
+  click-to-edit (name/alt text/tags). MediaPicker attaches article covers.
+- **Rolled across 8 collections**: Queue + Library (articles), ContentStudio,
+  Social, Ideas, Pitches, Research, Media — each gets row-click edit-in-panel +
+  saved views. Existing lists, bulk actions, and Writer flow untouched.
+- Server: data.articles.update gains excerpt/category/tags/featuredImageUrl;
+  data.pitches.update gains publication/editor; library.images gains
+  upload (R2+dedup) + update (name/altText/tags).
+- Prior prod fixes shipped alongside: ZimmWriter PG column drift self-heal
+  (#89) and the reconciling migration (#88).
+- Gate: tsc 0 · vitest 87/87 · build clean. Live browser flow test deferred —
+  blocked on the VPS SSH outage (dev server can't reach Supabase); verify
+  post-merge against the real DB.
+
 ## 2026-07-06 — Issue #44 completion: shared list-selection on the 5 remaining pages
 
 Wired `client/src/components/list-selection.tsx` (canonical Ideas.tsx usage) onto
