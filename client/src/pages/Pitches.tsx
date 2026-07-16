@@ -491,11 +491,14 @@ export default function Pitches() {
           const dbId = pitchIdMap.get(editing.id);
           if (dbId) {
             const p = patch as Record<string, unknown>;
+            // Drawer uses local store keys (snake_case); map to the DB mutation.
             updatePitchDb.mutate({
               id: dbId,
               subject: p.subject as string | undefined,
               body: p.body as string | undefined,
               status: p.status as Pitch['status'] | undefined,
+              publicationName: p.publication_name as string | undefined,
+              editorEmail: p.editor_email as string | undefined,
             });
           }
         }}

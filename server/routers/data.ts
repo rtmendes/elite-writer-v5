@@ -372,6 +372,9 @@ const pitchesRouter = router({
     subject: z.string().optional(),
     body: z.string().optional(),
     status: z.enum(["draft", "sent", "accepted", "rejected", "no_response"]).optional(),
+    publicationName: z.string().optional(),
+    editorName: z.string().optional(),
+    editorEmail: z.string().optional(),
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database unavailable");
