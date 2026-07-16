@@ -40,6 +40,7 @@ import { taskCenterRouter } from "./routers/taskCenter";
 import { acceleratorRouter } from "./routers/accelerator";
 import { stripeRouter } from "./routers/stripe";
 import { templateSopsRouter } from "./routers/templateSops";
+import { savedViewsRouter } from "./routers/savedViews";
 import { researchLibraryRouter } from "./routers/researchLibrary";
 import { ingestRouter } from "./routers/ingest";
 
@@ -111,6 +112,7 @@ export const appRouter = router({
   accelerator: acceleratorRouter,
   stripe: stripeRouter,
   templateSops: templateSopsRouter,
+  savedViews: savedViewsRouter,
   researchLibrary: researchLibraryRouter,
   ingest: ingestRouter,
 });

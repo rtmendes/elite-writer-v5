@@ -1,5 +1,5 @@
 import {
-  integer, pgTable, text, timestamp, varchar, jsonb, decimal, boolean, bigint, uniqueIndex, serial
+  integer, pgTable, text, timestamp, varchar, jsonb, decimal, boolean, bigint, uniqueIndex, index, serial
 } from "drizzle-orm/pg-core";
 
 // MySQL→Postgres port notes:
@@ -451,6 +451,7 @@ export const generatedImages = pgTable("generated_images", {
   model: varchar("model", { length: 100 }),
   style: varchar("style", { length: 100 }),
   articleId: integer("articleId"),
+  altText: varchar("altText", { length: 500 }),
   metadata: jsonb("metadata"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -477,6 +478,29 @@ export const userSettings = pgTable("user_settings", {
 
 export type UserSettings = typeof userSettings.$inferSelect;
 export type InsertUserSettings = typeof userSettings.$inferInsert;
+
+// ─── Saved Views (Admin UX: per-user collection views) ────
+// One row per named view on a collection page. config holds the full view
+// state (search, filters, sort, visible columns, view mode). See PRD_ADMIN_UX.md.
+export const savedViews = pgTable("saved_views", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  page: varchar("page", { length: 60 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  config: jsonb("config").$type<{
+    search?: string;
+    filters?: Record<string, unknown>;
+    sort?: { field: string; dir: "asc" | "desc" } | null;
+    columns?: string[];
+    mode?: "list" | "gallery" | "kanban";
+  }>().notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [index("saved_views_user_page_idx").on(t.userId, t.page)]);
+
+export type SavedView = typeof savedViews.$inferSelect;
+export type InsertSavedView = typeof savedViews.$inferInsert;
 
 // ═══════════════════════════════════════════════════════════
 // NEW TABLES — Blazly + GistStack Feature Integration
@@ -622,6 +646,8 @@ export const imageLibrary = pgTable("image_library", {
   brandId: integer("brandId"),
   width: integer("width"),
   height: integer("height"),
+  altText: varchar("altText", { length: 500 }),
+  contentHash: varchar("contentHash", { length: 64 }),
   presetName: varchar("presetName", { length: 200 }),
   metadata: jsonb("imageMeta").$type<{
     reference_images?: string[];
