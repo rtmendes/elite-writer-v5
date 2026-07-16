@@ -50,6 +50,8 @@ import { AGENTS } from '@/lib/agents';
 import {
   buildCoverMap, coverVisual, articlesToRows, rowsToCsv, type QueueExportRow,
 } from '@/lib/queue-tools';
+import { EditDrawer, type FieldDef } from '@/components/admin/EditDrawer';
+import { SavedViewBar, type ViewConfig } from '@/components/admin/SavedViewBar';
 
 // Article status in the queue pipeline
 type QueueStatus = 'researching' | 'drafting' | 'scoring' | 'queued' | 'review' | 'approved' | 'rejected';
@@ -100,6 +102,28 @@ const BULK_STATUS_OPTIONS: { value: DbStatus; label: string }[] = [
 const IMAGE_STYLES = ['editorial', 'bloomberg', 'forbes', 'atlantic', 'nyt', 'abstract', 'photographic', 'cinematic', 'minimal'] as const;
 const PAGE_SIZE = 24;
 
+// Payload-style edit-drawer field schema for an article (metadata only —
+// the long-form body stays in the Writer). Persisted via data.articles.update.
+const ARTICLE_FIELDS: FieldDef[] = [
+  { key: 'title', label: 'Title', type: 'text', group: 'Content' },
+  { key: 'excerpt', label: 'Excerpt', type: 'textarea', rows: 3, group: 'Content', placeholder: 'Short dek / summary' },
+  { key: 'category', label: 'Category', type: 'text', group: 'Content' },
+  { key: 'tags', label: 'Tags', type: 'tags', group: 'Content' },
+  { key: 'status', label: 'Status', type: 'select', group: 'Publication', options: [
+    { value: 'draft', label: 'Draft' },
+    { value: 'review', label: 'Review' },
+    { value: 'scored', label: 'Scored' },
+    { value: 'pitched', label: 'Pitched' },
+    { value: 'published', label: 'Published' },
+  ] },
+  { key: 'targetPublication', label: 'Target publication', type: 'text', group: 'Publication' },
+  { key: 'brandId', label: 'Brand ID', type: 'text', group: 'Publication' },
+  { key: 'overallScore', label: 'Score', type: 'readonly', group: 'Pipeline', format: (v) => (v == null ? '—' : String(v)) },
+  { key: 'wordCount', label: 'Word count', type: 'readonly', group: 'Pipeline', format: (v) => (v == null ? '—' : Number(v).toLocaleString()) },
+  { key: 'createdAt', label: 'Created', type: 'readonly', group: 'Pipeline', format: (v) => (v ? new Date(String(v)).toLocaleDateString() : '—') },
+  { key: 'sources', label: 'Sources', type: 'chips', group: 'Pipeline' },
+];
+
 export default function Queue() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
@@ -111,6 +135,11 @@ export default function Queue() {
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [pipelineStep, setPipelineStep] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+
+  // Edit-drawer: holds the raw article row (all DB fields) being edited.
+  const [editing, setEditing] = useState<any>(null);
+  // Saved-views: which saved view (if any) is currently applied.
+  const [activeViewId, setActiveViewId] = useState<number | null>(null);
 
   // Image generator dialog: targets a single article (cover) when articleId set.
   const [imageDialog, setImageDialog] = useState<{ articleId: number; title: string } | null>(null);
@@ -231,6 +260,36 @@ export default function Queue() {
   const refresh = useCallback(async () => {
     await Promise.all([articlesQuery.refetch(), coversQuery.refetch()]);
   }, [articlesQuery, coversQuery]);
+
+  // Open the edit-drawer for an article id (looks up the raw DB row).
+  const openEditor = useCallback((id: number) => {
+    setEditing((articles as any[]).find((a) => a.id === id) ?? null);
+  }, [articles]);
+
+  // ─── Saved views: snapshot current view state + apply a stored one ───
+  const viewConfig: ViewConfig = {
+    search: searchQuery,
+    filters: { status: statusFilter },
+    sort: { field: sortBy, dir: 'desc' },
+    mode: viewMode,
+  };
+
+  const applyView = (id: number | null, config: ViewConfig | null) => {
+    setActiveViewId(id);
+    if (!config) {
+      setSearchQuery('');
+      setStatusFilter('all');
+      setSortBy('score');
+      setViewMode('gallery');
+      return;
+    }
+    setSearchQuery(config.search ?? '');
+    const st = config.filters?.status as QueueStatus | 'all' | undefined;
+    setStatusFilter(st ?? 'all');
+    const sf = config.sort?.field;
+    if (sf === 'score' || sf === 'date' || sf === 'publication') setSortBy(sf);
+    if (config.mode === 'list' || config.mode === 'gallery') setViewMode(config.mode);
+  };
 
   // ─── Single-item handlers ───
   const handleOpenInWriter = (id: number) => navigate(`/writer/${id}`);
@@ -603,6 +662,9 @@ export default function Queue() {
           </div>
         </div>
 
+        {/* ─── Saved views ─── */}
+        <SavedViewBar page="queue" currentConfig={viewConfig} activeViewId={activeViewId} onApply={applyView} />
+
         {/* ─── Select-all + result count ─── */}
         {filteredItems.length > 0 && (
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -702,6 +764,7 @@ export default function Queue() {
                 onDelete={handleDelete}
                 onUpdateStatus={handleUpdateStatus}
                 onGenerateCover={(id, title) => setImageDialog({ articleId: id, title })}
+                onEdit={openEditor}
               />
             ))}
           </div>
@@ -717,6 +780,7 @@ export default function Queue() {
                 onDelete={handleDelete}
                 onUpdateStatus={handleUpdateStatus}
                 onGenerateCover={(id, title) => setImageDialog({ articleId: id, title })}
+                onEdit={openEditor}
               />
             ))}
           </div>
@@ -731,6 +795,25 @@ export default function Queue() {
           </div>
         )}
       </div>
+
+      {/* ─── Article edit drawer (Payload-style, autosave) ─── */}
+      <EditDrawer
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title={(editing?.title as string) ?? 'Article'}
+        record={editing as Record<string, unknown> | null}
+        fields={ARTICLE_FIELDS}
+        openInWriter={(r) => navigate(`/writer/${(r as any).id}`)}
+        onSave={async (patch) => {
+          if (!editing) return;
+          // data.articles.update takes the supported subset; any keys it does
+          // not accept (excerpt/category/tags) are stripped server-side by zod.
+          await updateArticle.mutateAsync(
+            { id: editing.id, ...patch } as Parameters<typeof updateArticle.mutateAsync>[0]
+          );
+          await articlesQuery.refetch();
+        }}
+      />
 
       {/* ─── AI Image Generator dialog ─── */}
       <ImageGeneratorDialog
@@ -793,12 +876,13 @@ function Cover({ item, className }: { item: QueueItem; className?: string }) {
   );
 }
 
-function ActionMenu({ item, onOpenInWriter, onUpdateStatus, onDelete, onGenerateCover }: {
+function ActionMenu({ item, onOpenInWriter, onUpdateStatus, onDelete, onGenerateCover, onEdit }: {
   item: QueueItem;
   onOpenInWriter: (id: number) => void;
   onUpdateStatus: (id: number, status: DbStatus) => void;
   onDelete: (id: number) => void;
   onGenerateCover: (id: number, title: string) => void;
+  onEdit: (id: number) => void;
 }) {
   return (
     <DropdownMenu>
@@ -806,6 +890,7 @@ function ActionMenu({ item, onOpenInWriter, onUpdateStatus, onDelete, onGenerate
         <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><MoreHorizontal className="w-3.5 h-3.5" /></Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => onEdit(item.id)}><FileText className="w-3.5 h-3.5 mr-2" /> Edit details</DropdownMenuItem>
         <DropdownMenuItem onClick={() => onOpenInWriter(item.id)}><PenTool className="w-3.5 h-3.5 mr-2" /> Open in Writer</DropdownMenuItem>
         <DropdownMenuItem onClick={() => onGenerateCover(item.id, item.title)}><ImageIcon className="w-3.5 h-3.5 mr-2" /> Generate cover</DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -827,9 +912,10 @@ type CardProps = {
   onDelete: (id: number) => void;
   onUpdateStatus: (id: number, status: DbStatus) => void;
   onGenerateCover: (id: number, title: string) => void;
+  onEdit: (id: number) => void;
 };
 
-function GalleryCard({ item, selected, onToggleSelect, onOpenInWriter, onDelete, onUpdateStatus, onGenerateCover }: CardProps) {
+function GalleryCard({ item, selected, onToggleSelect, onOpenInWriter, onDelete, onUpdateStatus, onGenerateCover, onEdit }: CardProps) {
   const config = STATUS_CONFIG[item.status];
   const StatusIcon = config.icon;
   return (
@@ -857,7 +943,9 @@ function GalleryCard({ item, selected, onToggleSelect, onOpenInWriter, onDelete,
       </div>
 
       <CardContent className="p-4 flex flex-col flex-1">
-        <h3 className="font-semibold text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors">{item.title}</h3>
+        <button type="button" onClick={() => onEdit(item.id)} className="text-left" title="Edit details">
+          <h3 className="font-semibold text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors cursor-pointer hover:underline">{item.title}</h3>
+        </button>
         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
           <Badge variant="outline" className={`text-[10px] ${config.color}`}><StatusIcon className="w-2.5 h-2.5 mr-1" />{config.label}</Badge>
           {item.qualityGrade && <Badge className={`text-[10px] font-mono ${getGradeBgColor(item.qualityGrade as any)}`}>{item.qualityGrade}</Badge>}
@@ -877,14 +965,14 @@ function GalleryCard({ item, selected, onToggleSelect, onOpenInWriter, onDelete,
               <Eye className="w-3 h-3" /> Review
             </Button>
           )}
-          <ActionMenu item={item} onOpenInWriter={onOpenInWriter} onUpdateStatus={onUpdateStatus} onDelete={onDelete} onGenerateCover={onGenerateCover} />
+          <ActionMenu item={item} onOpenInWriter={onOpenInWriter} onUpdateStatus={onUpdateStatus} onDelete={onDelete} onGenerateCover={onGenerateCover} onEdit={onEdit} />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function ListRow({ item, selected, onToggleSelect, onOpenInWriter, onDelete, onUpdateStatus, onGenerateCover }: CardProps) {
+function ListRow({ item, selected, onToggleSelect, onOpenInWriter, onDelete, onUpdateStatus, onGenerateCover, onEdit }: CardProps) {
   const config = STATUS_CONFIG[item.status];
   const StatusIcon = config.icon;
   return (
@@ -898,7 +986,9 @@ function ListRow({ item, selected, onToggleSelect, onOpenInWriter, onDelete, onU
           {item.score ?? '—'}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm leading-tight truncate group-hover:text-primary transition-colors">{item.title}</h3>
+          <button type="button" onClick={() => onEdit(item.id)} className="text-left w-full" title="Edit details">
+            <h3 className="font-semibold text-sm leading-tight truncate group-hover:text-primary transition-colors cursor-pointer hover:underline">{item.title}</h3>
+          </button>
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
             <Badge variant="outline" className={`text-[10px] ${config.color}`}><StatusIcon className="w-2.5 h-2.5 mr-1" />{config.label}</Badge>
             {item.targetPublication && <Badge variant="outline" className="text-[10px]"><BookOpen className="w-2.5 h-2.5 mr-1" />{item.targetPublication}</Badge>}
@@ -911,7 +1001,7 @@ function ListRow({ item, selected, onToggleSelect, onOpenInWriter, onDelete, onU
               <Eye className="w-3 h-3" /> Review
             </Button>
           )}
-          <ActionMenu item={item} onOpenInWriter={onOpenInWriter} onUpdateStatus={onUpdateStatus} onDelete={onDelete} onGenerateCover={onGenerateCover} />
+          <ActionMenu item={item} onOpenInWriter={onOpenInWriter} onUpdateStatus={onUpdateStatus} onDelete={onDelete} onGenerateCover={onGenerateCover} onEdit={onEdit} />
         </div>
       </CardContent>
     </Card>
