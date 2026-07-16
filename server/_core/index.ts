@@ -126,6 +126,8 @@ async function startServer() {
         exa: Boolean(process.env.EXA_API_KEY),
         stripe: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY),
         supabaseRealtime: Boolean(process.env.VITE_SUPABASE_URL && process.env.VITE_SUPABASE_ANON_KEY),
+        // ZimmWriter webhook is unusable until one auth mechanism is configured.
+        zimmwriterIngest: Boolean(process.env.ZIMMWRITER_INGEST_SECRET || process.env.ZIMMWRITER_INGEST_TOKEN),
         imageGen: Boolean(
           process.env.OPENAI_API_KEY ||
             process.env.GEMINI_API_KEY ||
