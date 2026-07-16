@@ -61,6 +61,8 @@ function Router() {
           <ErrorBoundary key={location}>
           <Switch>
             <Route path="/" component={Dashboard} />
+            {/* Alias — the org routing table lists elitewriter…/dashboard as canonical */}
+            <Route path="/dashboard" component={Dashboard} />
             <Route path="/giststack" component={Giststack} />
             <Route path="/sources" component={FeedSources} />
             <Route path="/workspace" component={WorkspaceShell} />
