@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "infisical": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@infisical/mcp"
+      ],
+      "env": {
+        "INFISICAL_AUTH_METHOD": "universal-auth",
+        "INFISICAL_UNIVERSAL_AUTH_CLIENT_ID": "${INFISICAL_CLIENT_ID}",
+        "INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET": "${INFISICAL_CLIENT_SECRET}"
+      }
+    }
+  }
+}
