@@ -979,8 +979,8 @@ export const PROACTIVE_JOBS: Record<ProactiveJobName, () => Promise<void>> = {
 };
 
 export function initProactiveAgents() {
-  if (process.env.WORKSPACE_PROACTIVE === "0") {
-    console.log("[proactive] disabled via WORKSPACE_PROACTIVE=0");
+  if (process.env.WORKSPACE_PROACTIVE !== "1") {
+    console.log("[proactive] disabled (set WORKSPACE_PROACTIVE=1 to enable)");
     return;
   }
   if (!process.env.DATABASE_URL) return;
